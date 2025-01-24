@@ -1,0 +1,17 @@
+{
+  "canisters": {
+    "origyn_nft": {
+      "candid": "./nft.did",
+      "package": "origyn_nft",
+      "type": "rust"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}

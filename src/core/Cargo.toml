@@ -1,0 +1,35 @@
+[package]
+name = "icpcoinflip_backend"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+candid = { workspace = true }
+canister_logger = { path = "../libraries/canister_logger" }
+canister_state_macros = { path = "../libraries/canister_state_macros" }
+canister_tracing_macros = { path = "../libraries/canister_tracing_macros" }
+canister_time = { path = "../libraries/canister_time" }
+ic-cdk = { workspace = true }
+ic-cdk-macros = { workspace = true }
+ic-cdk-timers = { workspace = true }
+ic-ledger-types = { workspace = true }
+ic-stable-structures = { workspace = true }
+icrc_ledger_canister_c2c_client = { path = "../external_canisters/icrc_ledger/c2c_client" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_bytes = { workspace = true }
+serializer = { path = "../libraries/serializer" }
+stable_memory = { path = "../libraries/stable_memory" }
+tracing = { workspace = true }
+types = { path = "../libraries/types" }
+utils = { path = "../libraries/utils" }
+futures = { workspace = true }
+icrc-ledger-types = { workspace = true }
+async-trait = { workspace = true }
+http_request = { path = '../libraries/http_request' }
+enum_dispatch = { workspace = true }
