@@ -2,7 +2,7 @@ use candid::{ Nat, CandidType, Decode, Encode };
 use serde::{ Deserialize, Serialize };
 use icrc_ledger_types::{ icrc::generic_value::ICRC3Value as Value, icrc1::account::Account };
 use ic_stable_structures::{ storable::Bound, Storable };
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 #[derive(CandidType, Serialize, Deserialize, Clone)]
 pub struct Icrc7Token {
@@ -14,7 +14,7 @@ pub struct Icrc7Token {
     pub token_metadata: Icrc7TokenMetadata,
 }
 
-pub type Icrc7TokenMetadata = BTreeMap<String, Value>;
+pub type Icrc7TokenMetadata = HashMap<String, Value>;
 
 impl Storable for Icrc7Token {
     fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
@@ -29,7 +29,7 @@ impl Storable for Icrc7Token {
 }
 
 impl Icrc7Token {
-    fn new(
+    pub fn new(
         token_id: Nat,
         token_name: String,
         token_description: Option<String>,
@@ -42,7 +42,7 @@ impl Icrc7Token {
             token_logo,
             token_owner,
             token_description,
-            token_metadata: BTreeMap::new(),
+            token_metadata: HashMap::new(),
         }
     }
 
@@ -51,7 +51,7 @@ impl Icrc7Token {
     }
 
     pub fn token_metadata(&self) -> Icrc7TokenMetadata {
-        let mut metadata = BTreeMap::<String, Value>::new();
+        let mut metadata = HashMap::<String, Value>::new();
         metadata.insert("Name".into(), Value::Text(self.token_name.clone()));
         metadata.insert("Symbol".into(), Value::Text(self.token_name.clone()));
         if let Some(ref description) = self.token_description {
@@ -61,6 +61,10 @@ impl Icrc7Token {
             metadata.insert("Logo".into(), Value::Text(logo.clone()));
         }
         metadata
+    }
+
+    pub fn add_metadata(&mut self, metadata: Icrc7TokenMetadata) {
+        self.token_metadata.extend(metadata);
     }
 
     fn burn(&mut self, burn_address: Account) {
