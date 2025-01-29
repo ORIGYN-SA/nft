@@ -1,6 +1,8 @@
 [workspace]
 members = [
     "src/core",
+    "src/storage_canister",
+    "src/storage_api_canister",
     "src/libraries/candid_gen",
     "src/libraries/canister_client",
     "src/libraries/canister_client_macros",
@@ -26,7 +28,7 @@ candid = { version = "0.10.13", features = ["value"] }
 ciborium = "0.2.2"
 futures = "0.3.29"
 # Enable `custom` feature of k256's getrandom dependency. See icp_neuron/impl/src/ecdsa.rs for more details.
-getrandom = { version = "0.2.12", features = ["custom"] }
+getrandom = { version = "0.3.1", features = ["custom"] }
 hex = "0.4.3"
 ic-cdk = "0.17.1"
 ic-cdk-macros = "0.17.1"

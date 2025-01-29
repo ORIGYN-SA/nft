@@ -18,6 +18,7 @@ pub struct InitArgs {
     version: BuildVersion,
     commit_hash: String,
     authorized_principals: Vec<Principal>,
+    minting_authorities: Vec<Principal>,
     description: Option<String>,
     symbol: String,
     name: String,
@@ -47,6 +48,7 @@ fn init(args: Args) {
             );
             let mut data = Data::new(
                 init_args.authorized_principals,
+                init_args.minting_authorities,
                 init_args.description,
                 init_args.symbol,
                 init_args.name,

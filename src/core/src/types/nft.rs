@@ -46,7 +46,7 @@ impl Icrc7Token {
         }
     }
 
-    fn transfer(&mut self, to: Account) {
+    pub fn transfer(&mut self, to: Account) {
         self.token_owner = to;
     }
 
@@ -67,7 +67,7 @@ impl Icrc7Token {
         self.token_metadata.extend(metadata);
     }
 
-    fn burn(&mut self, burn_address: Account) {
-        self.token_owner = burn_address;
+    fn burn(&mut self) {
+        self.token_owner = Account { owner: ic_cdk::id(), subaccount: None };
     }
 }

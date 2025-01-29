@@ -46,6 +46,7 @@ impl RuntimeState {
 #[derive(Serialize, Deserialize)]
 pub struct Data {
     pub authorized_principals: Vec<Principal>,
+    pub minting_authorities: Vec<Principal>,
     pub description: Option<String>,
     pub symbol: String,
     pub name: String,
@@ -69,6 +70,7 @@ impl Data {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         authorized_principals: Vec<Principal>,
+        minting_authorities: Vec<Principal>,
         description: Option<String>,
         symbol: String,
         name: String,
@@ -87,6 +89,7 @@ impl Data {
     ) -> Self {
         Self {
             authorized_principals: authorized_principals.into_iter().collect(),
+            minting_authorities: minting_authorities.into_iter().collect(),
             description,
             symbol,
             name,
@@ -159,6 +162,22 @@ pub struct InitApprovalsArg {
     pub max_revoke_approvals: Option<u16>,
     pub settle_to_approvals: Option<u16>,
     pub collection_approval_requires_token: Option<bool>,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Debug)]
+pub struct StorageCanisterInfo {
+    pub canister_id: Principal,
+    pub canister_stable_memory_used: Nat,
+    pub canister_stable_memory_free: Nat,
+    pub cycles_balance: Cycles,
+    pub cycles_consummed: Cycles,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Debug)]
+pub struct StorageCanisterConfig {
+    pub canister_ids: Vec<StorageCanisterInfo>,
+    pub max_canister_storage: Option<u128>,
+    pub max_canister_cycles: Option<u128>,
 }
 
 #[derive(CandidType, Serialize)]

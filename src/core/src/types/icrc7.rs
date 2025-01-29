@@ -7,6 +7,9 @@ use icrc_ledger_types::icrc1::account::Account;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
 
 pub const DEFAULT_TAKE_VALUE: usize = 100;
+pub const DEFAULT_MAX_UPDATE_BATCH_SIZE: u128 = 100;
+pub const DEFAULT_MAX_SUPPLY_CAP: u128 = 10_000;
+pub const DEFAULT_MAX_MEMO_SIZE: u128 = 1_000_000;
 
 #[derive(CandidType, Deserialize)]
 pub struct TransferArg {
