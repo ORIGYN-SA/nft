@@ -15,4 +15,5 @@ serde = { workspace = true }
 stable_memory = { path = "../stable_memory" }
 types = { path = "../types" }
 tracing = { workspace = true }
-tokio = { version = "1.39.2", features = ["macros"]}
+ic-cdk-timers = { workspace = true }
+tokio = { version = "1.39.2", features = ["macros", "rt"]}

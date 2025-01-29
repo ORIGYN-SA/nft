@@ -1,9 +1,4 @@
 use candid::{ Encode, Nat, Principal };
-use gldt_swap_api_archive::lifecycle::Args as ArgsArchive;
-use gldt_swap_api_archive::{ init::InitArgs, post_upgrade::UpgradeArgs };
-use gldt_swap_archive_c2c_client::get_archive_size;
-use gldt_swap_common::archive::ArchiveCanister;
-use gldt_swap_common::swap::NewArchiveError;
 use ic_cdk::api::management_canister::main::{
     canister_status,
     create_canister,
@@ -18,57 +13,28 @@ use ic_cdk::api::management_canister::main::{
     InstallCodeArgument,
     LogVisibility,
 };
-use tracing::{ debug, info };
 use utils::{ env::Environment, retry_async::retry_async };
+use storage_api_canister::lifecycle::{
+    Args as ArgsStorage,
+    init::InitArgs,
+    post_upgrade::UpgradeArgs,
+};
+use storage_canister_c2c_client::get_storage_size;
 
-use crate::state::{ mutate_state, read_state };
-use crate::utils::trace;
+use crate::state::read_state;
 
-const ARCHIVE_WASM: &[u8] = include_bytes!("../../archive/wasm/gldt_swap_archive_canister.wasm.gz");
+const STORAGE_WASM: &[u8] = include_bytes!(
+    "../../storage_canister/wasm/storage_canister_canister.wasm.gz"
+);
 
-pub async fn check_storage_and_create_archive() -> Result<(), ()> {
-    // check if the capacity is
-    if
-        let Some(current_archive) = read_state(|s|
-            s.data.swaps.get_archive_canisters().last().cloned()
-        )
-    {
-        if is_archive_canister_at_threshold(&current_archive).await {
-            info!("ARCHIVE :: at capacity :: creating new archive canister");
-            trace("///// Checking archive 3");
-            let archive_principal = match create_archive_canister().await {
-                Ok(principal) => principal,
-                Err(e) => {
-                    debug!("{e:?}");
-                    mutate_state(|s| {
-                        s.data.new_archive_error = Some(e);
-                    });
-                    return Err(());
-                }
-            };
-            let current_swap_index = read_state(|s| s.data.swaps.get_current_swap_index());
-            let archive_buffer = read_state(|s| s.data.archive_buffer);
-            let future_swap_index = current_swap_index + Nat::from(archive_buffer);
-            mutate_state(|s| {
-                s.data.swaps.set_new_archive_canister(ArchiveCanister {
-                    canister_id: archive_principal,
-                    start_index: future_swap_index,
-                    end_index: None,
-                    active: false,
-                })
-            });
-            // new archive created
-            return Ok(());
-        } else {
-            // we still have room
-            return Ok(());
-        }
-    }
-    // no archive canisters
-    Err(())
+pub enum NewStorageError {
+    CreateCanisterError(String),
+    InstallCodeError(String),
+    FailedToSerializeInitArgs(String),
+    CantFindControllers(String),
 }
 
-pub async fn create_archive_canister() -> Result<Principal, NewArchiveError> {
+pub async fn create_storage_canister() -> Result<Principal, NewStorageError> {
     let this_canister_id = read_state(|s| s.env.canister_id());
     let test_mode = read_state(|s| s.env.is_test_mode());
     let mut controllers = get_canister_controllers(this_canister_id).await?;
@@ -108,9 +74,10 @@ pub async fn create_archive_canister() -> Result<Principal, NewArchiveError> {
     {
         Ok(canister) => canister.0.canister_id,
         Err(e) => {
-            return Err(NewArchiveError::CreateCanisterError(format!("{e:?}")));
+            return Err(NewStorageError::CreateCanisterError(format!("{e:?}")));
         }
     };
+
     let mut current_auth_prins = read_state(|s| s.data.authorized_principals.clone());
     let test_mode = read_state(|s| s.env.is_test_mode());
     let commit_hash = read_state(|s| s.env.commit_hash().to_string());
@@ -118,7 +85,7 @@ pub async fn create_archive_canister() -> Result<Principal, NewArchiveError> {
 
     let init_args = match
         Encode!(
-            &ArgsArchive::Init(InitArgs {
+            &ArgsStorage::Init(InitArgs {
                 commit_hash,
                 authorized_principals: current_auth_prins,
                 test_mode,
@@ -127,7 +94,7 @@ pub async fn create_archive_canister() -> Result<Principal, NewArchiveError> {
     {
         Ok(encoded_init_args) => encoded_init_args,
         Err(e) => {
-            return Err(NewArchiveError::FailedToSerializeInitArgs(format!("{e}")));
+            return Err(NewStorageError::FailedToSerializeInitArgs(format!("{e}")));
         }
     };
 
@@ -135,25 +102,20 @@ pub async fn create_archive_canister() -> Result<Principal, NewArchiveError> {
     let install_args = InstallCodeArgument {
         mode: CanisterInstallMode::Install,
         canister_id: canister_id,
-        wasm_module: ARCHIVE_WASM.to_vec(),
+        wasm_module: STORAGE_WASM.to_vec(),
         arg: init_args,
     };
 
     match retry_async(|| install_code(install_args.clone()), 3).await {
-        Ok(_) => {
-            mutate_state(|s| {
-                s.data.new_archive_error = None;
-            });
-            Ok(canister_id)
-        }
+        Ok(_) => { Ok(canister_id) }
         Err(e) => {
-            return Err(NewArchiveError::InstallCodeError(format!("{e:?}")));
+            return Err(NewStorageError::InstallCodeError(format!("{e:?}")));
         }
     }
 }
 
-pub async fn is_archive_canister_at_threshold(archive: &ArchiveCanister) -> bool {
-    let res = retry_async(|| get_archive_size(archive.canister_id, &()), 3).await;
+pub async fn is_storage_canister_at_threshold(storage: Principal) -> bool {
+    let res = retry_async(|| get_storage_size(storage, &()), 3).await;
     let max_canister_archive_threshold = read_state(|s|
         s.data.max_canister_archive_threshold.clone()
     );
@@ -216,7 +178,7 @@ pub async fn update_archive_canisters() -> Result<(), Vec<String>> {
 
         let result = {
             let init_args = init_args.clone();
-            let wasm_module = ARCHIVE_WASM.to_vec();
+            let wasm_module = STORAGE_WASM.to_vec();
 
             let install_args = InstallCodeArgument {
                 mode: CanisterInstallMode::Upgrade(None),

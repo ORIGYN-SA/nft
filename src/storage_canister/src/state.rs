@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-
 use candid::{ CandidType, Nat, Principal };
 use canister_state_macros::canister_state;
-use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
+// use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
+use storage_api_canister::types::value_custom::CustomValue as Value;
 use serde::{ Deserialize, Serialize };
 use types::BuildVersion;
 use types::{ Cycles, TimestampMillis };
@@ -66,7 +65,11 @@ impl Data {
         self.storage.insert_data(data, data_id, nft_id)
     }
 
-    pub fn update_data(&mut self, hash_id: String, data: Value) -> Result<(String, Value), String> {
+    pub fn update_data(
+        &mut self,
+        hash_id: String,
+        data: Value
+    ) -> Result<(String, Option<Value>), String> {
         self.storage.update_data(hash_id, data)
     }
 

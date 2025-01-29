@@ -15,6 +15,7 @@ members = [
     "src/libraries/stable_memory",
     "src/libraries/types",
     "src/libraries/utils",
+    "src/external_canisters/storage_canister/c2c_client",
 ]
 resolver = "2"
 
@@ -34,7 +35,7 @@ ic-cdk = "0.17.1"
 ic-cdk-macros = "0.17.1"
 ic-cdk-timers = "0.11.0"
 ic-ledger-types = "0.14.0"
-ic-stable-structures = "0.6.4"
+ic-stable-structures = "0.6.7"
 ic-transport-types = "0.39.3"
 ic0 = "0.23.0"
 icrc-ledger-types = "0.1.8"
@@ -45,7 +46,7 @@ rmp-serde = "1.1.2"
 serde = "1.0.196"
 serde_bytes = "0.11.12"
 serde_cbor = "0.11.2"
-serde_json = "1.0.137"
+serde_json = "1.0.138"
 serde_with = "3.7.0"
 serde_yaml = "0.9.29"
 serde_tokenstream = "0.2.2"
@@ -65,3 +66,4 @@ pocket-ic = "6.0.0"
 async-trait = "0.1.81"
 enum_dispatch = "0.3.13"
 typetag = "0.2.18"
+minicbor = { version = "0.19.1", features = ["alloc", "derive"] }

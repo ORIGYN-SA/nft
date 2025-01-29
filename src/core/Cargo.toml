@@ -20,6 +20,7 @@ ic-cdk-timers = { workspace = true }
 ic-ledger-types = { workspace = true }
 ic-stable-structures = { workspace = true }
 icrc_ledger_canister_c2c_client = { path = "../external_canisters/icrc_ledger/c2c_client" }
+storage_canister_c2c_client = { path = "../external_canisters/storage_canister/c2c_client" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_bytes = { workspace = true }
@@ -33,3 +34,4 @@ icrc-ledger-types = { workspace = true }
 async-trait = { workspace = true }
 http_request = { path = '../libraries/http_request' }
 enum_dispatch = { workspace = true }
+storage_api_canister = { path = "../storage_api_canister", features = []}
