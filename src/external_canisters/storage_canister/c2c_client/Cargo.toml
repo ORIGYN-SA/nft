@@ -1,0 +1,14 @@
+[package]
+name = "storage_canister_c2c_client"
+version = "0.1.0"
+edition = "2021"
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+canister_client = { path = "../../../libraries/canister_client" }
+storage_canister = { path = "../../../storage_canister", features = [] }
+storage_api_canister = { path = "../../../storage_api_canister", features = [] }
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
