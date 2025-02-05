@@ -3,7 +3,6 @@ use ic_cdk::export_candid;
 mod guards;
 mod lifecycle;
 mod memory;
-mod utils;
 // mod migrations;
 
 mod state;

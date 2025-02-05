@@ -32,6 +32,7 @@ pub struct InitArgs {
     atomic_batch_transfers: Option<bool>,
     tx_window: Option<Nat>,
     permitted_drift: Option<Nat>,
+    max_canister_storage_threshold: Option<Nat>,
     collection_metadata: CollectionMetadata,
     approval_init: Option<InitApprovalsArg>,
 }
@@ -62,6 +63,7 @@ fn init(args: Args) {
                 init_args.atomic_batch_transfers,
                 init_args.tx_window,
                 init_args.permitted_drift,
+                init_args.max_canister_storage_threshold,
                 init_args.collection_metadata,
                 init_args.approval_init
             );

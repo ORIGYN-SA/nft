@@ -8,9 +8,7 @@ use candid::{ CandidType, Decode, Encode };
 // TODO remove this once the ICRC3Value type implements the Storable trait
 
 #[derive(Serialize, Clone, Deserialize, CandidType, Debug, PartialEq, Eq)]
-pub struct CustomValue {
-    pub v: Value,
-}
+pub struct CustomValue(pub Value);
 
 impl Storable for CustomValue {
     fn to_bytes(&self) -> Cow<[u8]> {

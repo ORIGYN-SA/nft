@@ -10,10 +10,16 @@ use utils::memory::MemorySize;
 use crate::types::collection_metadata::CollectionMetadata;
 use crate::types::nft::Icrc7Token;
 use icrc_ledger_types::icrc1::account::Account;
+use crate::sub_canister_manager::StorageSubCanisterManager;
+use crate::types::sub_canister;
+
+const STORAGE_WASM: &[u8] = include_bytes!(
+    "../../storage_canister/wasm/storage_canister_canister.wasm.gz"
+);
 
 canister_state!(RuntimeState);
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct RuntimeState {
     pub env: CanisterEnv,
     pub data: Data,
@@ -43,7 +49,7 @@ impl RuntimeState {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct Data {
     pub authorized_principals: Vec<Principal>,
     pub minting_authorities: Vec<Principal>,
@@ -60,9 +66,11 @@ pub struct Data {
     pub atomic_batch_transfers: Option<bool>,
     pub tx_window: Option<Nat>,
     pub permitted_drift: Option<Nat>,
+    pub max_canister_storage_threshold: Option<Nat>,
     pub collection_metadata: CollectionMetadata,
     pub tokens_list: HashMap<Nat, Icrc7Token>,
     pub approval_init: Option<InitApprovalsArg>,
+    pub sub_canister_manager: StorageSubCanisterManager,
     // pub archive_init: Option<InitArchiveArg>,
 }
 
@@ -83,10 +91,36 @@ impl Data {
         max_memo_size: Option<Nat>,
         atomic_batch_transfers: Option<bool>,
         tx_window: Option<Nat>,
+        max_canister_storage_threshold: Option<Nat>,
         permitted_drift: Option<Nat>,
         collection_metadata: CollectionMetadata,
         approval_init: Option<InitApprovalsArg>
     ) -> Self {
+        let test_mode = read_state(|state| state.env.is_test_mode());
+        let commit_hash = read_state(|state| state.env.commit_hash().to_string());
+        let version = read_state(|state| state.env.version());
+
+        let sub_canister_manager = StorageSubCanisterManager::new(
+            sub_canister::InitArgs {
+                test_mode,
+                commit_hash: commit_hash.clone(),
+                authorized_principals: authorized_principals.clone(),
+            },
+            sub_canister::UpgradeArgs {
+                version,
+                commit_hash: commit_hash.clone(),
+            },
+            ic_cdk::api::id(),
+            HashMap::new(),
+            vec![],
+            authorized_principals.clone(),
+            0,
+            0,
+            test_mode,
+            commit_hash.clone(),
+            STORAGE_WASM.to_vec()
+        );
+
         Self {
             authorized_principals: authorized_principals.into_iter().collect(),
             minting_authorities: minting_authorities.into_iter().collect(),
@@ -103,9 +137,11 @@ impl Data {
             atomic_batch_transfers,
             tx_window,
             permitted_drift,
+            max_canister_storage_threshold,
             collection_metadata,
             tokens_list: HashMap::new(),
             approval_init,
+            sub_canister_manager,
         }
     }
 
@@ -155,7 +191,7 @@ impl Data {
     }
 }
 
-#[derive(CandidType, Deserialize, Serialize, Debug)]
+#[derive(CandidType, Deserialize, Serialize, Debug, Clone)]
 pub struct InitApprovalsArg {
     pub max_approvals: Option<u16>,
     pub max_approvals_per_token_or_collection: Option<u16>,

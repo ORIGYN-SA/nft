@@ -51,7 +51,7 @@ serde_with = "3.7.0"
 serde_yaml = "0.9.29"
 serde_tokenstream = "0.2.2"
 sha2 = "0.10.8"
-syn = "2.0.96"
+syn = "2.0.98"
 tracing = "0.1.40"
 tracing-attributes = "0.1.27"
 tracing-subscriber = "0.3.18"
@@ -63,7 +63,8 @@ time = { version = "0.3.36", features = [
   "formatting",
 ] }
 pocket-ic = "6.0.0"
-async-trait = "0.1.81"
+async-trait = "0.1.86"
 enum_dispatch = "0.3.13"
 typetag = "0.2.18"
-minicbor = { version = "0.19.1", features = ["alloc", "derive"] }
+minicbor = { version = "0.25.1", features = ["alloc", "derive"] }
+canfund = "0.7.0"

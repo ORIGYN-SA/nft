@@ -1,10 +1,10 @@
 use candid::Nat;
 // use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
 use storage_api_canister::types::value_custom::CustomValue as Value;
+use storage_api_canister::utils;
 use ic_stable_structures::StableBTreeMap;
 use crate::memory::get_data_storage_memory;
 use crate::memory::VM;
-use crate::utils;
 use hex;
 use sha2::{ Sha256, Digest };
 use serde::{ Deserialize, Serialize };
@@ -48,7 +48,7 @@ impl StorageData {
         hash_id: String,
         data: Value
     ) -> Result<(String, Option<Value>), String> {
-        let data_size: u128 = utils::get_value_size(data.v.clone());
+        let data_size: u128 = utils::get_value_size(data.clone());
 
         if self.get_storage_size_bytes() < data_size {
             return Err(
@@ -68,7 +68,7 @@ impl StorageData {
         data_id: Nat,
         nft_id: Nat
     ) -> Result<String, String> {
-        let data_size: u128 = utils::get_value_size(data.v.clone());
+        let data_size: u128 = utils::get_value_size(data.clone());
 
         if self.get_storage_size_bytes() < data_size {
             return Err("Not enough storage".to_string());
