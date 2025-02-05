@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use candid::{ Encode, Nat, Principal };
+use candid::{ CandidType, Encode, Nat, Principal };
 use ic_cdk::api::management_canister::main::{
     canister_status,
     create_canister,
@@ -315,7 +315,7 @@ impl StorageSubCanisterManager {
     pub async fn insert_data(
         &mut self,
         data: Value,
-        data_id: Nat,
+        data_id: String,
         nft_id: Nat
     ) -> Result<(String, Canister), String> {
         let required_space = get_value_size(data.clone());
@@ -382,14 +382,14 @@ enum CanisterError {
     CantFindControllers(String),
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(CandidType, Serialize, Deserialize, Clone, PartialEq, Debug)]
 enum CanisterState {
     Created,
     Installed,
     Stopped,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct Canister {
     pub canister_id: Principal,
     state: CanisterState,
@@ -419,7 +419,12 @@ impl Canister {
         }
     }
 
-    async fn insert_data(&self, data: Value, data_id: Nat, nft_id: Nat) -> Result<String, String> {
+    async fn insert_data(
+        &self,
+        data: Value,
+        data_id: String,
+        nft_id: Nat
+    ) -> Result<String, String> {
         if self.state != CanisterState::Installed {
             return Err("Canister is not installed".to_string());
         }

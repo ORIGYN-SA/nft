@@ -1,8 +1,12 @@
 use candid::{ Nat, CandidType, Decode, Encode };
 use serde::{ Deserialize, Serialize };
-use icrc_ledger_types::{ icrc::generic_value::ICRC3Value as Value, icrc1::account::Account };
+use icrc_ledger_types::{ icrc::generic_value::ICRC3Value as Icrc3Value, icrc1::account::Account };
 use ic_stable_structures::{ storable::Bound, Storable };
 use std::collections::HashMap;
+use super::NftMetadata;
+use storage_api_canister::types::value_custom::CustomValue as Value;
+
+pub type Icrc7TokenMetadata = HashMap<String, Icrc3Value>;
 
 #[derive(CandidType, Serialize, Deserialize, Clone)]
 pub struct Icrc7Token {
@@ -11,10 +15,8 @@ pub struct Icrc7Token {
     pub token_description: Option<String>,
     pub token_logo: Option<String>,
     pub token_owner: Account,
-    pub token_metadata: Icrc7TokenMetadata,
+    pub token_metadata: NftMetadata,
 }
-
-pub type Icrc7TokenMetadata = HashMap<String, Value>;
 
 impl Storable for Icrc7Token {
     fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
@@ -42,7 +44,7 @@ impl Icrc7Token {
             token_logo,
             token_owner,
             token_description,
-            token_metadata: HashMap::new(),
+            token_metadata: NftMetadata::new(),
         }
     }
 
@@ -50,21 +52,35 @@ impl Icrc7Token {
         self.token_owner = to;
     }
 
-    pub fn token_metadata(&self) -> Icrc7TokenMetadata {
-        let mut metadata = HashMap::<String, Value>::new();
-        metadata.insert("Name".into(), Value::Text(self.token_name.clone()));
-        metadata.insert("Symbol".into(), Value::Text(self.token_name.clone()));
+    pub async fn token_metadata(&self) -> Icrc7TokenMetadata {
+        let mut metadata = HashMap::<String, Icrc3Value>::new();
+        metadata.insert("Name".into(), Icrc3Value::Text(self.token_name.clone()));
+        metadata.insert("Symbol".into(), Icrc3Value::Text(self.token_name.clone()));
         if let Some(ref description) = self.token_description {
-            metadata.insert("Description".into(), Value::Text(description.clone()));
+            metadata.insert("Description".into(), Icrc3Value::Text(description.clone()));
         }
         if let Some(ref logo) = self.token_logo {
-            metadata.insert("Logo".into(), Value::Text(logo.clone()));
+            metadata.insert("Logo".into(), Icrc3Value::Text(logo.clone()));
         }
+
+        self.token_metadata
+            .get_all_data().await
+            .iter()
+            .for_each(|(key, value)| {
+                metadata.insert(key.clone(), value.0.clone());
+            });
+
         metadata
     }
 
-    pub fn add_metadata(&mut self, metadata: Icrc7TokenMetadata) {
-        self.token_metadata.extend(metadata);
+    pub async fn add_metadata(&mut self, metadata: Icrc7TokenMetadata) {
+        for (key, value) in metadata.iter() {
+            self.token_metadata.insert_data(
+                self.token_id.clone(),
+                key.clone(),
+                Value(value.clone())
+            ).await;
+        }
     }
 
     fn burn(&mut self) {

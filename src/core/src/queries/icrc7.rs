@@ -85,17 +85,24 @@ pub fn icrc7_permitted_drift() -> icrc7::PermittedDriftResult {
 }
 
 #[query]
-pub fn icrc7_token_metadata(token_ids: icrc7::TokenMetadataArgs) -> icrc7::TokenMetadataResult {
-    read_state(|state| {
-        token_ids
-            .iter()
-            .map(|token_id| {
-                state.data
-                    .get_token_by_id(token_id)
-                    .map(|token| token.token_metadata().clone().into_iter().collect())
-            })
-            .collect()
-    })
+pub async fn icrc7_token_metadata(
+    token_ids: icrc7::TokenMetadataArgs
+) -> icrc7::TokenMetadataResult {
+    let mut ret = Vec::new();
+    for token_id in token_ids {
+        let token = read_state(|state| state.data.get_token_by_id(&token_id).cloned());
+        match token {
+            Some(token) => {
+                let metadata = token.token_metadata().await;
+                let metadata_vec = metadata.into_iter().collect();
+                ret.push(Some(metadata_vec));
+            }
+            None => {
+                ret.push(None);
+            }
+        }
+    }
+    ret
 }
 
 #[query]

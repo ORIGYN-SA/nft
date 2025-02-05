@@ -59,7 +59,7 @@ impl Data {
     pub fn insert_data(
         &mut self,
         data: Value,
-        data_id: Nat,
+        data_id: String,
         nft_id: Nat
     ) -> Result<String, String> {
         self.storage.insert_data(data, data_id, nft_id)

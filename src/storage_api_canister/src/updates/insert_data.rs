@@ -6,7 +6,7 @@ use crate::types::value_custom::CustomValue as Value;
 #[derive(Serialize, Deserialize, CandidType)]
 pub struct InsertDataRequest {
     pub data: Value,
-    pub data_id: Nat,
+    pub data_id: String,
     pub nft_id: Nat,
 }
 

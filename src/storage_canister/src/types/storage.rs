@@ -65,7 +65,7 @@ impl StorageData {
     pub fn insert_data(
         &mut self,
         data: Value,
-        data_id: Nat,
+        data_id: String,
         nft_id: Nat
     ) -> Result<String, String> {
         let data_size: u128 = utils::get_value_size(data.clone());
@@ -89,9 +89,9 @@ impl StorageData {
         bytes as u128
     }
 
-    fn hash_data(&self, data_id: Nat, nft_id: Nat) -> Result<String, String> {
+    fn hash_data(&self, data_id: String, nft_id: Nat) -> Result<String, String> {
         let mut hasher = Sha256::new();
-        hasher.update(data_id.to_string().as_bytes());
+        hasher.update(data_id.as_bytes());
         hasher.update(nft_id.to_string().as_bytes());
         let result = hasher.finalize();
 

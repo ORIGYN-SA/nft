@@ -51,7 +51,7 @@ pub fn mint(req: management::MintRequest) -> management::MintResult {
 }
 
 #[update(guard = "caller_is_governance_principal")]
-pub fn update_nft_metadata(
+pub async fn update_nft_metadata(
     req: management::UpdateInternalRequest
 ) -> management::UpdateInternalResult {
     let token_name_hash = req.token_id;
@@ -71,7 +71,7 @@ pub fn update_nft_metadata(
                 token.token_logo = Some(logo);
             }
             if let Some(metadata) = req.token_metadata {
-                token.add_metadata(metadata);
+                token.add_metadata(metadata).await;
             }
             mutate_state(|state| {
                 state.data.tokens_list.insert(token_name_hash.clone(), token);
