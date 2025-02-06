@@ -1,6 +1,7 @@
 [workspace]
 members = [
-    "src/core",
+    "integrations_tests",
+    "src/core_nft",
     "src/storage_canister",
     "src/storage_api_canister",
     "src/libraries/candid_gen",

@@ -60,7 +60,7 @@ impl Data {
         &mut self,
         data: Value,
         data_id: String,
-        nft_id: Nat
+        nft_id: Option<Nat>
     ) -> Result<String, String> {
         self.storage.insert_data(data, data_id, nft_id)
     }
@@ -80,15 +80,6 @@ impl Data {
     pub fn get_data(&self, hash_id: String) -> Result<Value, String> {
         self.storage.get_data(hash_id)
     }
-}
-
-#[derive(CandidType, Deserialize, Serialize, Debug)]
-pub struct StorageCanisterInfo {
-    pub canister_id: Principal,
-    pub canister_stable_memory_used: Nat,
-    pub canister_stable_memory_free: Nat,
-    pub cycles_balance: Cycles,
-    pub cycles_consummed: Cycles,
 }
 
 #[derive(CandidType, Serialize)]

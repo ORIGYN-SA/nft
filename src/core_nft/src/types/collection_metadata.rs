@@ -14,8 +14,14 @@ impl CollectionMetadata {
         }
     }
 
-    pub async fn insert_data(&mut self, nft_id: Nat, data_id: String, data: Value) {
-        self.0.insert_data(nft_id, data_id, data).await;
+    pub fn from(metadata: HashMap<String, Value>) -> Self {
+        Self {
+            0: Metadata::from(metadata),
+        }
+    }
+
+    pub async fn insert_data(&mut self, data_id: String, data: Value) {
+        self.0.insert_data(None, data_id, data).await;
     }
 
     pub async fn get_data(&self, data_id: String) -> Result<Value, String> {

@@ -8,7 +8,7 @@ use ic_cdk::api::call::RejectionCode;
 
 //TODO Use minting autority to mint tokens
 #[update(guard = "caller_is_governance_principal")]
-pub fn mint(req: management::MintRequest) -> management::MintResult {
+pub fn mint(req: management::mint::Args) -> management::mint::Response {
     let token_name_hash = Nat::from(hash_string_to_u64(&req.token_name));
 
     let token_list = read_state(|state| { state.data.tokens_list.clone() });
@@ -52,8 +52,8 @@ pub fn mint(req: management::MintRequest) -> management::MintResult {
 
 #[update(guard = "caller_is_governance_principal")]
 pub async fn update_nft_metadata(
-    req: management::UpdateInternalRequest
-) -> management::UpdateInternalResult {
+    req: management::update_nft_metadata::Args
+) -> management::update_nft_metadata::Response {
     let token_name_hash = req.token_id;
 
     let token_list = read_state(|state| { state.data.tokens_list.clone() });
@@ -94,8 +94,8 @@ pub async fn update_nft_metadata(
 
 #[update(guard = "caller_is_governance_principal")]
 pub fn update_minting_authorities(
-    req: management::UpdateMintingAuthoritiesRequest
-) -> management::UpdateMintingAuthoritiesResult {
+    req: management::update_minting_authorities::Args
+) -> management::update_minting_authorities::Response {
     let mut minting_authorities = req.minting_authorities.clone();
     let previous_minting_authorities = mutate_state(|state| {
         state.data.minting_authorities.clone()
@@ -114,8 +114,8 @@ pub fn update_minting_authorities(
 
 #[update(guard = "caller_is_governance_principal")]
 pub fn remove_minting_authorities(
-    req: management::RemoveMintingAuthoritiesRequest
-) -> management::RemoveMintingAuthoritiesResult {
+    req: management::remove_minting_authorities::Args
+) -> management::remove_minting_authorities::Response {
     let mut minting_authorities = req.minting_authorities.clone();
     let previous_minting_authorities = mutate_state(|state| {
         state.data.minting_authorities.clone()

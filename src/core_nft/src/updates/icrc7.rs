@@ -7,7 +7,7 @@ use icrc_ledger_types::icrc1::account::Account;
 use crate::utils::check_memo;
 
 #[update]
-pub fn icrc7_transfer(args: Vec<icrc7::TransferArg>) -> Vec<Option<icrc7::TransferResult>> {
+pub fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_transfer::Response {
     if args.len() == 0 {
         return vec![Some(Err((RejectionCode::CanisterError, "No argument provided".to_string())))];
     }

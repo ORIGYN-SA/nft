@@ -15,7 +15,7 @@ impl NftMetadata {
     }
 
     pub async fn insert_data(&mut self, nft_id: Nat, data_id: String, data: Value) {
-        self.0.insert_data(nft_id, data_id, data).await;
+        self.0.insert_data(Some(nft_id), data_id, data).await;
     }
 
     pub async fn get_data(&self, data_id: String) -> Result<Value, String> {

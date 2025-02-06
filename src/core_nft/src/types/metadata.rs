@@ -17,7 +17,19 @@ impl Metadata {
         }
     }
 
-    pub async fn insert_data(&mut self, nft_id: Nat, data_id: String, data: Value) {
+    pub fn from(metadata: HashMap<String, Value>) -> Self {
+        let mut new = Self {
+            data: HashMap::new(),
+        };
+
+        for (key, value) in metadata.iter() {
+            new.insert_data(None, key.clone(), value.clone());
+        }
+
+        new
+    }
+
+    pub async fn insert_data(&mut self, nft_id: Option<Nat>, data_id: String, data: Value) {
         let mut sub_canister_manager = read_state(|state| state.data.sub_canister_manager.clone());
 
         match sub_canister_manager.insert_data(data.clone(), data_id.clone(), nft_id.clone()).await {

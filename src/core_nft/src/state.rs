@@ -200,22 +200,6 @@ pub struct InitApprovalsArg {
     pub collection_approval_requires_token: Option<bool>,
 }
 
-#[derive(CandidType, Deserialize, Serialize, Debug)]
-pub struct StorageCanisterInfo {
-    pub canister_id: Principal,
-    pub canister_stable_memory_used: Nat,
-    pub canister_stable_memory_free: Nat,
-    pub cycles_balance: Cycles,
-    pub cycles_consummed: Cycles,
-}
-
-#[derive(CandidType, Deserialize, Serialize, Debug)]
-pub struct StorageCanisterConfig {
-    pub canister_ids: Vec<StorageCanisterInfo>,
-    pub max_canister_storage: Option<u128>,
-    pub max_canister_cycles: Option<u128>,
-}
-
 #[derive(CandidType, Serialize)]
 pub struct Metrics {
     pub canister_info: CanisterInfo,

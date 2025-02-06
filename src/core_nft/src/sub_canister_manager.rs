@@ -316,7 +316,7 @@ impl StorageSubCanisterManager {
         &mut self,
         data: Value,
         data_id: String,
-        nft_id: Nat
+        nft_id: Option<Nat>
     ) -> Result<(String, Canister), String> {
         let required_space = get_value_size(data.clone());
 
@@ -423,7 +423,7 @@ impl Canister {
         &self,
         data: Value,
         data_id: String,
-        nft_id: Nat
+        nft_id: Option<Nat>
     ) -> Result<String, String> {
         if self.state != CanisterState::Installed {
             return Err("Canister is not installed".to_string());

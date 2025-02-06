@@ -5,28 +5,28 @@ use candid::Nat;
 use crate::state::read_state;
 
 #[query]
-pub fn icrc7_collection_metadata() -> icrc7::CollectionMetadataResult {
+pub fn icrc7_collection_metadata() -> icrc7::icrc7_collection_metadata::Response {
     // TODO
     Vec::new()
 }
 
 #[query]
-pub fn icrc7_symbol() -> icrc7::SymbolResult {
+pub fn icrc7_symbol() -> icrc7::icrc7_symbol::Response {
     read_state(|state| state.data.symbol.clone())
 }
 
 #[query]
-pub fn icrc7_name() -> icrc7::NameResult {
+pub fn icrc7_name() -> icrc7::icrc7_name::Response {
     read_state(|state| state.data.name.clone())
 }
 
 #[query]
-pub fn icrc7_description() -> icrc7::DescriptionResult {
+pub fn icrc7_description() -> icrc7::icrc7_description::Response {
     read_state(|state| state.data.description.clone())
 }
 
 #[query]
-pub fn icrc7_logo() -> icrc7::LogoResult {
+pub fn icrc7_logo() -> icrc7::icrc7_logo::Response {
     if let Some(_) = read_state(|state| state.data.logo.clone()) {
         Some(format!("https://{}.raw.icp0.io/logo", ic_cdk::id().to_text()))
     } else {
@@ -35,59 +35,59 @@ pub fn icrc7_logo() -> icrc7::LogoResult {
 }
 
 #[query]
-pub fn icrc7_total_supply() -> icrc7::TotalSupplyResult {
+pub fn icrc7_total_supply() -> icrc7::icrc7_total_supply::Response {
     read_state(|state| state.data.total_supply())
 }
 
 #[query]
-pub fn icrc7_supply_cap() -> icrc7::SupplyCapResult {
+pub fn icrc7_supply_cap() -> icrc7::icrc7_supply_cap::Response {
     read_state(|state| state.data.supply_cap.clone())
 }
 
 #[query]
-pub fn icrc7_max_query_batch_size() -> icrc7::MaxQueryBatchSizeResult {
+pub fn icrc7_max_query_batch_size() -> icrc7::icrc7_max_query_batch_size::Response {
     read_state(|state| state.data.max_query_batch_size.clone())
 }
 
 #[query]
-pub fn icrc7_max_update_batch_size() -> icrc7::MaxUpdateBatchSizeResult {
+pub fn icrc7_max_update_batch_size() -> icrc7::icrc7_max_update_batch_size::Response {
     read_state(|state| state.data.max_update_batch_size.clone())
 }
 
 #[query]
-pub fn icrc7_default_take_value() -> icrc7::DefaultTakeValueResult {
+pub fn icrc7_default_take_value() -> icrc7::icrc7_default_take_value::Response {
     read_state(|state| state.data.default_take_value.clone())
 }
 
 #[query]
-pub fn icrc7_max_take_value() -> icrc7::MaxTakeValueResult {
+pub fn icrc7_max_take_value() -> icrc7::icrc7_max_take_value::Response {
     read_state(|state| state.data.max_take_value.clone())
 }
 
 #[query]
-pub fn icrc7_max_memo_size() -> icrc7::MaxMemoSizeResult {
+pub fn icrc7_max_memo_size() -> icrc7::icrc7_max_memo_size::Response {
     read_state(|state| state.data.max_memo_size.clone())
 }
 
 #[query]
-pub fn icrc7_atomic_batch_transfers() -> icrc7::AtomicBatchTransfersResult {
+pub fn icrc7_atomic_batch_transfers() -> icrc7::icrc7_atomic_batch_transfers::Response {
     read_state(|state| state.data.atomic_batch_transfers.clone())
 }
 
 #[query]
-pub fn icrc7_tx_window() -> icrc7::TxWindowResult {
+pub fn icrc7_tx_window() -> icrc7::icrc7_tx_window::Response {
     read_state(|state| state.data.tx_window.clone())
 }
 
 #[query]
-pub fn icrc7_permitted_drift() -> icrc7::PermittedDriftResult {
+pub fn icrc7_permitted_drift() -> icrc7::icrc7_permitted_drift::Response {
     read_state(|state| state.data.permitted_drift.clone())
 }
 
 #[query]
 pub async fn icrc7_token_metadata(
-    token_ids: icrc7::TokenMetadataArgs
-) -> icrc7::TokenMetadataResult {
+    token_ids: icrc7::icrc7_token_metadata::Args
+) -> icrc7::icrc7_token_metadata::Response {
     let mut ret = Vec::new();
     for token_id in token_ids {
         let token = read_state(|state| state.data.get_token_by_id(&token_id).cloned());
@@ -106,7 +106,7 @@ pub async fn icrc7_token_metadata(
 }
 
 #[query]
-pub fn icrc7_owner_of(token_ids: icrc7::OwnerOfArgs) -> icrc7::OwnerOfResult {
+pub fn icrc7_owner_of(token_ids: icrc7::icrc7_owner_of::Args) -> icrc7::icrc7_owner_of::Response {
     read_state(|state| {
         token_ids
             .iter()
@@ -116,7 +116,9 @@ pub fn icrc7_owner_of(token_ids: icrc7::OwnerOfArgs) -> icrc7::OwnerOfResult {
 }
 
 #[query]
-pub fn icrc7_balance_of(accounts: icrc7::BalanceOfArgs) -> icrc7::BalanceOfResult {
+pub fn icrc7_balance_of(
+    accounts: icrc7::icrc7_balance_of::Args
+) -> icrc7::icrc7_balance_of::Response {
     read_state(|state| {
         accounts
             .iter()
@@ -126,7 +128,7 @@ pub fn icrc7_balance_of(accounts: icrc7::BalanceOfArgs) -> icrc7::BalanceOfResul
 }
 
 #[query]
-pub fn icrc7_tokens(args: icrc7::TokensArgs) -> icrc7::TokensResult {
+pub fn icrc7_tokens(args: icrc7::icrc7_tokens::Args) -> icrc7::icrc7_tokens::Response {
     read_state(|state| {
         let prev = args.0.unwrap_or(Nat::from(0 as u64));
         let take: usize = usize
@@ -150,7 +152,7 @@ pub fn icrc7_tokens(args: icrc7::TokensArgs) -> icrc7::TokensResult {
 }
 
 #[query]
-pub fn icrc7_tokens_of(args: icrc7::TokensOfArgs) -> icrc7::TokensOfResult {
+pub fn icrc7_tokens_of(args: icrc7::icrc7_tokens_of::Args) -> icrc7::icrc7_tokens_of::Response {
     read_state(|state| {
         let (account, prev, take) = args;
         let prev = prev.unwrap_or(Nat::from(0 as u64));

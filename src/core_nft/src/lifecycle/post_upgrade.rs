@@ -18,8 +18,7 @@ use canfund::{
 use std::sync::Arc;
 use crate::sub_canister_manager::SubCanister;
 
-//todo add fund_manager in state with skip serialize
-#[ic_cdk_macros::init]
+//todo gwojda add fund_manager in state with skip serialize
 fn initialize(canister_id_lst: Vec<Principal>) {
     let mut fund_manager = FundManager::new();
 
