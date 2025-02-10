@@ -1,5 +1,5 @@
-use serde::{ Deserialize, Serialize };
 use candid::Principal;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct RuntimeStateV0 {

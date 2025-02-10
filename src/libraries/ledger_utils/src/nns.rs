@@ -28,18 +28,20 @@ pub async fn process_transaction(
     let transaction_hash = calculate_transaction_hash(sender, &transfer_args);
 
     match icp_ledger_canister_c2c_client::transfer(transaction.ledger, &transfer_args).await {
-        Ok(Ok(block_index)) => Ok(CompletedCryptoTransaction::NNS(types::nns::CompletedCryptoTransaction {
-            ledger: transaction.ledger,
-            token: transaction.token.clone(),
-            amount: transaction.amount,
-            fee,
-            from: types::nns::CryptoAccount::Account(from),
-            to: types::nns::CryptoAccount::Account(to),
-            memo,
-            created: transaction.created,
-            transaction_hash,
-            block_index,
-        })),
+        Ok(Ok(block_index)) => Ok(CompletedCryptoTransaction::NNS(
+            types::nns::CompletedCryptoTransaction {
+                ledger: transaction.ledger,
+                token: transaction.token.clone(),
+                amount: transaction.amount,
+                fee,
+                from: types::nns::CryptoAccount::Account(from),
+                to: types::nns::CryptoAccount::Account(to),
+                memo,
+                created: transaction.created,
+                transaction_hash,
+                block_index,
+            },
+        )),
         Ok(Err(transfer_error)) => {
             let error_message = format!("Transfer failed. {transfer_error:?}");
             Err(error_message)

@@ -1,10 +1,10 @@
+use crate::types::nft;
+use crate::utils::check_memo;
+use crate::{ state::{ mutate_state, read_state }, types::icrc7 };
+use candid::{ Nat, Principal };
 use ic_cdk::api::call::RejectionCode;
 use ic_cdk_macros::update;
-use crate::{ state::{ read_state, mutate_state }, types::icrc7 };
-use candid::{ Nat, Principal };
-use crate::types::nft;
 use icrc_ledger_types::icrc1::account::Account;
-use crate::utils::check_memo;
 
 #[update]
 pub fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_transfer::Response {
@@ -56,7 +56,10 @@ pub fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_transfe
             }
         }
 
-        let caller_as_account = Account { owner: ic_cdk::caller(), subaccount: None };
+        let caller_as_account = Account {
+            owner: ic_cdk::caller(),
+            subaccount: None,
+        };
         if nft.token_owner != caller_as_account {
             txn_results[index] = Some(
                 Err((

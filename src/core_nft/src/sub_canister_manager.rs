@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use crate::types::sub_canister;
+use crate::utils::trace;
 use candid::{ CandidType, Encode, Nat, Principal };
 use ic_cdk::api::management_canister::main::{
     canister_status,
@@ -14,13 +16,11 @@ use ic_cdk::api::management_canister::main::{
     InstallCodeArgument,
     LogVisibility,
 };
-use utils::retry_async::retry_async;
-use storage_canister_c2c_client::{ get_storage_size, insert_data, get_data };
-use crate::utils::trace;
-use crate::types::sub_canister;
 use serde::{ Deserialize, Serialize };
 use storage_api_canister::types::value_custom::CustomValue as Value;
 use storage_api_canister::utils::get_value_size;
+use storage_canister_c2c_client::{ get_data, get_storage_size, insert_data };
+use utils::retry_async::retry_async;
 
 #[derive(Debug)]
 pub enum NewStorageError {
@@ -117,7 +117,7 @@ impl SubCanister for SubCanisterManager<sub_canister::InitArgs, sub_canister::Up
                 wasm_memory_limit: None, // use default of 3GB
             };
             // Step 1: Create the canister
-            let canister_id = match
+            canister_id = match
                 retry_async(|| {
                     create_canister(
                         CreateCanisterArgument {
@@ -157,6 +157,7 @@ impl SubCanister for SubCanisterManager<sub_canister::InitArgs, sub_canister::Up
         match retry_async(|| install_code(install_args.clone()), 3).await {
             Ok(_) => {}
             Err(e) => {
+                trace(&format!("ERROR : failed to install code with error - {e:?}"));
                 return Err(NewStorageError::InstallCodeError(format!("{:?}", e.1)));
             }
         }
@@ -319,7 +320,10 @@ impl StorageSubCanisterManager {
         nft_id: Option<Nat>
     ) -> Result<(String, Canister), String> {
         let required_space = get_value_size(data.clone());
+        trace(&format!("SubCanisterManager Insert Data : {:?}", data_id));
+        trace(&format!("SubCanisterManager required space: {:?}", required_space));
 
+        // TODO get only canister with installed WASM (ie in right state)
         for canister in self.sub_canister_manager.sub_canisters.values() {
             match canister.get_storage_size().await {
                 Ok(size) if size + required_space <= MAX_STORAGE_SIZE => {
@@ -338,15 +342,31 @@ impl StorageSubCanisterManager {
             }
         }
 
+        trace(&format!("SubCanisterManager no canister available found, create a new one"));
         // if no canister has enough space, create a new one
         match self.sub_canister_manager.create_canister().await {
             Ok(new_canister) => {
+                trace(
+                    &format!(
+                        "SubCanisterManager created a new canister with principal : {:?}",
+                        new_canister
+                    )
+                );
+
                 match new_canister.insert_data(data.clone(), data_id.clone(), nft_id.clone()).await {
-                    Ok(hash_id) => { Ok((hash_id, new_canister)) }
-                    Err(e) => { Err(format!("{e:?}")) }
+                    Ok(hash_id) => {
+                        trace(
+                            &format!(
+                                "SubCanisterManager inserted data with hash_id : {:?}",
+                                hash_id
+                            )
+                        );
+                        Ok((hash_id, new_canister))
+                    }
+                    Err(e) => Err(format!("{e:?}")),
                 }
             }
-            Err(e) => { Err(format!("{e:?}")) }
+            Err(e) => Err(format!("{e:?}")),
         }
     }
 
@@ -409,10 +429,11 @@ impl Canister {
 
     async fn get_canister_controllers(&self) -> Result<Vec<Principal>, CanisterError> {
         match
-            retry_async(
-                || canister_status(CanisterIdRecord { canister_id: self.canister_id }),
-                3
-            ).await
+            retry_async(|| {
+                canister_status(CanisterIdRecord {
+                    canister_id: self.canister_id,
+                })
+            }, 3).await
         {
             Ok(res) => Ok(res.0.settings.controllers),
             Err(e) => Err(CanisterError::CantFindControllers(format!("{e:?}"))),
@@ -429,30 +450,39 @@ impl Canister {
             return Err("Canister is not installed".to_string());
         }
 
-        let res = retry_async(
-            ||
-                insert_data(self.canister_id, insert_data::Args {
-                    data: data.clone(),
-                    data_id: data_id.clone(),
-                    nft_id: nft_id.clone(),
-                }),
-            3
-        ).await;
+        let res = retry_async(|| {
+            insert_data(self.canister_id, insert_data::Args {
+                data: data.clone(),
+                data_id: data_id.clone(),
+                nft_id: nft_id.clone(),
+            })
+        }, 3).await;
 
         match res {
-            Ok(data_response) => Ok(data_response.hash_id),
+            Ok(data_response) => {
+                match data_response {
+                    Ok(data) => Ok(data.hash_id),
+                    Err(e) => Err(format!("{e:?}")),
+                }
+            }
             Err(e) => Err(format!("{e:?}")),
         }
     }
 
     pub async fn get_data(&self, hash_id: String) -> Result<Value, String> {
-        let res = retry_async(
-            || get_data(self.canister_id, get_data::Args { hash_id: hash_id.clone() }),
-            3
-        ).await;
+        let res = retry_async(|| {
+            get_data(self.canister_id, get_data::Args {
+                hash_id: hash_id.clone(),
+            })
+        }, 3).await;
 
         match res {
-            Ok(data) => Ok(data.data_value),
+            Ok(_data) => {
+                match _data {
+                    Ok(data) => Ok(data.data_value),
+                    Err(e) => Err(format!("{e:?}")),
+                }
+            }
             Err(e) => Err(format!("{e:?}")),
         }
     }

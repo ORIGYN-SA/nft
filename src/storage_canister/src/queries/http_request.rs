@@ -1,8 +1,8 @@
-use http_request::{ build_response, build_json_response, encode_logs, extract_route, Route };
+use http_request::{build_json_response, build_response, encode_logs, extract_route, Route};
 use ic_cdk_macros::query;
-use types::{ HttpRequest, HttpResponse, TimestampMillis };
+use types::{HttpRequest, HttpResponse, TimestampMillis};
 
-use crate::state::{ read_state, RuntimeState };
+use crate::state::{read_state, RuntimeState};
 
 #[query(hidden = true)]
 fn http_request(request: HttpRequest) -> HttpResponse {
@@ -22,6 +22,6 @@ fn http_request(request: HttpRequest) -> HttpResponse {
         Route::Logs(since) => get_logs_impl(since),
         Route::Traces(since) => get_traces_impl(since),
         Route::Metrics => read_state(get_metrics_impl),
-        Route::Other(_, _) => { HttpResponse::not_found() }
+        Route::Other(_, _) => HttpResponse::not_found(),
     }
 }

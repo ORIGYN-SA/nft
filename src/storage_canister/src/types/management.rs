@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use candid::{ CandidType, Nat, Principal };
-use serde::{ Deserialize, Serialize };
-use icrc_ledger_types::icrc1::account::Account;
+use candid::{CandidType, Nat, Principal};
 use ic_cdk::api::call::CallResult as Result;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
+use icrc_ledger_types::icrc1::account::Account;
+use serde::{Deserialize, Serialize};
 
 #[derive(CandidType, Serialize, Deserialize, Clone)]
 pub struct MintRequest {

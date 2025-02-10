@@ -1,17 +1,17 @@
 use std::collections::HashMap;
 
+use crate::sub_canister_manager::StorageSubCanisterManager;
+use crate::types::collection_metadata::CollectionMetadata;
+use crate::types::nft::Icrc7Token;
+use crate::types::sub_canister;
 use candid::{ CandidType, Nat, Principal };
 use canister_state_macros::canister_state;
+use icrc_ledger_types::icrc1::account::Account;
 use serde::{ Deserialize, Serialize };
 use types::BuildVersion;
 use types::{ Cycles, TimestampMillis };
 use utils::env::{ CanisterEnv, Environment };
 use utils::memory::MemorySize;
-use crate::types::collection_metadata::CollectionMetadata;
-use crate::types::nft::Icrc7Token;
-use icrc_ledger_types::icrc1::account::Account;
-use crate::sub_canister_manager::StorageSubCanisterManager;
-use crate::types::sub_canister;
 
 const STORAGE_WASM: &[u8] = include_bytes!(
     "../../storage_canister/wasm/storage_canister_canister.wasm.gz"
@@ -77,6 +77,9 @@ pub struct Data {
 impl Data {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        test_mode: bool,
+        commit_hash: String,
+        version: BuildVersion,
         authorized_principals: Vec<Principal>,
         minting_authorities: Vec<Principal>,
         description: Option<String>,
@@ -96,13 +99,10 @@ impl Data {
         collection_metadata: CollectionMetadata,
         approval_init: Option<InitApprovalsArg>
     ) -> Self {
-        let test_mode = read_state(|state| state.env.is_test_mode());
-        let commit_hash = read_state(|state| state.env.commit_hash().to_string());
-        let version = read_state(|state| state.env.version());
-
         let sub_canister_manager = StorageSubCanisterManager::new(
             sub_canister::InitArgs {
                 test_mode,
+                version,
                 commit_hash: commit_hash.clone(),
                 authorized_principals: authorized_principals.clone(),
             },
@@ -114,8 +114,8 @@ impl Data {
             HashMap::new(),
             vec![],
             authorized_principals.clone(),
-            0,
-            0,
+            2_000_000_000_000,
+            2_000_000_000_000,
             test_mode,
             commit_hash.clone(),
             STORAGE_WASM.to_vec()

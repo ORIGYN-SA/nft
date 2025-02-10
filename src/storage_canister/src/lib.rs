@@ -5,8 +5,8 @@ mod lifecycle;
 mod memory;
 // mod migrations;
 
-mod state;
 pub mod queries;
+mod state;
 pub mod types;
 pub mod updates;
 

@@ -1,2 +1,2 @@
-mod setup;
+pub mod setup;
 mod tests;

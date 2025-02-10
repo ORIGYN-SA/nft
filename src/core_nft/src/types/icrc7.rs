@@ -1,10 +1,10 @@
 // This is an experimental feature to generate Rust binding from Candid.
 // You may want to manually adjust some of the types.
 #![allow(dead_code, unused_imports)]
-use candid::{ self, CandidType, Deserialize, Principal };
+use candid::{self, CandidType, Deserialize, Principal};
 use ic_cdk::api::call::CallResult as Result;
-use icrc_ledger_types::icrc1::account::Account;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
+use icrc_ledger_types::icrc1::account::Account;
 
 pub const DEFAULT_TAKE_VALUE: usize = 100;
 pub const DEFAULT_MAX_UPDATE_BATCH_SIZE: u128 = 100;

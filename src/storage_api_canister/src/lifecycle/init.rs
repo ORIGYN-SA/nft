@@ -1,9 +1,11 @@
 use candid::{ CandidType, Principal };
 use serde::{ Deserialize, Serialize };
+use types::BuildVersion;
 
-#[derive(Deserialize, Serialize, CandidType, Debug, Clone)]
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct InitArgs {
     pub test_mode: bool,
+    pub version: BuildVersion,
     pub commit_hash: String,
     pub authorized_principals: Vec<Principal>,
 }

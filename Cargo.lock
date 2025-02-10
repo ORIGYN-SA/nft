@@ -1102,6 +1102,7 @@ dependencies = [
  "canister_time",
  "core_nft",
  "hex",
+ "ic-cdk",
  "ic-ledger-types",
  "icrc-ledger-types 0.1.6",
  "icrc-ledger-types 0.1.8",

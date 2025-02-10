@@ -1,3 +1,3 @@
 mod http_request;
-pub mod icrc7;
 mod icrc37;
+pub mod icrc7;

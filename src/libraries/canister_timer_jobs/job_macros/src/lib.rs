@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
-use syn::{ parse_macro_input, AttributeArgs, ItemFn, Meta, NestedMeta };
 use quote::quote;
+use syn::{parse_macro_input, AttributeArgs, ItemFn, Meta, NestedMeta};
 
 #[proc_macro_attribute]
 pub fn job(args: TokenStream, input: TokenStream) -> TokenStream {
@@ -34,8 +34,7 @@ pub fn job(args: TokenStream, input: TokenStream) -> TokenStream {
 
     // Generate the output
     let fn_name = &input_fn.sig.ident;
-    let expanded =
-        quote! {
+    let expanded = quote! {
         // Original function
         #input_fn
 

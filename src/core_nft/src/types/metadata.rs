@@ -2,6 +2,7 @@ use candid::{ CandidType, Nat };
 use serde::{ Deserialize, Serialize };
 use std::collections::HashMap;
 use storage_api_canister::types::value_custom::CustomValue as Value;
+use crate::utils::trace;
 
 use crate::{ state::{ mutate_state, read_state }, sub_canister_manager::Canister };
 
@@ -30,6 +31,7 @@ impl Metadata {
     }
 
     pub async fn insert_data(&mut self, nft_id: Option<Nat>, data_id: String, data: Value) {
+        trace(&format!("Inserting data: {:?}", data_id));
         let mut sub_canister_manager = read_state(|state| state.data.sub_canister_manager.clone());
 
         match sub_canister_manager.insert_data(data.clone(), data_id.clone(), nft_id.clone()).await {
@@ -37,6 +39,7 @@ impl Metadata {
                 self.data.insert(data_id, (hash_id, canister));
             }
             Err(e) => {
+                trace(&format!("Error inserting data: {:?}", e));
                 println!("Error inserting data: {:?}", e);
             }
         }
@@ -55,6 +58,7 @@ impl Metadata {
 
     pub async fn get_all_data(&self) -> HashMap<String, Value> {
         let mut all_data = HashMap::new();
+        trace(&format!("Getting all data: {:?}", self.data));
 
         for (data_id, (hash_id, canister)) in self.data.iter() {
             let data = read_state(|state| state.data.sub_canister_manager.clone());
@@ -64,6 +68,7 @@ impl Metadata {
                     all_data.insert(data_id.to_string(), value);
                 }
                 Err(e) => {
+                    trace(&format!("Error getting data: {:?}", e));
                     println!("Error getting data: {:?}", e);
                 }
             }

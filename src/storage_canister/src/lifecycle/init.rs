@@ -2,21 +2,14 @@ use crate::lifecycle::init_canister;
 use crate::lifecycle::Args;
 use crate::state::{ Data, RuntimeState };
 use candid::CandidType;
+use candid::Principal;
 use canister_tracing_macros::trace;
 use ic_cdk_macros::init;
 use serde::{ Deserialize, Serialize };
 use tracing::info;
-use utils::env::{ CanisterEnv, Environment };
-use candid::Principal;
 use types::BuildVersion;
-
-#[derive(CandidType, Serialize, Deserialize, Debug)]
-pub struct InitArgs {
-    test_mode: bool,
-    version: BuildVersion,
-    commit_hash: String,
-    authorized_principals: Vec<Principal>,
-}
+use utils::env::{ CanisterEnv, Environment };
+use storage_api_canister::lifecycle::init::InitArgs;
 
 #[init]
 #[trace]

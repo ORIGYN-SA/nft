@@ -2,19 +2,19 @@ use std::collections::HashMap;
 
 use crate::lifecycle::init_canister;
 use crate::lifecycle::Args;
+use crate::state::InitApprovalsArg;
 use crate::state::{ Data, RuntimeState };
 use crate::types::collection_metadata;
+use crate::types::collection_metadata::CollectionMetadata;
+use candid::Principal;
 use candid::{ CandidType, Nat };
 use canister_tracing_macros::trace;
 use ic_cdk_macros::init;
 use serde::{ Deserialize, Serialize };
 use storage_api_canister::value_custom::CustomValue as Value;
 use tracing::info;
-use utils::env::{ CanisterEnv, Environment };
-use candid::Principal;
-use crate::state::InitApprovalsArg;
 use types::BuildVersion;
-use crate::types::collection_metadata::CollectionMetadata;
+use utils::env::{ CanisterEnv, Environment };
 
 #[derive(CandidType, Serialize, Deserialize, Debug)]
 pub struct InitArgs {
@@ -46,16 +46,21 @@ pub struct InitArgs {
 fn init(args: Args) {
     match args {
         Args::Init(init_args) => {
+            info!("Init start.");
             let env = CanisterEnv::new(
                 init_args.test_mode,
                 init_args.version,
-                init_args.commit_hash
+                init_args.commit_hash.clone()
             );
             let collection_metadata: CollectionMetadata = CollectionMetadata::from(
                 init_args.collection_metadata
             );
+            // let collection_metadata = CollectionMetadata::new();
 
             let mut data = Data::new(
+                init_args.test_mode,
+                init_args.commit_hash,
+                init_args.version,
                 init_args.authorized_principals,
                 init_args.minting_authorities,
                 init_args.description,

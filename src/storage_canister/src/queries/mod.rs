@@ -1,6 +1,6 @@
 mod http_request;
-pub mod storage;
 pub mod management;
+pub mod storage;
 
-pub use storage::*;
 pub use management::*;
+pub use storage::*;

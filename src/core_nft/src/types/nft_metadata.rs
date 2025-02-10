@@ -1,17 +1,15 @@
-use candid::{ Nat, CandidType };
-use serde::{ Deserialize, Serialize };
 use crate::types::metadata::Metadata;
-use storage_api_canister::types::value_custom::CustomValue as Value;
+use candid::{CandidType, Nat};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use storage_api_canister::types::value_custom::CustomValue as Value;
 
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct NftMetadata(Metadata);
 
 impl NftMetadata {
     pub fn new() -> Self {
-        Self {
-            0: Metadata::new(),
-        }
+        Self { 0: Metadata::new() }
     }
 
     pub async fn insert_data(&mut self, nft_id: Nat, data_id: String, data: Value) {

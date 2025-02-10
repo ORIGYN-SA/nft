@@ -1,14 +1,14 @@
 use candid::Nat;
 // use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
-use storage_api_canister::types::value_custom::CustomValue as Value;
-use storage_api_canister::utils;
-use ic_stable_structures::StableBTreeMap;
 use crate::memory::get_data_storage_memory;
 use crate::memory::VM;
 use hex;
-use sha2::{ Sha256, Digest };
-use serde::{ Deserialize, Serialize };
-use ic_cdk::api::stable::{ stable_size, WASM_PAGE_SIZE_IN_BYTES };
+use ic_cdk::api::stable::{stable_size, WASM_PAGE_SIZE_IN_BYTES};
+use ic_stable_structures::StableBTreeMap;
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use storage_api_canister::types::value_custom::CustomValue as Value;
+use storage_api_canister::utils;
 
 #[derive(Serialize, Deserialize)]
 pub struct StorageData {
@@ -38,7 +38,10 @@ impl StorageData {
     }
 
     pub fn remove_data(&mut self, hash_id: String) -> Result<Value, String> {
-        let data = self.storage.remove(&hash_id).ok_or("Data not found".to_string())?;
+        let data = self
+            .storage
+            .remove(&hash_id)
+            .ok_or("Data not found".to_string())?;
 
         Ok(data)
     }
@@ -46,7 +49,7 @@ impl StorageData {
     pub fn update_data(
         &mut self,
         hash_id: String,
-        data: Value
+        data: Value,
     ) -> Result<(String, Option<Value>), String> {
         let data_size: u128 = utils::get_value_size(data.clone());
 
@@ -66,7 +69,7 @@ impl StorageData {
         &mut self,
         data: Value,
         data_id: String,
-        nft_id: Option<Nat>
+        nft_id: Option<Nat>,
     ) -> Result<String, String> {
         let data_size: u128 = utils::get_value_size(data.clone());
 

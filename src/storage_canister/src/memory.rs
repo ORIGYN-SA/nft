@@ -1,5 +1,5 @@
 use ic_stable_structures::{
-    memory_manager::{ MemoryId, MemoryManager, VirtualMemory },
+    memory_manager::{MemoryId, MemoryManager, VirtualMemory},
     DefaultMemoryImpl,
 };
 

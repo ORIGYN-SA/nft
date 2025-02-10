@@ -1,7 +1,7 @@
 use canister_client::generate_candid_c2c_call;
-use storage_api_canister::get_storage_size::{ GetStorageSizeArgs, GetStorageSizeResponse };
-use storage_api_canister::insert_data::{ InsertDataRequest, InsertDataResponse };
-use storage_api_canister::get_data::{ GetDataRequest, GetDataResponse };
+use storage_api_canister::get_data::{GetDataRequest, GetDataResponse};
+use storage_api_canister::get_storage_size::{GetStorageSizeArgs, GetStorageSizeResponse};
+use storage_api_canister::insert_data::{InsertDataRequest, InsertDataResponse};
 
 pub mod get_storage_size {
     use super::*;

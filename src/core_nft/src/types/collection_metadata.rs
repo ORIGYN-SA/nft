@@ -1,6 +1,6 @@
-use candid::{ Nat, CandidType };
-use serde::{ Deserialize, Serialize };
 use crate::types::metadata::Metadata;
+use candid::{CandidType, Nat};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use storage_api_canister::types::value_custom::CustomValue as Value;
 
@@ -9,9 +9,7 @@ pub struct CollectionMetadata(Metadata);
 
 impl CollectionMetadata {
     pub fn new() -> Self {
-        Self {
-            0: Metadata::new(),
-        }
+        Self { 0: Metadata::new() }
     }
 
     pub fn from(metadata: HashMap<String, Value>) -> Self {

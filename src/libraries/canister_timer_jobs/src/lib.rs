@@ -1,5 +1,5 @@
 use ic_cdk_timers::TimerId;
-use serde::{ Deserialize, Deserializer, Serialize, Serializer };
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::ops::Deref;
@@ -12,13 +12,21 @@ use crate::timer_manager::TimerManager;
 
 pub mod timer_manager;
 
-pub struct TimerJobs<J, R> where J: Fn() -> R, R: 'static {
+pub struct TimerJobs<J, R>
+where
+    J: Fn() -> R,
+    R: 'static,
+{
     jobs: BTreeMap<String, TimerManager<J, R>>,
 }
 
 type JobWrapper<J> = Rc<RefCell<Option<J>>>;
 
-impl<J, R> TimerJobs<J, R> where J: Fn() -> R, R: 'static {
+impl<J, R> TimerJobs<J, R>
+where
+    J: Fn() -> R,
+    R: 'static,
+{
     pub fn iter(&self) -> impl Iterator<Item = &TimerManager<J, R>> {
         self.jobs.values()
     }

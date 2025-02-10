@@ -1,9 +1,11 @@
-use candid::{ Nat, CandidType, Decode, Encode };
-use serde::{ Deserialize, Serialize };
-use icrc_ledger_types::{ icrc::generic_value::ICRC3Value as Icrc3Value, icrc1::account::Account };
-use ic_stable_structures::{ storable::Bound, Storable };
-use std::collections::HashMap;
 use super::NftMetadata;
+use candid::{ CandidType, Decode, Encode, Nat };
+use ic_stable_structures::{ storable::Bound, Storable };
+use icrc_ledger_types::{ icrc::generic_value::ICRC3Value as Icrc3Value, icrc1::account::Account };
+use serde::{ Deserialize, Serialize };
+use tracing::info;
+use crate::utils::trace;
+use std::collections::HashMap;
 use storage_api_canister::types::value_custom::CustomValue as Value;
 
 pub type Icrc7TokenMetadata = HashMap<String, Icrc3Value>;
@@ -63,10 +65,13 @@ impl Icrc7Token {
             metadata.insert("Logo".into(), Icrc3Value::Text(logo.clone()));
         }
 
+        trace(&format!("nft token_metadata"));
+
         self.token_metadata
             .get_all_data().await
             .iter()
             .for_each(|(key, value)| {
+                trace(&format!("nft token_metadata - key: {:?}, value: {:?}", key, value));
                 metadata.insert(key.clone(), value.0.clone());
             });
 
@@ -74,6 +79,8 @@ impl Icrc7Token {
     }
 
     pub async fn add_metadata(&mut self, metadata: Icrc7TokenMetadata) {
+        info!("Adding metadata to token: {:?}", metadata);
+        trace(&format!("nft add_metadata"));
         for (key, value) in metadata.iter() {
             self.token_metadata.insert_data(
                 self.token_id.clone(),
@@ -81,9 +88,13 @@ impl Icrc7Token {
                 Value(value.clone())
             ).await;
         }
+        trace(&format!("nft add_metadata - finished"));
     }
 
     fn burn(&mut self) {
-        self.token_owner = Account { owner: ic_cdk::id(), subaccount: None };
+        self.token_owner = Account {
+            owner: ic_cdk::id(),
+            subaccount: None,
+        };
     }
 }

@@ -7,9 +7,9 @@ mod guards;
 pub mod lifecycle;
 mod memory;
 pub mod queries;
+mod sub_canister_manager;
 pub mod updates;
 mod utils;
-mod sub_canister_manager;
 // mod migrations;
 
 mod state;

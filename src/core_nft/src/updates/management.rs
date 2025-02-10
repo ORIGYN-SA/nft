@@ -1,17 +1,17 @@
-use ic_cdk_macros::update;
-use crate::types::{ management, nft, icrc7 };
-use candid::Nat;
 use crate::guards::caller_is_governance_principal;
-use crate::state::{ read_state, mutate_state };
-use crate::utils::{ check_memo, hash_string_to_u64 };
+use crate::state::{ mutate_state, read_state };
+use crate::types::{ icrc7, management, nft };
+use crate::utils::{ check_memo, hash_string_to_u64, trace };
+use candid::Nat;
 use ic_cdk::api::call::RejectionCode;
+use ic_cdk_macros::update;
 
 //TODO Use minting autority to mint tokens
 #[update(guard = "caller_is_governance_principal")]
 pub fn mint(req: management::mint::Args) -> management::mint::Response {
     let token_name_hash = Nat::from(hash_string_to_u64(&req.token_name));
 
-    let token_list = read_state(|state| { state.data.tokens_list.clone() });
+    let token_list = read_state(|state| state.data.tokens_list.clone());
     let supply_cap = read_state(|state| {
         state.data.supply_cap.clone().unwrap_or(Nat::from(icrc7::DEFAULT_MAX_SUPPLY_CAP))
     });
@@ -54,9 +54,10 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
 pub async fn update_nft_metadata(
     req: management::update_nft_metadata::Args
 ) -> management::update_nft_metadata::Response {
+    trace("Updating NFT metadata");
     let token_name_hash = req.token_id;
 
-    let token_list = read_state(|state| { state.data.tokens_list.clone() });
+    let token_list = read_state(|state| state.data.tokens_list.clone());
 
     match token_list.contains_key(&token_name_hash.clone()) {
         true => {
@@ -71,11 +72,13 @@ pub async fn update_nft_metadata(
                 token.token_logo = Some(logo);
             }
             if let Some(metadata) = req.token_metadata {
+                trace(&format!("Adding metadata to token: {:?}", metadata));
                 token.add_metadata(metadata).await;
             }
             mutate_state(|state| {
                 state.data.tokens_list.insert(token_name_hash.clone(), token);
             });
+            trace(&format!("Updated NFT metadata for token: {:?}", token_name_hash.clone()));
         }
         false => {
             return Err((RejectionCode::CanisterError, "Token does not exist".to_string()));
@@ -97,9 +100,7 @@ pub fn update_minting_authorities(
     req: management::update_minting_authorities::Args
 ) -> management::update_minting_authorities::Response {
     let mut minting_authorities = req.minting_authorities.clone();
-    let previous_minting_authorities = mutate_state(|state| {
-        state.data.minting_authorities.clone()
-    });
+    let previous_minting_authorities = mutate_state(|state| state.data.minting_authorities.clone());
 
     minting_authorities.append(&mut previous_minting_authorities.clone());
     minting_authorities.sort();
@@ -117,9 +118,7 @@ pub fn remove_minting_authorities(
     req: management::remove_minting_authorities::Args
 ) -> management::remove_minting_authorities::Response {
     let mut minting_authorities = req.minting_authorities.clone();
-    let previous_minting_authorities = mutate_state(|state| {
-        state.data.minting_authorities.clone()
-    });
+    let previous_minting_authorities = mutate_state(|state| state.data.minting_authorities.clone());
 
     minting_authorities.retain(|auth| !previous_minting_authorities.contains(auth));
 

@@ -1,6 +1,7 @@
 use candid::CandidType;
 use serde::{ Deserialize, Serialize };
 // use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
+use ic_cdk::api::call::CallResult as Result;
 use crate::types::value_custom::CustomValue as Value;
 
 #[derive(Serialize, Deserialize, CandidType)]
@@ -9,6 +10,8 @@ pub struct GetDataRequest {
 }
 
 #[derive(Serialize, Deserialize, CandidType)]
-pub struct GetDataResponse {
+pub struct GetDataResp {
     pub data_value: Value,
 }
+
+pub type GetDataResponse = Result<GetDataResp>;

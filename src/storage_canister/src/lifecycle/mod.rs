@@ -11,8 +11,8 @@ pub fn init_canister(runtime_state: RuntimeState) {
 use candid::CandidType;
 use serde::{ Deserialize, Serialize };
 
-use crate::init::InitArgs;
-use crate::post_upgrade::UpgradeArgs;
+use storage_api_canister::lifecycle::init::InitArgs;
+use storage_api_canister::lifecycle::post_upgrade::UpgradeArgs;
 
 #[derive(CandidType, Serialize, Deserialize, Debug)]
 pub enum Args {

@@ -1,31 +1,31 @@
 use crate::wasms::CORE_WASM;
 use candid::encode_one;
 use candid::Principal;
-use pocket_ic::PocketIc;
 use core_nft::lifecycle::Args;
+use pocket_ic::PocketIc;
 
 pub fn setup_core_canister(
     pic: &mut PocketIc,
-    buyback_burn_id: Principal,
+    core_canister_id: Principal,
     args: Args,
     controller: Principal
 ) -> Principal {
-    let buyback_burn_wasm = CORE_WASM.clone();
-    pic.add_cycles(buyback_burn_id, 1_000_000_000_000_000);
+    let core_nft_wasm = CORE_WASM.clone();
+    pic.add_cycles(core_canister_id, 100_000_000_000_000_000);
 
     pic.set_controllers(
-        buyback_burn_id,
+        core_canister_id,
         Some(controller.clone()),
         vec![controller.clone()]
     ).unwrap();
     pic.tick();
 
     pic.install_canister(
-        buyback_burn_id,
-        buyback_burn_wasm,
+        core_canister_id,
+        core_nft_wasm,
         encode_one(args).unwrap(),
         Some(controller.clone())
     );
 
-    buyback_burn_id
+    core_canister_id
 }

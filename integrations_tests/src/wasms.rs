@@ -13,18 +13,14 @@ lazy_static! {
     // pub static ref ICP_LEDGER: CanisterWasm = get_canister_wasm("ledger");
 
     // Wasms in particular canister folder
-    pub static ref CORE_WASM: CanisterWasm = get_canister_wasm_from_bin("core");
-    pub static ref STORAGE_WASM: CanisterWasm = get_canister_wasm_from_bin("storage_canister");
+    pub static ref CORE_WASM: CanisterWasm = get_canister_wasm_from_bin("core_nft");
+    // pub static ref STORAGE_WASM: CanisterWasm = get_canister_wasm_from_bin("storage_canister");
 }
 
 fn get_canister_wasm_from_bin(canister_name: &str) -> CanisterWasm {
-    match
-        read_file_from_relative_bin(
-            &format!(
-                "../src/{canister_name}/target/wasm32-unknown-unknown/release/{canister_name}_canister.wasm.gz"
-            )
-        )
-    {
+    match read_file_from_relative_bin(&format!(
+        "../src/{canister_name}/wasm/{canister_name}_canister.wasm.gz"
+    )) {
         Ok(wasm) => wasm,
         Err(err) => {
             println!(
@@ -47,9 +43,8 @@ fn read_file_from_local_bin(file_name: &str) -> Vec<u8> {
     let mut file_path = local_bin();
     file_path.push(file_name);
 
-    let mut file = File::open(&file_path).unwrap_or_else(|_|
-        panic!("Failed to open file: {}", file_path.to_str().unwrap())
-    );
+    let mut file = File::open(&file_path)
+        .unwrap_or_else(|_| panic!("Failed to open file: {}", file_path.to_str().unwrap()));
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes).expect("Failed to read file");
     bytes
@@ -57,7 +52,8 @@ fn read_file_from_local_bin(file_name: &str) -> Vec<u8> {
 
 pub fn local_bin() -> PathBuf {
     let mut file_path = PathBuf::from(
-        std::env::var("CARGO_MANIFEST_DIR").expect("Failed to read CARGO_MANIFEST_DIR env variable")
+        std::env::var("CARGO_MANIFEST_DIR")
+            .expect("Failed to read CARGO_MANIFEST_DIR env variable"),
     );
     file_path.push("wasms");
     file_path
