@@ -323,8 +323,7 @@ impl StorageSubCanisterManager {
         trace(&format!("SubCanisterManager Insert Data : {:?}", data_id));
         trace(&format!("SubCanisterManager required space: {:?}", required_space));
 
-        // TODO get only canister with installed WASM (ie in right state)
-        for canister in self.sub_canister_manager.sub_canisters.values() {
+        for canister in self.get_subcanisters_installed() {
             match canister.get_storage_size().await {
                 Ok(size) if size + required_space <= MAX_STORAGE_SIZE => {
                     match canister.insert_data(data.clone(), data_id.clone(), nft_id.clone()).await {
@@ -368,6 +367,14 @@ impl StorageSubCanisterManager {
             }
             Err(e) => Err(format!("{e:?}")),
         }
+    }
+
+    fn get_subcanisters_installed(&self) -> Vec<Canister> {
+        self.sub_canister_manager
+            .list_canisters()
+            .into_iter()
+            .filter(|canister| canister.state == CanisterState::Installed)
+            .collect()
     }
 
     pub async fn get_data(&self, canister: Canister, hash_id: String) -> Result<Value, String> {

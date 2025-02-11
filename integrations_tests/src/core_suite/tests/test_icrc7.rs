@@ -110,7 +110,7 @@ fn test_icrc7_total_supply() {
 }
 
 #[test]
-fn test_icrc7_token_metadata() {
+fn test_icrc7_token_metadata_simple() {
     let mut test_env: TestEnv = default_test_setup();
     println!("test_env: {:?}", test_env);
 
@@ -134,7 +134,7 @@ fn test_icrc7_token_metadata() {
             new_metadata.insert("test1".to_string(), Value::Text("test1".to_string()));
             new_metadata.insert("test2".to_string(), Value::Nat(Nat::from(1 as u64)));
             let logo_data = include_bytes!("../assets/logo2.min-3f9527e7.svg").to_vec();
-            new_metadata.insert("test3".to_string(), Value::Blob(ByteBuf::from(logo_data)));
+            new_metadata.insert("test3".to_string(), Value::Blob(ByteBuf::from(logo_data.clone())));
 
             let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),
@@ -144,7 +144,7 @@ fn test_icrc7_token_metadata() {
                 token_metadata: Some(new_metadata),
             };
 
-            let update_nft_metadata_result = update_nft_metadata(
+            let _ = update_nft_metadata(
                 pic,
                 controller,
                 collection_canister_id,
@@ -153,7 +153,6 @@ fn test_icrc7_token_metadata() {
 
             pic.tick();
 
-            println!("update_nft_metadata_result: {:?}", update_nft_metadata_result);
             let metadata = icrc7_token_metadata(
                 pic,
                 controller,
@@ -162,9 +161,154 @@ fn test_icrc7_token_metadata() {
             );
 
             println!("metadata: {:?}", metadata);
+
+            assert_eq!(metadata[0].clone().unwrap()[0].0, "Name".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[0].1, Value::Text("test1".to_string()));
+            assert_eq!(metadata[0].clone().unwrap()[1].0, "test3".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[1].1, Value::Blob(ByteBuf::from(logo_data)));
+            assert_eq!(metadata[0].clone().unwrap()[2].0, "test1".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[2].1, Value::Text("test1".to_string()));
+            assert_eq!(metadata[0].clone().unwrap()[3].0, "Description".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[3].1, Value::Text("description".to_string()));
+            assert_eq!(metadata[0].clone().unwrap()[4].0, "Symbol".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[4].1, Value::Text("test1".to_string()));
+            assert_eq!(metadata[0].clone().unwrap()[5].0, "Logo".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[5].1, Value::Text("logo".to_string()));
+            assert_eq!(metadata[0].clone().unwrap()[6].0, "test2".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[6].1, Value::Nat(Nat::from(1 as u64)));
+            assert_eq!(metadata[0].clone().unwrap().len(), 7);
         }
         Err(e) => {
             println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
+    }
+}
+
+#[test]
+fn test_icrc7_token_metadata_multiple_insert() {
+    let mut test_env: TestEnv = default_test_setup();
+    println!("test_env: {:?}", test_env);
+
+    let TestEnv { ref mut pic, collection_canister_id, controller, nft_owner1, nft_owner2 } =
+        test_env;
+
+    let mint_return = mint_nft(
+        pic,
+        "test1".to_string(),
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id
+    );
+
+    match mint_return {
+        Ok(token_id) => {
+            let mut new_metadata: HashMap<String, Value> = HashMap::new();
+            new_metadata.insert("test1".to_string(), Value::Text("test1".to_string()));
+            new_metadata.insert("test2".to_string(), Value::Nat(Nat::from(1 as u64)));
+            let logo_data = include_bytes!("../assets/logo2.min-3f9527e7.svg").to_vec();
+            new_metadata.insert("test3".to_string(), Value::Blob(ByteBuf::from(logo_data.clone())));
+
+            let update_nft_metadata_args = update_nft_metadata::Args {
+                token_id: token_id.clone(),
+                token_name: Some("test1".to_string()),
+                token_description: Some("description".to_string()),
+                token_logo: Some("logo".to_string()),
+                token_metadata: Some(new_metadata),
+            };
+
+            let _ = update_nft_metadata(
+                pic,
+                controller,
+                collection_canister_id,
+                &update_nft_metadata_args
+            );
+
+            pic.tick();
+
+            let metadata = icrc7_token_metadata(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![token_id.clone()]
+            );
+
+            assert_eq!(metadata[0].clone().unwrap()[0].0, "Name".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[0].1, Value::Text("test1".to_string()));
+            assert_eq!(metadata[0].clone().unwrap()[1].0, "test3".to_string());
+            assert_eq!(
+                metadata[0].clone().unwrap()[1].1,
+                Value::Blob(ByteBuf::from(logo_data.clone()))
+            );
+            assert_eq!(metadata[0].clone().unwrap()[2].0, "test1".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[2].1, Value::Text("test1".to_string()));
+            assert_eq!(metadata[0].clone().unwrap()[3].0, "Description".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[3].1, Value::Text("description".to_string()));
+            assert_eq!(metadata[0].clone().unwrap()[4].0, "Symbol".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[4].1, Value::Text("test1".to_string()));
+            assert_eq!(metadata[0].clone().unwrap()[5].0, "Logo".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[5].1, Value::Text("logo".to_string()));
+            assert_eq!(metadata[0].clone().unwrap()[6].0, "test2".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[6].1, Value::Nat(Nat::from(1 as u64)));
+            assert_eq!(metadata[0].clone().unwrap().len(), 7);
+
+            let mut new_metadata_2: HashMap<String, Value> = HashMap::new();
+            new_metadata_2.insert("test4".to_string(), Value::Text("test4".to_string()));
+            new_metadata_2.insert("test5".to_string(), Value::Nat(Nat::from(2 as u64)));
+
+            let update_nft_metadata_args_2 = update_nft_metadata::Args {
+                token_id: token_id.clone(),
+                token_name: None,
+                token_description: None,
+                token_logo: None,
+                token_metadata: Some(new_metadata_2),
+            };
+
+            let _ = update_nft_metadata(
+                pic,
+                controller,
+                collection_canister_id,
+                &update_nft_metadata_args_2
+            );
+
+            let metadata_2 = icrc7_token_metadata(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![token_id.clone()]
+            );
+
+            println!("metadata_2: {:?}", metadata_2);
+
+            assert_eq!(metadata_2[0].clone().unwrap()[0].0, "test4".to_string());
+            assert_eq!(metadata_2[0].clone().unwrap()[0].1, Value::Text("test4".to_string()));
+            assert_eq!(metadata_2[0].clone().unwrap()[1].0, "test5".to_string());
+            assert_eq!(metadata_2[0].clone().unwrap()[1].1, Value::Nat(Nat::from(2 as u64)));
+            assert_eq!(metadata_2[0].clone().unwrap()[2].0, "Symbol".to_string());
+            assert_eq!(metadata_2[0].clone().unwrap()[2].1, Value::Text("test1".to_string()));
+            assert_eq!(metadata_2[0].clone().unwrap()[3].0, "Description".to_string());
+            assert_eq!(metadata_2[0].clone().unwrap()[3].1, Value::Text("description".to_string()));
+            assert_eq!(metadata_2[0].clone().unwrap()[4].0, "Name".to_string());
+            assert_eq!(metadata_2[0].clone().unwrap()[4].1, Value::Text("test1".to_string()));
+            assert_eq!(metadata[0].clone().unwrap()[5].0, "Logo".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[5].1, Value::Text("logo".to_string()));
+            assert_eq!(metadata_2[0].clone().unwrap()[6].0, "test3".to_string());
+            assert_eq!(
+                metadata_2[0].clone().unwrap()[6].1,
+                Value::Blob(ByteBuf::from(logo_data.clone()))
+            );
+            assert_eq!(metadata_2[0].clone().unwrap()[7].0, "test2".to_string());
+            assert_eq!(metadata_2[0].clone().unwrap()[7].1, Value::Nat(Nat::from(1 as u64)));
+            assert_eq!(metadata_2[0].clone().unwrap()[8].0, "Logo".to_string());
+            assert_eq!(metadata_2[0].clone().unwrap()[8].1, Value::Text("logo".to_string()));
+            assert_eq!(metadata_2[0].clone().unwrap().len(), 9);
+        }
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
         }
     }
 }
