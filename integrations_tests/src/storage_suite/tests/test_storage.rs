@@ -1,0 +1,155 @@
+use crate::client::storage::{
+    get_data,
+    insert_data,
+    http_request,
+    remove_data,
+    update_data,
+    get_storage_size,
+    init_upload,
+    store_chunk,
+    finalize_upload,
+};
+use candid::{ Encode, Decode, CandidType, Nat };
+
+use reqwest::blocking::Client;
+use reqwest::blocking::ClientBuilder;
+use storage_api_canister::init_upload;
+use storage_api_canister::store_chunk;
+use storage_api_canister::finalize_upload;
+use sha2::{ Sha256, Digest };
+use types::HttpResponse;
+
+use crate::storage_suite::setup::setup::TestEnv;
+use crate::{ storage_suite::setup::default_test_setup, utils::tick_n_blocks };
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+use std::thread::sleep;
+use std::time::Duration;
+use types::HttpRequest;
+use serde_bytes::ByteBuf;
+use serde_json::{ from_slice, Value };
+
+#[test]
+fn test_storage_simple() {
+    let mut test_env: TestEnv = default_test_setup();
+    println!("test_env: {:?}", test_env);
+
+    let TestEnv { ref mut pic, storage_canister_id, controller, nft_owner1, nft_owner2 } = test_env;
+
+    let file_path = Path::new("./src/storage_suite/assets/test.png");
+    let mut file = File::open(&file_path).expect("Failed to open file");
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer).expect("Failed to read file");
+
+    let file_size = buffer.len() as u64;
+
+    // Calculate SHA-256 hash
+    let mut hasher = Sha256::new();
+    hasher.update(&buffer);
+    let file_hash = hasher.finalize();
+
+    let file_type = "image/png".to_string();
+    let media_hash_id = "test.png".to_string();
+
+    let init_upload_resp = init_upload(
+        pic,
+        controller,
+        storage_canister_id,
+        &(init_upload::Args {
+            file_type,
+            file_hash: format!("{:x}", file_hash),
+            file_size,
+            media_hash_id: media_hash_id.clone(),
+            chunk_size: None,
+        })
+    );
+
+    match init_upload_resp {
+        Ok(resp) => {
+            println!("init_upload_resp: {:?}", resp);
+        }
+        Err(e) => {
+            println!("init_upload_resp error: {:?}", e);
+        }
+    }
+
+    let mut offset = 0;
+    let chunk_size = 1024 * 1024;
+    let mut chunk_index = 0;
+
+    while offset < buffer.len() {
+        let chunk = &buffer[offset..(offset + (chunk_size as usize)).min(buffer.len())];
+        let store_chunk_resp = store_chunk(
+            pic,
+            controller,
+            storage_canister_id,
+            &(store_chunk::Args {
+                media_hash_id: media_hash_id.clone(),
+                chunk_id: Nat::from(chunk_index as u64),
+                chunk_data: chunk.to_vec(),
+            })
+        );
+
+        match store_chunk_resp {
+            Ok(resp) => {
+                println!("store_chunk_resp: {:?}", resp);
+            }
+            Err(e) => {
+                println!("store_chunk_resp error: {:?}", e);
+            }
+        }
+
+        offset += chunk_size as usize;
+        chunk_index += 1;
+    }
+
+    let finalize_upload_resp = finalize_upload(
+        pic,
+        controller,
+        storage_canister_id,
+        &(finalize_upload::Args {
+            media_hash_id: media_hash_id.clone(),
+        })
+    );
+
+    match finalize_upload_resp {
+        Ok(resp) => {
+            println!("finalize_upload_resp: {:?}", resp);
+        }
+        Err(e) => {
+            println!("finalize_upload_resp error: {:?}", e);
+        }
+    }
+
+    let endpoint = pic.make_live(None);
+    println!("gateway url: {:?}", endpoint);
+
+    let client = ClientBuilder::new().build().unwrap();
+
+    let mut url = endpoint.clone();
+    let gateway_host = endpoint.host().unwrap();
+    let host = format!("{}.raw.{}", storage_canister_id, gateway_host);
+    url.set_host(Some(&host)).unwrap();
+    url.set_path("/test.png");
+    println!("url: {:?}", url);
+
+    let res = client.get(url.clone()).send().unwrap();
+    let received_bytes = res.bytes().unwrap().to_vec();
+
+    pic.stop_live();
+
+    // Check file size
+    assert_eq!(
+        buffer.len(),
+        received_bytes.len(),
+        "Uploaded image size does not match the original image size"
+    );
+
+    // Check file content
+    assert_eq!(
+        buffer,
+        received_bytes,
+        "Uploaded image content does not match the original image content"
+    );
+}
