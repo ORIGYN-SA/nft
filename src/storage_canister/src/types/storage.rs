@@ -1,4 +1,5 @@
 use candid::Nat;
+use ic_asset_certification::Asset;
 use ic_cdk::api::call::RejectionCode;
 use storage_api_canister::finalize_upload;
 use storage_api_canister::finalize_upload::FinalizeUploadResp;
@@ -18,9 +19,11 @@ use storage_api_canister::utils;
 use std::collections::HashMap;
 use crate::utils::trace;
 
+use super::http::certify_asset;
+
 const DEFAULT_CHUNK_SIZE: u64 = 1 * 1024 * 1024;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum UploadState {
     Init,
     InProgress,
@@ -29,7 +32,7 @@ pub enum UploadState {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct InternalRawStorageMetadata {
-    pub file_type: String,
+    pub file_path: String,
     pub file_hash: String,
     pub file_size: u64,
     pub received_size: u64,
@@ -165,7 +168,7 @@ impl StorageData {
         let num_chunks = (data.file_size + chunk_size - 1) / chunk_size;
 
         let metadata: InternalRawStorageMetadata = InternalRawStorageMetadata {
-            file_type: data.file_type,
+            file_path: data.file_path,
             file_hash: data.file_hash,
             file_size: data.file_size,
             received_size: 0,
@@ -262,7 +265,8 @@ impl StorageData {
         metadata.state = UploadState::Finalized;
 
         self.storage_raw_internal_metadata.insert(data.media_hash_id.clone(), metadata.clone());
-        self.storage_raw.insert(data.media_hash_id, file_data);
+        self.storage_raw.insert(data.media_hash_id, file_data.clone());
+        certify_asset(vec![Asset::new(metadata.file_path, file_data)]);
 
         Ok(finalize_upload::FinalizeUploadResp {})
     }
@@ -288,5 +292,19 @@ impl StorageData {
             }
             _ => Err("Data not finalized".to_string()),
         }
+    }
+
+    pub fn get_all_files(&self) -> Vec<(InternalRawStorageMetadata, Vec<u8>)> {
+        self.storage_raw_internal_metadata
+            .iter()
+            .filter_map(|(hash_id, metadata)| {
+                if metadata.state == UploadState::Finalized {
+                    let raw_data = self.storage_raw.get(hash_id).unwrap().clone();
+                    Some((metadata.clone(), raw_data))
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }

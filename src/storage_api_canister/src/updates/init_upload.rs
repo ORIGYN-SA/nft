@@ -6,7 +6,7 @@ use ic_cdk::api::call::CallResult as Result;
 
 #[derive(Serialize, Deserialize, CandidType)]
 pub struct Args {
-    pub file_type: String,
+    pub file_path: String,
     pub file_hash: String,
     pub file_size: u64,
     pub media_hash_id: String,

@@ -10,6 +10,7 @@ use serde::{ Deserialize, Serialize };
 use stable_memory::get_reader;
 use tracing::info;
 use types::BuildVersion;
+use crate::types::http::certify_all_assets;
 
 #[derive(CandidType, Serialize, Deserialize, Debug)]
 pub struct UpgradeArgs {
@@ -47,6 +48,7 @@ fn post_upgrade(args: Args) {
 
             canister_logger::init_with_logs(state.env.is_test_mode(), logs, traces);
             init_canister(state);
+            certify_all_assets();
 
             info!(version = %upgrade_args.version, "Post-upgrade complete");
         }

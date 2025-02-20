@@ -69,3 +69,5 @@ enum_dispatch = "0.3.13"
 typetag = "0.2.18"
 minicbor = { version = "0.25.1", features = ["alloc", "derive"] }
 canfund = "0.7.0"
+ic-asset-certification = "3.0.3"
+ic-http-certification = "3.0.3"

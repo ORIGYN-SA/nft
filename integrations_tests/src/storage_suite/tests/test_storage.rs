@@ -13,6 +13,7 @@ use candid::{ Encode, Decode, CandidType, Nat };
 
 use reqwest::blocking::Client;
 use reqwest::blocking::ClientBuilder;
+use reqwest::blocking::Response;
 use storage_api_canister::init_upload;
 use storage_api_canister::store_chunk;
 use storage_api_canister::finalize_upload;
@@ -57,7 +58,7 @@ fn test_storage_simple() {
         controller,
         storage_canister_id,
         &(init_upload::Args {
-            file_type,
+            file_path: "/test.png".to_string(),
             file_hash: format!("{:x}", file_hash),
             file_size,
             media_hash_id: media_hash_id.clone(),
@@ -134,8 +135,59 @@ fn test_storage_simple() {
     url.set_path("/test.png");
     println!("url: {:?}", url);
 
-    let res = client.get(url.clone()).send().unwrap();
-    let received_bytes = res.bytes().unwrap().to_vec();
+    let mut received_bytes = Vec::new();
+    let mut start = 0;
+    let mut chunk_size = 1024 * 1024; // Default chunk size
+    let max_retries = 5;
+
+    // Initial request to get the chunk size from the headers
+    let initial_res = client.get(url.clone()).send().unwrap();
+    if initial_res.status() == 206 {
+        if let Some(content_range) = initial_res.headers().get("content-range") {
+            let content_range_str = content_range.to_str().unwrap();
+            if let Some(range) = content_range_str.split('/').next() {
+                println!("content-range: {:?}", range);
+                let parts: Vec<&str> = range.split(' ').nth(1).unwrap().split('-').collect();
+                println!("parts: {:?}", parts);
+                if parts.len() == 2 {
+                    let start_range: usize = parts[0].parse().unwrap();
+                    let end_range: usize = parts[1].parse().unwrap();
+                    chunk_size = end_range - start_range + 1;
+                }
+            }
+        }
+    } else {
+        panic!("Failed to get initial response: {:?}", initial_res.status());
+    }
+
+    println!("initial_res: {:?}", initial_res);
+    println!("start: {:?}", start);
+    println!("buffer.len(): {:?}", buffer.len());
+    println!("chunk_size: {:?}", chunk_size);
+
+    while start < buffer.len() {
+        let end = (start + chunk_size - 1).min(buffer.len() - 1);
+        let range_header = format!("bytes={}-{}", start, end);
+        println!("range_header: {:?}", range_header);
+
+        let res = client.get(url.clone()).header("Range", range_header.clone()).send();
+
+        match res {
+            Ok(mut response) => {
+                println!("res: {:?}", response);
+
+                if response.status() == 206 {
+                    let mut chunk = Vec::new();
+                    response.copy_to(&mut chunk).unwrap();
+                    received_bytes.extend_from_slice(&chunk);
+                    start += chunk_size;
+                }
+            }
+            Err(e) => {
+                panic!("Failed to get response after {} retries: {:?}", max_retries, e);
+            }
+        }
+    }
 
     pic.stop_live();
 
