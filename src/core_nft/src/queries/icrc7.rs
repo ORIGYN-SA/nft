@@ -2,6 +2,7 @@ use crate::types::icrc7;
 use candid::Nat;
 use ic_cdk::update;
 use ic_cdk_macros::query;
+use icrc_ledger_types::icrc::generic_value::ICRC3Value;
 
 use crate::state::read_state;
 
@@ -95,7 +96,8 @@ pub async fn icrc7_token_metadata(
         match token {
             Some(token) => {
                 let metadata = token.token_metadata().await;
-                let metadata_vec = metadata.into_iter().collect();
+                let mut metadata_vec: Vec<(String, ICRC3Value)> = metadata.into_iter().collect();
+                metadata_vec.sort_by(|a, b| a.0.cmp(&b.0));
                 ret.push(Some(metadata_vec));
             }
             None => {

@@ -1,2 +1,2 @@
-pub type GetStorageSizeArgs = ();
-pub type GetStorageSizeResponse = u128;
+pub type Args = ();
+pub type Response = u128;

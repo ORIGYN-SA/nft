@@ -1,15 +1,10 @@
 use crate::lifecycle::init_canister;
-use crate::lifecycle::Args;
+use storage_api_canister::lifecycle::Args;
 use crate::state::{ Data, RuntimeState };
-use candid::CandidType;
-use candid::Principal;
 use canister_tracing_macros::trace;
 use ic_cdk_macros::init;
-use serde::{ Deserialize, Serialize };
 use tracing::info;
-use types::BuildVersion;
 use utils::env::{ CanisterEnv, Environment };
-use storage_api_canister::lifecycle::init::InitArgs;
 
 #[init]
 #[trace]
@@ -21,6 +16,7 @@ fn init(args: Args) {
                 init_args.version,
                 init_args.commit_hash
             );
+
             let mut data = Data::new(init_args.authorized_principals);
 
             if init_args.test_mode {

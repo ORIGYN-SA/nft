@@ -1,10 +1,13 @@
 use crate::guards::caller_is_governance_principal;
 use crate::state::mutate_state;
 use ic_cdk::{ api::call::RejectionCode, update };
+pub use storage_api_canister::init_upload;
+pub use storage_api_canister::store_chunk;
+pub use storage_api_canister::finalize_upload;
 pub use storage_api_canister::updates::{ insert_data, remove_data, update_data };
 
 #[update(guard = "caller_is_governance_principal")]
-pub fn insert_data(data: insert_data::InsertDataRequest) -> insert_data::InsertDataResponse {
+pub fn insert_data(data: insert_data::Args) -> insert_data::Response {
     match mutate_state(|state| state.data.insert_data(data.data, data.data_id, data.nft_id)) {
         Ok(hash_id) => Ok(insert_data::InsertDataResp { hash_id: hash_id }),
         Err(e) => Err((RejectionCode::CanisterError, e)),
@@ -12,7 +15,7 @@ pub fn insert_data(data: insert_data::InsertDataRequest) -> insert_data::InsertD
 }
 
 #[update(guard = "caller_is_governance_principal")]
-pub fn update_data(data: update_data::UpdateDataRequest) -> update_data::UpdateDataResponse {
+pub fn update_data(data: update_data::Args) -> update_data::Response {
     match mutate_state(|state| state.data.update_data(data.hash_id, data.data)) {
         Ok((hash_id, previous_data)) =>
             Ok(update_data::UpdateDataResp {
@@ -24,12 +27,36 @@ pub fn update_data(data: update_data::UpdateDataRequest) -> update_data::UpdateD
 }
 
 #[update(guard = "caller_is_governance_principal")]
-pub fn remove_data(data: remove_data::RemoveDataRequest) -> remove_data::RemoveDataResponse {
+pub fn remove_data(data: remove_data::Args) -> remove_data::Response {
     match mutate_state(|state| state.data.remove_data(data.hash_id)) {
         Ok(previous_data) =>
             Ok(remove_data::RemoveDataResp {
                 previous_data_value: previous_data,
             }),
+        Err(e) => Err((RejectionCode::CanisterError, e)),
+    }
+}
+
+#[update(guard = "caller_is_governance_principal")]
+pub fn init_upload(data: init_upload::Args) -> init_upload::Response {
+    match mutate_state(|state| state.data.init_upload(data)) {
+        Ok(_) => Ok(init_upload::InitUploadResp {}),
+        Err(e) => Err((RejectionCode::CanisterError, e)),
+    }
+}
+
+#[update(guard = "caller_is_governance_principal")]
+pub fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
+    match mutate_state(|state| state.data.store_chunk(data)) {
+        Ok(_) => Ok(store_chunk::StoreChunkResp {}),
+        Err(e) => Err((RejectionCode::CanisterError, e)),
+    }
+}
+
+#[update(guard = "caller_is_governance_principal")]
+pub fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Response {
+    match mutate_state(|state| state.data.finalize_upload(data)) {
+        Ok(_) => Ok(finalize_upload::FinalizeUploadResp {}),
         Err(e) => Err((RejectionCode::CanisterError, e)),
     }
 }

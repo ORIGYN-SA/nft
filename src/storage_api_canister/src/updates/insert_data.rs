@@ -5,7 +5,7 @@ use crate::types::value_custom::CustomValue as Value;
 use ic_cdk::api::call::CallResult as Result;
 
 #[derive(Serialize, Deserialize, CandidType)]
-pub struct InsertDataRequest {
+pub struct Args {
     pub data: Value,
     pub data_id: String,
     pub nft_id: Option<Nat>,
@@ -16,4 +16,4 @@ pub struct InsertDataResp {
     pub hash_id: String,
 }
 
-pub type InsertDataResponse = Result<InsertDataResp>;
+pub type Response = Result<InsertDataResp>;

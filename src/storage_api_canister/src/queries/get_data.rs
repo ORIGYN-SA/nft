@@ -5,7 +5,7 @@ use ic_cdk::api::call::CallResult as Result;
 use crate::types::value_custom::CustomValue as Value;
 
 #[derive(Serialize, Deserialize, CandidType)]
-pub struct GetDataRequest {
+pub struct Args {
     pub hash_id: String,
 }
 
@@ -14,4 +14,4 @@ pub struct GetDataResp {
     pub data_value: Value,
 }
 
-pub type GetDataResponse = Result<GetDataResp>;
+pub type Response = Result<GetDataResp>;

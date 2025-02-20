@@ -74,7 +74,6 @@ impl Icrc7Token {
                 trace(&format!("nft token_metadata - key: {:?}, value: {:?}", key, value));
                 metadata.insert(key.clone(), value.0.clone());
             });
-
         metadata
     }
 

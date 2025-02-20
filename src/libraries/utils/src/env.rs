@@ -1,10 +1,10 @@
-use candid::Principal;
+use candid::{ CandidType, Principal };
 use canister_time::now_nanos;
-use serde::{Deserialize, Serialize};
+use serde::{ Deserialize, Serialize };
 use types::BuildVersion;
-use types::{CanisterId, Cycles, TimestampMillis, TimestampNanos};
+use types::{ CanisterId, Cycles, TimestampMillis, TimestampNanos };
 
-#[derive(Default, Serialize, Deserialize, Clone)]
+#[derive(Default, CandidType, Serialize, Deserialize, Clone)]
 pub struct CanisterEnv {
     test_mode: bool,
     version: BuildVersion,

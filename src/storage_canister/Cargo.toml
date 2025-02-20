@@ -40,4 +40,5 @@ http_request = { path = '../libraries/http_request' }
 enum_dispatch = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
+ic0 = { workspace = true }
 storage_api_canister = { path = "../storage_api_canister", features = []}

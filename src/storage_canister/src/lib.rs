@@ -7,6 +7,7 @@ mod memory;
 
 pub mod queries;
 mod state;
+mod utils;
 pub mod types;
 pub mod updates;
 

@@ -1,9 +1,15 @@
 {
   "canisters": {
-    "origyn_nft": {
-      "candid": "./nft.did",
-      "package": "origyn_nft",
-      "type": "rust"
+    "storage": {
+      "build": ["./scripts/build.sh ./src storage_canister"],
+      "candid": "src/storage_canister/api/can.did",
+      "declarations": {
+        "bindings": ["js", "did"],
+        "env_override": null,
+        "output": "src/storage_canister/api/declarations"
+      },
+      "type": "custom",
+      "wasm": "src/storage_canister/wasm/storage_canister_canister.wasm.gz"
     }
   },
   "defaults": {

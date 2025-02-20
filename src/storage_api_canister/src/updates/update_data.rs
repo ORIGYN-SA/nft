@@ -5,7 +5,7 @@ use crate::types::value_custom::CustomValue as Value;
 use ic_cdk::api::call::CallResult as Result;
 
 #[derive(Serialize, Deserialize, CandidType)]
-pub struct UpdateDataRequest {
+pub struct Args {
     pub data: Value,
     pub hash_id: String,
 }
@@ -16,4 +16,4 @@ pub struct UpdateDataResp {
     pub previous_data_value: Option<Value>,
 }
 
-pub type UpdateDataResponse = Result<UpdateDataResp>;
+pub type Response = Result<UpdateDataResp>;
