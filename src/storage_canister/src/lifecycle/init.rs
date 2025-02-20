@@ -5,6 +5,7 @@ use canister_tracing_macros::trace;
 use ic_cdk_macros::init;
 use tracing::info;
 use utils::env::{ CanisterEnv, Environment };
+use crate::types::http::certify_all_assets;
 
 #[init]
 #[trace]
@@ -26,6 +27,7 @@ fn init(args: Args) {
             let runtime_state = RuntimeState::new(env, data);
 
             init_canister(runtime_state);
+            certify_all_assets();
 
             info!("Init complete.")
         }

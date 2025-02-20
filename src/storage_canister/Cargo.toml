@@ -42,3 +42,5 @@ sha2 = { workspace = true }
 hex = { workspace = true }
 ic0 = { workspace = true }
 storage_api_canister = { path = "../storage_api_canister", features = []}
+ic-asset-certification = { workspace = true}
+ic-http-certification = { workspace = true}
