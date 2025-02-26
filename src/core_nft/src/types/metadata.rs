@@ -24,7 +24,7 @@ impl Metadata {
         };
 
         for (key, value) in metadata.iter() {
-            new.insert_data(None, key.clone(), value.clone());
+            futures::executor::block_on(new.insert_data(None, key.clone(), value.clone()));
         }
 
         new

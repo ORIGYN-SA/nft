@@ -1,9 +1,8 @@
 use candid::{ CandidType, Nat, Principal };
 use canister_state_macros::canister_state;
-use storage_api_canister::{ finalize_upload, init_upload, store_chunk };
+use storage_api_canister::{ cancel_upload, delete_file, finalize_upload, init_upload, store_chunk };
 // use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
-use crate::types::storage::{ self, InternalRawStorageMetadata };
-use crate::utils::trace;
+use crate::types::storage;
 use serde::{ Deserialize, Serialize };
 use storage_api_canister::types::value_custom::CustomValue as Value;
 use types::BuildVersion;
@@ -47,6 +46,7 @@ impl RuntimeState {
 pub struct Data {
     pub authorized_principals: Vec<Principal>,
     pub storage: storage::StorageData,
+    pub http_cache: HttpCache,
 }
 
 impl Data {
@@ -55,6 +55,7 @@ impl Data {
         Self {
             authorized_principals: authorized_principals.into_iter().collect(),
             storage: storage::StorageData::default(),
+            http_cache: HttpCache::default(),
         }
     }
 
@@ -106,11 +107,18 @@ impl Data {
         self.storage.finalize_upload(data)
     }
 
-    pub fn get_raw_data(
-        &self,
-        hash_id: String
-    ) -> Result<(InternalRawStorageMetadata, Vec<u8>), String> {
-        self.storage.get_raw_data(hash_id)
+    pub fn cancel_upload(
+        &mut self,
+        media_hash_id: String
+    ) -> Result<cancel_upload::CancelUploadResp, String> {
+        self.storage.cancel_upload(media_hash_id)
+    }
+
+    pub fn delete_file(
+        &mut self,
+        media_hash_id: String
+    ) -> Result<delete_file::DeleteFileResp, String> {
+        self.storage.delete_file(media_hash_id)
     }
 }
 
@@ -128,6 +136,18 @@ pub struct CanisterInfo {
     pub commit_hash: String,
     pub memory_used: MemorySize,
     pub cycles_balance: Cycles,
+}
+#[derive(CandidType, Deserialize, Serialize)]
+pub struct HttpCache {
+    pub current_size: Nat,
+}
+
+impl Default for HttpCache {
+    fn default() -> Self {
+        Self {
+            current_size: Nat::from(0 as u64),
+        }
+    }
 }
 
 #[cfg(test)]

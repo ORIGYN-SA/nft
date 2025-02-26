@@ -8,6 +8,8 @@ use storage_api_canister::updates::{
     init_upload,
     store_chunk,
     finalize_upload,
+    cancel_upload,
+    delete_file,
 };
 
 generate_pocket_query_call!(get_data);
@@ -20,3 +22,5 @@ generate_pocket_update_call!(update_data);
 generate_pocket_update_call!(init_upload);
 generate_pocket_update_call!(store_chunk);
 generate_pocket_update_call!(finalize_upload);
+generate_pocket_update_call!(cancel_upload);
+generate_pocket_update_call!(delete_file);

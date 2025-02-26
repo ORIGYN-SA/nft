@@ -4,3 +4,5 @@ pub mod update_data;
 pub mod init_upload;
 pub mod store_chunk;
 pub mod finalize_upload;
+pub mod cancel_upload;
+pub mod delete_file;

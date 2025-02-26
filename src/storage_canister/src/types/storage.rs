@@ -1,8 +1,8 @@
 use candid::Nat;
 use ic_asset_certification::Asset;
-use ic_cdk::api::call::RejectionCode;
+use storage_api_canister::cancel_upload;
+use storage_api_canister::delete_file;
 use storage_api_canister::finalize_upload;
-use storage_api_canister::finalize_upload::FinalizeUploadResp;
 use storage_api_canister::init_upload;
 use storage_api_canister::store_chunk;
 use tracing::info;
@@ -18,8 +18,8 @@ use storage_api_canister::types::value_custom::CustomValue as Value;
 use storage_api_canister::utils;
 use std::collections::HashMap;
 use crate::utils::trace;
-
-use super::http::certify_asset;
+use super::http::{ certify_asset, uncertify_asset };
+use ic_cdk::trap;
 
 const DEFAULT_CHUNK_SIZE: u64 = 1 * 1024 * 1024;
 
@@ -149,6 +149,11 @@ impl StorageData {
         &mut self,
         data: init_upload::Args
     ) -> Result<init_upload::InitUploadResp, String> {
+        // Check if the file already exists
+        if self.storage_raw_internal_metadata.contains_key(&data.media_hash_id) {
+            return Err("File already exists".to_string());
+        }
+
         info!("self.get_storage_size_bytes(): {:?}", self.get_storage_size_bytes());
         trace(
             &format!(
@@ -156,6 +161,12 @@ impl StorageData {
                 self.get_storage_size_bytes()
             )
         );
+
+        // TODO gwojda this is temporary. in long term we add cache.
+        if (self.get_free_heap_size_bytes() as u128) < (data.file_size as u128) {
+            return Err("Not enough storage".to_string());
+        }
+
         if self.get_storage_size_bytes() < (data.file_size as u128) {
             return Err("Not enough storage".to_string());
         }
@@ -208,6 +219,11 @@ impl StorageData {
 
         if received_size + (data.chunk_data.len() as u64) > file_size {
             return Err("Chunk exceeds file size".to_string());
+        }
+
+        // Check if the chunk has already been stored
+        if !metadata.chunks[chunk_index].is_empty() {
+            return Err("Chunk already stored".to_string());
         }
 
         metadata.chunks[chunk_index] = data.chunk_data.clone();
@@ -271,29 +287,6 @@ impl StorageData {
         Ok(finalize_upload::FinalizeUploadResp {})
     }
 
-    pub fn get_raw_data(
-        &self,
-        media_hash_id: String
-    ) -> Result<(InternalRawStorageMetadata, Vec<u8>), String> {
-        trace(&format!("get_raw_data - hash_id: {:?}", media_hash_id));
-
-        let metadata = self.storage_raw_internal_metadata
-            .get(&media_hash_id)
-            .ok_or("Data not found".to_string())?;
-
-        trace(&format!("get_raw_data - metadata: {:?}", metadata));
-        match metadata.state {
-            UploadState::Finalized => {
-                let raw_data = self.storage_raw
-                    .get(&media_hash_id)
-                    .map(|v| v.clone())
-                    .ok_or("Data not found".to_string())?;
-                Ok((metadata.clone(), raw_data))
-            }
-            _ => Err("Data not finalized".to_string()),
-        }
-    }
-
     pub fn get_all_files(&self) -> Vec<(InternalRawStorageMetadata, Vec<u8>)> {
         self.storage_raw_internal_metadata
             .iter()
@@ -306,5 +299,44 @@ impl StorageData {
                 }
             })
             .collect()
+    }
+
+    pub fn cancel_upload(
+        &mut self,
+        media_hash_id: String
+    ) -> Result<cancel_upload::CancelUploadResp, String> {
+        let metadata = self.storage_raw_internal_metadata
+            .remove(&media_hash_id)
+            .ok_or("Upload not initialized".to_string())?;
+
+        if metadata.state == UploadState::Finalized {
+            trap("Cannot cancel a finalized upload");
+        }
+
+        Ok(cancel_upload::CancelUploadResp {})
+    }
+
+    pub fn delete_file(
+        &mut self,
+        media_hash_id: String
+    ) -> Result<delete_file::DeleteFileResp, String> {
+        let metadata = self.storage_raw_internal_metadata
+            .remove(&media_hash_id)
+            .ok_or("File not found".to_string())?;
+
+        if metadata.state != UploadState::Finalized {
+            trap("Cannot delete a file that is not finalized");
+        }
+
+        self.storage_raw.remove(&media_hash_id);
+        uncertify_asset(vec![Asset::new(metadata.file_path, vec![])]);
+
+        Ok(delete_file::DeleteFileResp {})
+    }
+
+    // TODO GWOJDA fix this method to get the real heap size
+    pub fn get_free_heap_size_bytes(&self) -> u64 {
+        let max_heap_size_wasm32 = 4 * 1024 * 1024 * 1024; // 4Gb
+        max_heap_size_wasm32 - 3 * 1024 * 1024 * 1024 // 1Gb
     }
 }

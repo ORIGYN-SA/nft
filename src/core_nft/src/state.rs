@@ -12,6 +12,7 @@ use types::BuildVersion;
 use types::{ Cycles, TimestampMillis };
 use utils::env::{ CanisterEnv, Environment };
 use utils::memory::MemorySize;
+use std::collections::BTreeSet;
 
 const STORAGE_WASM: &[u8] = include_bytes!(
     "../../storage_canister/wasm/storage_canister_canister.wasm.gz"
@@ -23,11 +24,18 @@ canister_state!(RuntimeState);
 pub struct RuntimeState {
     pub env: CanisterEnv,
     pub data: Data,
+    pub principal_guards: BTreeSet<Principal>,
+    pub internal_filestorage: InternalFilestorage,
 }
 
 impl RuntimeState {
     pub fn new(env: CanisterEnv, data: Data) -> Self {
-        RuntimeState { env, data }
+        RuntimeState {
+            env,
+            data,
+            principal_guards: BTreeSet::new(),
+            internal_filestorage: InternalFilestorage::new(),
+        }
     }
 
     pub fn is_caller_governance_principal(&self) -> bool {
@@ -216,5 +224,47 @@ pub struct CanisterInfo {
     pub cycles_balance: Cycles,
 }
 
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum UploadState {
+    Init,
+    InProgress,
+    Finalized,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct InternalFilestorageData {
+    pub state: UploadState,
+    pub canister: Principal,
+    pub path: String,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct InternalFilestorage {
+    pub map: HashMap<String, InternalFilestorageData>,
+}
+
+impl InternalFilestorage {
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::new(),
+        }
+    }
+
+    pub fn insert(&mut self, path: String, data: InternalFilestorageData) {
+        self.map.insert(path, data);
+    }
+
+    pub fn get(&self, path: &str) -> Option<&InternalFilestorageData> {
+        self.map.get(path)
+    }
+
+    pub fn remove(&mut self, path: &str) -> Option<InternalFilestorageData> {
+        self.map.remove(path)
+    }
+
+    pub fn contains_path(&self, path: &str) -> bool {
+        self.map.values().any(|data| data.path == path)
+    }
+}
 #[cfg(test)]
 mod tests {}
