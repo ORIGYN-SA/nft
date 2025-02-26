@@ -1,40 +1,131 @@
-use http_request::{build_json_response, build_response, encode_logs, extract_route, Route};
+use canister_logger::LogEntry;
 use ic_cdk_macros::query;
-use types::{HttpRequest, HttpResponse, TimestampMillis};
+use ic_http_certification::{
+    utils::add_v2_certificate_header,
+    DefaultCelBuilder,
+    HttpCertification,
+    HttpCertificationPath,
+    HttpCertificationTreeEntry,
+    HttpRequest,
+    HttpResponse,
+    StatusCode,
+    CERTIFICATE_EXPRESSION_HEADER_NAME,
+};
+use crate::{
+    types::http::{ get_asset_headers, ASSET_ROUTER, HTTP_TREE, NO_CACHE_ASSET_CACHE_CONTROL },
+    utils::trace,
+};
+use ic_cdk::api::data_certificate;
 
-use crate::state::{read_state, RuntimeState};
+use crate::state::read_state;
 
 #[query(hidden = true)]
-fn http_request(request: HttpRequest) -> HttpResponse {
-    fn get_logs_impl(since: Option<TimestampMillis>) -> HttpResponse {
-        encode_logs(canister_logger::export_logs(), since.unwrap_or(0))
-    }
+fn http_request(req: HttpRequest) -> HttpResponse {
+    trace(&format!("Received HTTP request: {:?}", req));
+    let path = req.get_path().expect("Failed to parse request path");
 
-    fn get_traces_impl(since: Option<TimestampMillis>) -> HttpResponse {
-        encode_logs(canister_logger::export_traces(), since.unwrap_or(0))
+    match path.as_str() {
+        "/logs" => serve_logs(canister_logger::export_logs()),
+        "/traces" => serve_logs(canister_logger::export_traces()),
+        "/metrics" => serve_metrics(),
+        _ => serve_asset(&req),
     }
+}
 
-    fn get_metrics_impl(state: &RuntimeState) -> HttpResponse {
-        build_json_response(&state.metrics())
-    }
+fn serve_logs(logs: Vec<LogEntry>) -> HttpResponse<'static> {
+    ASSET_ROUTER.with_borrow(|_| {
+        let body = serde_json::to_vec(&logs).expect("Failed to serialize metrics");
+        let headers = get_asset_headers(
+            vec![
+                (
+                    CERTIFICATE_EXPRESSION_HEADER_NAME.to_string(),
+                    DefaultCelBuilder::skip_certification().to_string(),
+                ),
+                ("content-type".to_string(), "application/json".to_string()),
+                ("cache-control".to_string(), NO_CACHE_ASSET_CACHE_CONTROL.to_string())
+            ]
+        );
+        let mut response = HttpResponse::builder()
+            .with_status_code(StatusCode::OK)
+            .with_body(body)
+            .with_headers(headers)
+            .build();
 
-    fn get_collection_logo(state: &RuntimeState) -> HttpResponse {
-        match state.data.logo.clone() {
-            Some(logo) => build_response(logo.clone(), "image/png"),
-            None => HttpResponse::not_found(),
+        HTTP_TREE.with(|tree| {
+            let tree = tree.borrow();
+
+            let metrics_tree_path = HttpCertificationPath::exact("/metrics");
+            let metrics_certification = HttpCertification::skip();
+            let metrics_tree_entry = HttpCertificationTreeEntry::new(
+                &metrics_tree_path,
+                metrics_certification
+            );
+            add_v2_certificate_header(
+                &data_certificate().expect("No data certificate available"),
+                &mut response,
+                &tree.witness(&metrics_tree_entry, "/metrics").unwrap(),
+                &metrics_tree_path.to_expr_path()
+            );
+
+            response
+        })
+    })
+}
+
+fn serve_metrics() -> HttpResponse<'static> {
+    ASSET_ROUTER.with_borrow(|_| {
+        let metrics = read_state(|state| state.metrics());
+        let body = serde_json::to_vec(&metrics).expect("Failed to serialize metrics");
+        let headers = get_asset_headers(
+            vec![
+                (
+                    CERTIFICATE_EXPRESSION_HEADER_NAME.to_string(),
+                    DefaultCelBuilder::skip_certification().to_string(),
+                ),
+                ("content-type".to_string(), "application/json".to_string()),
+                ("cache-control".to_string(), NO_CACHE_ASSET_CACHE_CONTROL.to_string())
+            ]
+        );
+        let mut response = HttpResponse::builder()
+            .with_status_code(StatusCode::OK)
+            .with_body(body)
+            .with_headers(headers)
+            .build();
+
+        HTTP_TREE.with(|tree| {
+            let tree = tree.borrow();
+
+            let metrics_tree_path = HttpCertificationPath::exact("/metrics");
+            let metrics_certification = HttpCertification::skip();
+            let metrics_tree_entry = HttpCertificationTreeEntry::new(
+                &metrics_tree_path,
+                metrics_certification
+            );
+            add_v2_certificate_header(
+                &data_certificate().expect("No data certificate available"),
+                &mut response,
+                &tree.witness(&metrics_tree_entry, "/metrics").unwrap(),
+                &metrics_tree_path.to_expr_path()
+            );
+
+            response
+        })
+    })
+}
+
+fn serve_asset(req: &HttpRequest) -> HttpResponse<'static> {
+    ASSET_ROUTER.with_borrow(|asset_router| {
+        if
+            let Ok(response) = asset_router.serve_asset(
+                &data_certificate().expect("No data certificate available"),
+                req
+            )
+        {
+            trace("Served asset");
+            response
+        } else {
+            trace("Failed to serve asset");
+            ic_cdk::trap("Failed to serve asset");
         }
-    }
-
-    match extract_route(&request.url) {
-        Route::Logs(since) => get_logs_impl(since),
-        Route::Traces(since) => get_traces_impl(since),
-        Route::Metrics => read_state(get_metrics_impl),
-        Route::Other(path, _) => {
-            if path == "logo" {
-                return read_state(get_collection_logo);
-            } else {
-                HttpResponse::not_found()
-            }
-        }
-    }
+    })
 }

@@ -6,6 +6,7 @@ pub mod metadata;
 pub mod nft;
 pub mod nft_metadata;
 pub mod sub_canister;
+pub mod http;
 
 pub use collection_metadata::*;
 pub use icrc37::*;

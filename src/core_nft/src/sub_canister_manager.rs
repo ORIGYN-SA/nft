@@ -17,10 +17,24 @@ use ic_cdk::api::management_canister::main::{
     LogVisibility,
 };
 use serde::{ Deserialize, Serialize };
+use storage_api_canister::cancel_upload;
+use storage_api_canister::delete_file;
 use storage_api_canister::types::value_custom::CustomValue as Value;
 use storage_api_canister::utils::get_value_size;
-use storage_canister_c2c_client::{ get_data, get_storage_size, insert_data };
+use storage_canister_c2c_client::{
+    get_data,
+    get_storage_size,
+    insert_data,
+    init_upload,
+    store_chunk,
+    finalize_upload,
+    cancel_upload,
+    delete_file,
+};
 use utils::retry_async::retry_async;
+use storage_api_canister::init_upload;
+use storage_api_canister::store_chunk;
+use storage_api_canister::finalize_upload;
 
 #[derive(Debug)]
 pub enum NewStorageError {
@@ -30,6 +44,7 @@ pub enum NewStorageError {
 }
 
 const MAX_STORAGE_SIZE: u128 = 500 * 1024 * 1024 * 1024; // 500 GiB TODO maybe we should put a be less here ?
+const MAX_FILE_SIZE: u128 = 2 * 1024 * 1024 * 1024; // 2 GiB
 
 // TODO
 
@@ -369,6 +384,54 @@ impl StorageSubCanisterManager {
         }
     }
 
+    pub async fn init_upload(
+        &mut self,
+        data: init_upload::Args
+    ) -> Result<(init_upload::InitUploadResp, Principal), String> {
+        let file_size: u128 = data.file_size as u128;
+        if file_size > MAX_FILE_SIZE {
+            return Err("File size exceeds the maximum limit of 2GB".to_string());
+        }
+
+        for canister in self.get_subcanisters_installed() {
+            match canister.get_storage_size().await {
+                Ok(size) if size + file_size <= MAX_STORAGE_SIZE => {
+                    match canister.init_upload(data.clone()).await {
+                        Ok(_) => {
+                            trace(&format!("Initialized upload"));
+                            return Ok((init_upload::InitUploadResp {}, canister.canister_id));
+                        }
+                        Err(_) => {
+                            continue;
+                        }
+                    }
+                }
+                _ => {
+                    continue;
+                }
+            }
+        }
+
+        trace(&format!("No available canister found, creating a new one"));
+        match self.sub_canister_manager.create_canister().await {
+            Ok(new_canister) => {
+                trace(&format!("Created a new canister with principal: {:?}", new_canister));
+                match new_canister.init_upload(data.clone()).await {
+                    Ok(_) => {
+                        trace(&format!("Initialized upload"));
+                        Ok((init_upload::InitUploadResp {}, new_canister.canister_id))
+                    }
+                    Err(e) => Err(format!("{e:?}")),
+                }
+            }
+            Err(e) => Err(format!("{e:?}")),
+        }
+    }
+
+    pub fn get_canister(&self, canister_id: Principal) -> Option<Canister> {
+        self.sub_canister_manager.sub_canisters.get(&canister_id).cloned()
+    }
+
     fn get_subcanisters_installed(&self) -> Vec<Canister> {
         self.sub_canister_manager
             .list_canisters()
@@ -487,6 +550,111 @@ impl Canister {
             Ok(_data) => {
                 match _data {
                     Ok(data) => Ok(data.data_value),
+                    Err(e) => Err(format!("{e:?}")),
+                }
+            }
+            Err(e) => Err(format!("{e:?}")),
+        }
+    }
+
+    pub async fn init_upload(
+        &self,
+        data: init_upload::Args
+    ) -> Result<init_upload::InitUploadResp, String> {
+        if self.state != CanisterState::Installed {
+            return Err("Canister is not installed".to_string());
+        }
+
+        let res = retry_async(|| { init_upload(self.canister_id, data.clone()) }, 3).await;
+
+        match res {
+            Ok(init_upload_response) => {
+                match init_upload_response {
+                    Ok(data) => Ok(data),
+                    Err(e) => Err(format!("{e:?}")),
+                }
+            }
+            Err(e) => Err(format!("{e:?}")),
+        }
+    }
+
+    pub async fn store_chunk(
+        &self,
+        data: store_chunk::Args
+    ) -> Result<store_chunk::StoreChunkResp, String> {
+        if self.state != CanisterState::Installed {
+            return Err("Canister is not installed".to_string());
+        }
+
+        let res = retry_async(|| { store_chunk(self.canister_id, data.clone()) }, 3).await;
+
+        match res {
+            Ok(store_chunk_response) => {
+                match store_chunk_response {
+                    Ok(data) => Ok(data),
+                    Err(e) => Err(format!("{e:?}")),
+                }
+            }
+            Err(e) => Err(format!("{e:?}")),
+        }
+    }
+
+    pub async fn finalize_upload(
+        &self,
+        data: finalize_upload::Args
+    ) -> Result<finalize_upload::FinalizeUploadResp, String> {
+        if self.state != CanisterState::Installed {
+            return Err("Canister is not installed".to_string());
+        }
+
+        let res = retry_async(|| { finalize_upload(self.canister_id, data.clone()) }, 3).await;
+
+        match res {
+            Ok(finalize_upload_response) => {
+                match finalize_upload_response {
+                    Ok(data) => Ok(data),
+                    Err(e) => Err(format!("{e:?}")),
+                }
+            }
+            Err(e) => Err(format!("{e:?}")),
+        }
+    }
+
+    pub async fn cancel_upload(
+        &self,
+        data: cancel_upload::Args
+    ) -> Result<cancel_upload::CancelUploadResp, String> {
+        if self.state != CanisterState::Installed {
+            return Err("Canister is not installed".to_string());
+        }
+
+        let res = retry_async(|| { cancel_upload(self.canister_id, data.clone()) }, 3).await;
+
+        match res {
+            Ok(cancel_upload_response) => {
+                match cancel_upload_response {
+                    Ok(data) => Ok(data),
+                    Err(e) => Err(format!("{e:?}")),
+                }
+            }
+            Err(e) => Err(format!("{e:?}")),
+        }
+    }
+
+    pub async fn delete_file(
+        &self,
+        data: delete_file::Args
+    ) -> Result<delete_file::DeleteFileResp, String> {
+        if self.state != CanisterState::Installed {
+            return Err("Canister is not installed".to_string());
+        }
+
+        let res = retry_async(|| { delete_file(self.canister_id, data.clone()) }, 3).await;
+
+        match res {
+            Ok(delete_file_response) => {
+                match delete_file_response {
+                    Ok(data) => Ok(data),
                     Err(e) => Err(format!("{e:?}")),
                 }
             }

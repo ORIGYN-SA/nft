@@ -37,3 +37,5 @@ enum_dispatch = { workspace = true }
 storage_api_canister = { path = "../storage_api_canister", features = []}
 ic0 = { workspace = true }
 canfund = {workspace = true }
+ic-asset-certification = { workspace = true}
+ic-http-certification = { workspace = true}

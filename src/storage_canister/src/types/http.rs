@@ -1,25 +1,11 @@
-use ic_asset_certification::{
-    Asset,
-    AssetConfig,
-    AssetEncoding,
-    AssetFallbackConfig,
-    AssetMap,
-    AssetRedirectKind,
-    AssetRouter,
-};
-use ic_cdk::{ api::{ data_certificate, set_certified_data }, * };
+use ic_asset_certification::{ Asset, AssetConfig, AssetEncoding, AssetRouter };
+use ic_cdk::api::set_certified_data;
 use ic_http_certification::{
-    utils::add_v2_certificate_header,
-    DefaultCelBuilder,
     HeaderField,
     HttpCertification,
     HttpCertificationPath,
     HttpCertificationTree,
     HttpCertificationTreeEntry,
-    HttpRequest,
-    HttpResponse,
-    StatusCode,
-    CERTIFICATE_EXPRESSION_HEADER_NAME,
 };
 use std::{ cell::RefCell, rc::Rc };
 
@@ -225,6 +211,20 @@ pub fn certify_asset(assets: Vec<Asset<'static, '_>>) {
     ASSET_ROUTER.with_borrow_mut(|asset_router| {
         // 4. Certify the assets using the `certify_assets` function from the `ic-asset-certification` crate.
         if let Err(err) = asset_router.certify_assets(assets, asset_configs) {
+            ic_cdk::trap(&format!("Failed to certify assets: {}", err));
+        }
+
+        // 5. Set the canister's certified data.
+        set_certified_data(&asset_router.root_hash());
+    });
+}
+
+pub fn uncertify_asset(assets: Vec<Asset<'static, '_>>) {
+    let asset_configs = get_asset_config();
+
+    ASSET_ROUTER.with_borrow_mut(|asset_router| {
+        // 4. Certify the assets using the `certify_assets` function from the `ic-asset-certification` crate.
+        if let Err(err) = asset_router.delete_assets(assets, asset_configs) {
             ic_cdk::trap(&format!("Failed to certify assets: {}", err));
         }
 

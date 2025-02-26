@@ -24,6 +24,13 @@ use core_nft::types::icrc7::{
     icrc7_tx_window,
 };
 use core_nft::types::management::{ mint, update_minting_authorities, update_nft_metadata };
+use storage_api_canister::updates::{
+    finalize_upload,
+    init_upload,
+    store_chunk,
+    cancel_upload,
+    delete_file,
+};
 
 generate_pocket_query_call!(icrc7_collection_metadata);
 generate_pocket_query_call!(icrc7_symbol);
@@ -52,3 +59,8 @@ generate_pocket_update_call!(icrc7_transfer);
 generate_pocket_update_call!(mint);
 generate_pocket_update_call!(update_nft_metadata);
 generate_pocket_update_call!(update_minting_authorities);
+generate_pocket_update_call!(init_upload);
+generate_pocket_update_call!(store_chunk);
+generate_pocket_update_call!(finalize_upload);
+generate_pocket_update_call!(cancel_upload);
+generate_pocket_update_call!(delete_file);

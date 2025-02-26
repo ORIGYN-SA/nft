@@ -15,6 +15,7 @@ use storage_api_canister::value_custom::CustomValue as Value;
 use tracing::info;
 use types::BuildVersion;
 use utils::env::{ CanisterEnv, Environment };
+use crate::types::http::certify_all_assets;
 
 #[derive(CandidType, Serialize, Deserialize, Debug)]
 pub struct InitArgs {
@@ -88,6 +89,7 @@ fn init(args: Args) {
             let runtime_state = RuntimeState::new(env, data);
 
             init_canister(runtime_state);
+            certify_all_assets();
 
             info!("Init complete.")
         }

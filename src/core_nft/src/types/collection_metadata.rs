@@ -1,6 +1,6 @@
 use crate::types::metadata::Metadata;
-use candid::{CandidType, Nat};
-use serde::{Deserialize, Serialize};
+use candid::{ CandidType, Nat };
+use serde::{ Deserialize, Serialize };
 use std::collections::HashMap;
 use storage_api_canister::types::value_custom::CustomValue as Value;
 

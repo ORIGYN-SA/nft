@@ -4,7 +4,7 @@ use serde::{ Deserialize, Serialize };
 use crate::types::value_custom::CustomValue as Value;
 use ic_cdk::api::call::CallResult as Result;
 
-#[derive(Serialize, Deserialize, CandidType)]
+#[derive(Serialize, Deserialize, CandidType, Clone, Debug)]
 pub struct Args {
     pub media_hash_id: String,
     pub chunk_id: Nat,
