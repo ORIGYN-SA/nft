@@ -27,6 +27,7 @@ use crate::state::read_state;
 async fn http_request(req: HttpRequest<'static>) -> HttpResponse<'static> {
     trace(&format!("Received request: {:?}", req));
     let path = req.get_path().expect("Failed to parse request path");
+    trace(&format!("Received request path: {:?}", path));
 
     match path.as_str() {
         "/logs" => serve_logs(canister_logger::export_logs()),
@@ -34,6 +35,8 @@ async fn http_request(req: HttpRequest<'static>) -> HttpResponse<'static> {
         "/metrics" => serve_metrics(),
         _ => {
             let asset_resp = serve_asset(&req);
+
+            trace(&format!("Asset response: {:?}", asset_resp));
 
             match asset_resp {
                 Some(response) => response,
@@ -49,10 +52,12 @@ async fn http_request(req: HttpRequest<'static>) -> HttpResponse<'static> {
                                     v.contains(ic_cdk::api::id().to_string().as_str())
                             )
                     {
+                        return HttpResponse::builder()
+                            .with_status_code(StatusCode::NOT_FOUND)
+                            .build();
+                    } else {
                         return HttpResponse::builder().with_upgrade(true).build();
                     }
-                    let response = HttpResponse::builder().with_upgrade(true).build();
-                    response
                 }
             }
         }
@@ -61,6 +66,7 @@ async fn http_request(req: HttpRequest<'static>) -> HttpResponse<'static> {
 
 #[update(hidden = true)]
 async fn http_request_update(req: HttpUpdateRequest<'static>) -> HttpUpdateResponse<'static> {
+    trace(&format!("Received update request: {:?}", req));
     let path = req.get_path().expect("Failed to parse request path");
 
     match path.as_str() {
@@ -71,8 +77,14 @@ async fn http_request_update(req: HttpUpdateRequest<'static>) -> HttpUpdateRespo
             });
             match cache_miss_ret {
                 Ok(_) => {
+                    let redirection_url = format!(
+                        "https://{}.raw.icp0.io{}",
+                        ic_cdk::api::id().to_string(),
+                        path.clone()
+                    );
+
                     let response = HttpResponse::temporary_redirect(
-                        path,
+                        redirection_url,
                         req.headers().to_vec()
                     ).build();
                     HttpUpdateResponse::from(response)

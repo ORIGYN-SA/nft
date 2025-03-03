@@ -10,7 +10,6 @@ use storage_api_canister::store_chunk;
 use storage_api_canister::finalize_upload;
 use storage_api_canister::cancel_upload;
 use storage_api_canister::delete_file;
-use storage_api_canister::update_cache_miss;
 
 pub mod get_storage_size {
     use super::*;
@@ -38,4 +37,3 @@ generate_candid_c2c_call!(store_chunk);
 generate_candid_c2c_call!(finalize_upload);
 generate_candid_c2c_call!(cancel_upload);
 generate_candid_c2c_call!(delete_file);
-generate_candid_c2c_call!(update_cache_miss);

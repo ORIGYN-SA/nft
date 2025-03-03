@@ -128,10 +128,10 @@ fn test_storage_simple() {
     let max_retries = 5;
 
     loop {
-        // Initial request to get the chunk size from the headers
         println!("url: {:?}", url);
         let initial_res = client.get(url.clone()).send().unwrap();
         if initial_res.status() == 307 {
+            println!("location header: {:?}", initial_res.headers().get("location"));
             if let Some(location) = initial_res.headers().get("location") {
                 let location_str = location.to_str().unwrap();
                 let sub_canister_id = location_str
@@ -144,7 +144,7 @@ fn test_storage_simple() {
                 let host = format!("{}.raw.{}", sub_canister_id, gateway_host);
 
                 url.set_host(Some(&host)).unwrap();
-                continue; // Refaire la requête avec la nouvelle URL
+                continue;
             }
         } else if initial_res.status() == 206 {
             if let Some(content_range) = initial_res.headers().get("content-range") {
@@ -160,7 +160,7 @@ fn test_storage_simple() {
                     }
                 }
             }
-            break; // Sortir de la boucle si la réponse est 206
+            break;
         } else {
             panic!("Failed to get initial response: {:?}", initial_res);
         }
@@ -614,7 +614,7 @@ fn test_delete_file() {
             controller,
             collection_canister_id,
             &(store_chunk::Args {
-                file_path: "/test.png".to_string(),
+                file_path: "/test_delete.png".to_string(),
                 chunk_id: Nat::from(chunk_index as u64),
                 chunk_data: chunk.to_vec(),
             })
@@ -629,7 +629,7 @@ fn test_delete_file() {
         controller,
         collection_canister_id,
         &(finalize_upload::Args {
-            file_path: "/test.png".to_string(),
+            file_path: "/test_delete.png".to_string(),
         })
     );
 
