@@ -1,4 +1,5 @@
 use canister_logger::LogEntry;
+use ic_cdk::{ trap, update };
 use ic_cdk_macros::query;
 use ic_http_certification::{
     utils::add_v2_certificate_header,
@@ -8,11 +9,14 @@ use ic_http_certification::{
     HttpCertificationTreeEntry,
     HttpRequest,
     HttpResponse,
+    HttpUpdateRequest,
+    HttpUpdateResponse,
     StatusCode,
     CERTIFICATE_EXPRESSION_HEADER_NAME,
 };
 use crate::{
-    types::http::{ get_asset_headers, ASSET_ROUTER, HTTP_TREE, NO_CACHE_ASSET_CACHE_CONTROL },
+    state::mutate_state,
+    types::http::{ self, get_asset_headers, ASSET_ROUTER, HTTP_TREE, NO_CACHE_ASSET_CACHE_CONTROL },
     utils::trace,
 };
 use ic_cdk::api::data_certificate;
@@ -20,14 +24,64 @@ use ic_cdk::api::data_certificate;
 use crate::state::read_state;
 
 #[query(hidden = true)]
-fn http_request(req: HttpRequest) -> HttpResponse {
+async fn http_request(req: HttpRequest<'static>) -> HttpResponse<'static> {
+    trace(&format!("Received request: {:?}", req));
     let path = req.get_path().expect("Failed to parse request path");
 
     match path.as_str() {
         "/logs" => serve_logs(canister_logger::export_logs()),
         "/traces" => serve_logs(canister_logger::export_traces()),
         "/metrics" => serve_metrics(),
-        _ => serve_asset(&req),
+        _ => {
+            let asset_resp = serve_asset(&req);
+
+            match asset_resp {
+                Some(response) => response,
+                None => {
+                    if
+                        req
+                            .headers()
+                            .to_vec()
+                            .iter()
+                            .any(
+                                |(k, v)|
+                                    k == "referer" &&
+                                    v.contains(ic_cdk::api::id().to_string().as_str())
+                            )
+                    {
+                        return HttpResponse::builder().with_upgrade(true).build();
+                    }
+                    let response = HttpResponse::builder().with_upgrade(true).build();
+                    response
+                }
+            }
+        }
+    }
+}
+
+#[update(hidden = true)]
+async fn http_request_update(req: HttpUpdateRequest<'static>) -> HttpUpdateResponse<'static> {
+    let path = req.get_path().expect("Failed to parse request path");
+
+    match path.as_str() {
+        _ => {
+            trace("Cache miss");
+            let cache_miss_ret = mutate_state(|state| {
+                state.data.storage.cache_miss(path.clone())
+            });
+            match cache_miss_ret {
+                Ok(_) => {
+                    let response = HttpResponse::temporary_redirect(
+                        path,
+                        req.headers().to_vec()
+                    ).build();
+                    HttpUpdateResponse::from(response)
+                }
+                Err(e) => {
+                    trap(&format!("Failed to cache miss: {:?}", e));
+                }
+            }
+        }
     }
 }
 
@@ -112,18 +166,14 @@ fn serve_metrics() -> HttpResponse<'static> {
     })
 }
 
-fn serve_asset(req: &HttpRequest) -> HttpResponse<'static> {
-    trace(&format!("serve_asset: {:?}", req));
+fn serve_asset(req: &HttpRequest) -> Option<HttpResponse<'static>> {
     ASSET_ROUTER.with_borrow(|asset_router| {
-        if
-            let Ok(response) = asset_router.serve_asset(
-                &data_certificate().expect("No data certificate available"),
-                req
-            )
-        {
-            response
+        let data_cert = data_certificate().expect("No data certificate available");
+
+        if let Ok(response) = asset_router.serve_asset(&data_cert, &req) {
+            Some(response)
         } else {
-            ic_cdk::trap("Failed to serve asset");
+            None
         }
     })
 }

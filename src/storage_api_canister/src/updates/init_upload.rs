@@ -9,7 +9,6 @@ pub struct Args {
     pub file_path: String,
     pub file_hash: String,
     pub file_size: u64,
-    pub media_hash_id: String,
     pub chunk_size: Option<u64>,
 }
 

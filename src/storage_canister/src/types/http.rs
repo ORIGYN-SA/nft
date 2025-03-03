@@ -210,7 +210,7 @@ pub fn certify_asset(assets: Vec<Asset<'static, '_>>) {
 
     ASSET_ROUTER.with_borrow_mut(|asset_router| {
         // 4. Certify the assets using the `certify_assets` function from the `ic-asset-certification` crate.
-        if let Err(err) = asset_router.certify_assets(assets, asset_configs) {
+        if let Err(err) = asset_router.certify_assets(assets.clone(), asset_configs) {
             ic_cdk::trap(&format!("Failed to certify assets: {}", err));
         }
 

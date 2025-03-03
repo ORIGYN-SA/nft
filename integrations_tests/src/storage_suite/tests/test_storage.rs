@@ -66,7 +66,6 @@ fn test_storage_simple() {
             file_path: "/test.png".to_string(),
             file_hash: format!("{:x}", file_hash),
             file_size,
-            media_hash_id: media_hash_id.clone(),
             chunk_size: None,
         })
     );
@@ -91,7 +90,7 @@ fn test_storage_simple() {
             controller,
             storage_canister_id,
             &(store_chunk::Args {
-                media_hash_id: media_hash_id.clone(),
+                file_path: "/test.png".to_string(),
                 chunk_id: Nat::from(chunk_index as u64),
                 chunk_data: chunk.to_vec(),
             })
@@ -115,7 +114,7 @@ fn test_storage_simple() {
         controller,
         storage_canister_id,
         &(finalize_upload::Args {
-            media_hash_id: media_hash_id.clone(),
+            file_path: "/test.png".to_string(),
         })
     );
 
@@ -153,6 +152,7 @@ fn test_storage_simple() {
 
     // Initial request to get the chunk size from the headers
     let initial_res = client.get(url.clone()).send().unwrap();
+    println!("initial_res: {:?}", initial_res);
     if initial_res.status() == 206 {
         if let Some(content_range) = initial_res.headers().get("content-range") {
             let content_range_str = content_range.to_str().unwrap();
@@ -248,7 +248,6 @@ fn test_duplicate_upload() {
             file_path: "/test.png".to_string(),
             file_hash: format!("{:x}", file_hash),
             file_size,
-            media_hash_id: media_hash_id.clone(),
             chunk_size: None,
         })
     );
@@ -264,7 +263,7 @@ fn test_duplicate_upload() {
             controller,
             storage_canister_id,
             &(store_chunk::Args {
-                media_hash_id: media_hash_id.clone(),
+                file_path: "/test.png".to_string(),
                 chunk_id: Nat::from(chunk_index as u64),
                 chunk_data: chunk.to_vec(),
             })
@@ -279,7 +278,7 @@ fn test_duplicate_upload() {
         controller,
         storage_canister_id,
         &(finalize_upload::Args {
-            media_hash_id: media_hash_id.clone(),
+            file_path: "/test.png".to_string(),
         })
     );
 
@@ -302,7 +301,6 @@ fn test_duplicate_upload() {
             file_path: "/test.png".to_string(),
             file_hash: format!("{:x}", file_hash),
             file_size,
-            media_hash_id: media_hash_id.clone(),
             chunk_size: None,
         })
     );
@@ -349,7 +347,6 @@ fn test_duplicate_chunk_upload() {
             file_path: "/test.png".to_string(),
             file_hash: format!("{:x}", file_hash),
             file_size,
-            media_hash_id: media_hash_id.clone(),
             chunk_size: None,
         })
     );
@@ -365,7 +362,7 @@ fn test_duplicate_chunk_upload() {
             controller,
             storage_canister_id,
             &(store_chunk::Args {
-                media_hash_id: media_hash_id.clone(),
+                file_path: "/test.png".to_string(),
                 chunk_id: Nat::from(chunk_index as u64),
                 chunk_data: chunk.to_vec(),
             })
@@ -377,7 +374,7 @@ fn test_duplicate_chunk_upload() {
             controller,
             storage_canister_id,
             &(store_chunk::Args {
-                media_hash_id: media_hash_id.clone(),
+                file_path: "/test.png".to_string(),
                 chunk_id: Nat::from(chunk_index as u64),
                 chunk_data: chunk.to_vec(),
             })
@@ -403,7 +400,7 @@ fn test_duplicate_chunk_upload() {
         controller,
         storage_canister_id,
         &(finalize_upload::Args {
-            media_hash_id: media_hash_id.clone(),
+            file_path: "/test.png".to_string(),
         })
     );
 
@@ -448,7 +445,6 @@ fn test_finalize_upload_missing_chunk() {
             file_path: "/test.png".to_string(),
             file_hash: format!("{:x}", file_hash),
             file_size,
-            media_hash_id: media_hash_id.clone(),
             chunk_size: None,
         })
     );
@@ -465,7 +461,7 @@ fn test_finalize_upload_missing_chunk() {
             controller,
             storage_canister_id,
             &(store_chunk::Args {
-                media_hash_id: media_hash_id.clone(),
+                file_path: "/test.png".to_string(),
                 chunk_id: Nat::from(chunk_index as u64),
                 chunk_data: chunk.to_vec(),
             })
@@ -481,7 +477,7 @@ fn test_finalize_upload_missing_chunk() {
         controller,
         storage_canister_id,
         &(finalize_upload::Args {
-            media_hash_id: media_hash_id.clone(),
+            file_path: "/test.png".to_string(),
         })
     );
 
@@ -527,7 +523,6 @@ fn test_upload_with_incorrect_chunk() {
             file_path: "/test.png".to_string(),
             file_hash: format!("{:x}", file_hash),
             file_size,
-            media_hash_id: media_hash_id.clone(),
             chunk_size: None,
         })
     );
@@ -548,7 +543,7 @@ fn test_upload_with_incorrect_chunk() {
             controller,
             storage_canister_id,
             &(store_chunk::Args {
-                media_hash_id: media_hash_id.clone(),
+                file_path: "/test.png".to_string(),
                 chunk_id: Nat::from(chunk_index as u64),
                 chunk_data: chunk,
             })
@@ -572,7 +567,7 @@ fn test_upload_with_incorrect_chunk() {
         controller,
         storage_canister_id,
         &(finalize_upload::Args {
-            media_hash_id: media_hash_id.clone(),
+            file_path: "/test.png".to_string(),
         })
     );
 
@@ -618,7 +613,6 @@ fn test_cancel_upload() {
             file_path: "/test_cancel.png".to_string(),
             file_hash: format!("{:x}", file_hash),
             file_size,
-            media_hash_id: media_hash_id.clone(),
             chunk_size: None,
         })
     );
@@ -637,7 +631,7 @@ fn test_cancel_upload() {
         controller,
         storage_canister_id,
         &(cancel_upload::Args {
-            media_hash_id: media_hash_id.clone(),
+            file_path: "/test_cancel.png".to_string(),
         })
     );
 
@@ -657,7 +651,7 @@ fn test_cancel_upload() {
         controller,
         storage_canister_id,
         &(finalize_upload::Args {
-            media_hash_id: media_hash_id.clone(),
+            file_path: "/test.png".to_string(),
         })
     );
 
@@ -703,7 +697,6 @@ fn test_delete_file() {
             file_path: "/test_delete.png".to_string(),
             file_hash: format!("{:x}", file_hash),
             file_size,
-            media_hash_id: media_hash_id.clone(),
             chunk_size: None,
         })
     );
@@ -719,7 +712,7 @@ fn test_delete_file() {
             controller,
             storage_canister_id,
             &(store_chunk::Args {
-                media_hash_id: media_hash_id.clone(),
+                file_path: "/test.png".to_string(),
                 chunk_id: Nat::from(chunk_index as u64),
                 chunk_data: chunk.to_vec(),
             })
@@ -734,7 +727,7 @@ fn test_delete_file() {
         controller,
         storage_canister_id,
         &(finalize_upload::Args {
-            media_hash_id: media_hash_id.clone(),
+            file_path: "/test.png".to_string(),
         })
     );
 
@@ -788,7 +781,7 @@ fn test_delete_file() {
         controller,
         storage_canister_id,
         &(delete_file::Args {
-            media_hash_id: media_hash_id.clone(),
+            file_path: "/test_delete.png".to_string(),
         })
     );
 

@@ -8,7 +8,7 @@ use candid::{ CandidType, Nat, Principal };
 use canister_state_macros::canister_state;
 use icrc_ledger_types::icrc1::account::Account;
 use serde::{ Deserialize, Serialize };
-use types::BuildVersion;
+use types::{ BuildVersion, TimestampNanos };
 use types::{ Cycles, TimestampMillis };
 use utils::env::{ CanisterEnv, Environment };
 use utils::memory::MemorySize;
@@ -233,6 +233,7 @@ pub enum UploadState {
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
 pub struct InternalFilestorageData {
+    pub init_timestamp: TimestampNanos,
     pub state: UploadState,
     pub canister: Principal,
     pub path: String,
@@ -264,6 +265,13 @@ impl InternalFilestorage {
 
     pub fn contains_path(&self, path: &str) -> bool {
         self.map.values().any(|data| data.path == path)
+    }
+
+    pub fn get_all_files(&self) -> Vec<(String, InternalFilestorageData)> {
+        self.map
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
     }
 }
 #[cfg(test)]

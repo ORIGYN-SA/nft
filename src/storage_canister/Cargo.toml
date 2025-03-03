@@ -44,3 +44,4 @@ ic0 = { workspace = true }
 storage_api_canister = { path = "../storage_api_canister", features = []}
 ic-asset-certification = { workspace = true}
 ic-http-certification = { workspace = true}
+canister_client = { path = "../libraries/canister_client" }
