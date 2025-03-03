@@ -136,6 +136,7 @@ fn test_storage_simple() {
             "uqqxf-5h777-77774-qaaaa-cai.raw.localhost",
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), url.port().unwrap())
         )
+        .redirect(reqwest::redirect::Policy::none())
         .build()
         .unwrap();
 
@@ -150,31 +151,45 @@ fn test_storage_simple() {
     let mut chunk_size = 1024 * 1024; // Default chunk size
     let max_retries = 5;
 
-    // Initial request to get the chunk size from the headers
-    let initial_res = client.get(url.clone()).send().unwrap();
-    println!("initial_res: {:?}", initial_res);
-    if initial_res.status() == 206 {
-        if let Some(content_range) = initial_res.headers().get("content-range") {
-            let content_range_str = content_range.to_str().unwrap();
-            if let Some(range) = content_range_str.split('/').next() {
-                println!("content-range: {:?}", range);
-                let parts: Vec<&str> = range.split(' ').nth(1).unwrap().split('-').collect();
-                println!("parts: {:?}", parts);
-                if parts.len() == 2 {
-                    let start_range: usize = parts[0].parse().unwrap();
-                    let end_range: usize = parts[1].parse().unwrap();
-                    chunk_size = end_range - start_range + 1;
+    loop {
+        // Initial request to get the chunk size from the headers
+        println!("url: {:?}", url);
+        let initial_res = client.get(url.clone()).send().unwrap();
+        if initial_res.status() == 307 {
+            println!("location header: {:?}", initial_res.headers().get("location"));
+            if let Some(location) = initial_res.headers().get("location") {
+                let location_str = location.to_str().unwrap();
+                let sub_canister_id = location_str
+                    .split('.')
+                    .next()
+                    .unwrap()
+                    .split('/')
+                    .last()
+                    .unwrap();
+                let host = format!("{}.raw.{}", sub_canister_id, gateway_host);
+
+                url.set_host(Some(&host)).unwrap();
+                continue;
+            }
+        } else if initial_res.status() == 206 {
+            if let Some(content_range) = initial_res.headers().get("content-range") {
+                let content_range_str = content_range.to_str().unwrap();
+                if let Some(range) = content_range_str.split('/').next() {
+                    println!("content-range: {:?}", range);
+                    let parts: Vec<&str> = range.split(' ').nth(1).unwrap().split('-').collect();
+                    println!("parts: {:?}", parts);
+                    if parts.len() == 2 {
+                        let start_range: usize = parts[0].parse().unwrap();
+                        let end_range: usize = parts[1].parse().unwrap();
+                        chunk_size = end_range - start_range + 1;
+                    }
                 }
             }
+            break;
+        } else {
+            panic!("Failed to get initial response: {:?}", initial_res);
         }
-    } else {
-        panic!("Failed to get initial response: {:?}", initial_res.status());
     }
-
-    println!("initial_res: {:?}", initial_res);
-    println!("start: {:?}", start);
-    println!("buffer.len(): {:?}", buffer.len());
-    println!("chunk_size: {:?}", chunk_size);
 
     while start < buffer.len() {
         let end = (start + chunk_size - 1).min(buffer.len() - 1);
@@ -701,6 +716,8 @@ fn test_delete_file() {
         })
     );
 
+    println!("init_upload_resp: {:?}", init_upload_resp);
+
     let mut offset = 0;
     let chunk_size = 1024 * 1024;
     let mut chunk_index = 0;
@@ -712,11 +729,13 @@ fn test_delete_file() {
             controller,
             storage_canister_id,
             &(store_chunk::Args {
-                file_path: "/test.png".to_string(),
+                file_path: "/test_delete.png".to_string(),
                 chunk_id: Nat::from(chunk_index as u64),
                 chunk_data: chunk.to_vec(),
             })
         );
+
+        println!("store chunk resp {:?}", store_chunk_resp);
 
         offset += chunk_size as usize;
         chunk_index += 1;
@@ -727,7 +746,7 @@ fn test_delete_file() {
         controller,
         storage_canister_id,
         &(finalize_upload::Args {
-            file_path: "/test.png".to_string(),
+            file_path: "/test_delete.png".to_string(),
         })
     );
 
@@ -750,6 +769,7 @@ fn test_delete_file() {
                 "uqqxf-5h777-77774-qaaaa-cai.raw.localhost",
                 SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), url.port().unwrap())
             )
+            .redirect(reqwest::redirect::Policy::none())
             .build()
             .unwrap();
 
@@ -765,7 +785,7 @@ fn test_delete_file() {
             response => {
                 println!("initial_res: {:?}", response);
 
-                if response.status().is_success() {
+                if response.status().is_success() || response.status().is_redirection() {
                     println!("File is accessible");
                 } else {
                     panic!("File should be accessible");
