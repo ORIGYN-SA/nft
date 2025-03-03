@@ -18,6 +18,7 @@ use storage_api_canister::types::value_custom::CustomValue as Value;
 use storage_api_canister::utils;
 use std::collections::HashMap;
 use crate::utils::trace;
+use super::http;
 use super::http::{ certify_asset, uncertify_asset };
 use ic_cdk::trap;
 
@@ -150,7 +151,7 @@ impl StorageData {
         data: init_upload::Args
     ) -> Result<init_upload::InitUploadResp, String> {
         // Check if the file already exists
-        if self.storage_raw_internal_metadata.contains_key(&data.media_hash_id) {
+        if self.storage_raw_internal_metadata.contains_key(&data.file_path) {
             return Err("File already exists".to_string());
         }
 
@@ -162,7 +163,6 @@ impl StorageData {
             )
         );
 
-        // TODO gwojda this is temporary. in long term we add cache.
         if (self.get_free_heap_size_bytes() as u128) < (data.file_size as u128) {
             return Err("Not enough storage".to_string());
         }
@@ -179,7 +179,7 @@ impl StorageData {
         let num_chunks = (data.file_size + chunk_size - 1) / chunk_size;
 
         let metadata: InternalRawStorageMetadata = InternalRawStorageMetadata {
-            file_path: data.file_path,
+            file_path: data.file_path.clone(),
             file_hash: data.file_hash,
             file_size: data.file_size,
             received_size: 0,
@@ -188,7 +188,7 @@ impl StorageData {
             state: UploadState::Init,
         };
 
-        self.storage_raw_internal_metadata.insert(data.media_hash_id.clone(), metadata);
+        self.storage_raw_internal_metadata.insert(data.file_path.clone(), metadata);
 
         Ok(init_upload::InitUploadResp {})
     }
@@ -197,10 +197,10 @@ impl StorageData {
         &mut self,
         data: store_chunk::Args
     ) -> Result<store_chunk::StoreChunkResp, String> {
-        trace(&format!("store_chunk - hash_id: {:?}", data.media_hash_id));
+        trace(&format!("store_chunk - hash_id: {:?}", data.file_path));
 
         let metadata = self.storage_raw_internal_metadata
-            .get_mut(&data.media_hash_id.clone())
+            .get_mut(&data.file_path.clone())
             .ok_or("Upload not initialized".to_string())?;
 
         match metadata.state {
@@ -236,15 +236,15 @@ impl StorageData {
         &mut self,
         data: finalize_upload::Args
     ) -> Result<finalize_upload::FinalizeUploadResp, String> {
-        trace(&format!("finalize_upload - hash_id: {:?}", data.media_hash_id));
+        trace(&format!("finalize_upload - hash_id: {:?}", data.file_path));
 
         let mut metadata = self.storage_raw_internal_metadata
-            .remove(&data.media_hash_id.clone())
+            .remove(&data.file_path.clone())
             .ok_or("Upload not initialized".to_string())?;
 
         match metadata.state {
             UploadState::Init => {
-                self.storage_raw_internal_metadata.insert(data.media_hash_id.clone(), metadata);
+                self.storage_raw_internal_metadata.insert(data.file_path.clone(), metadata);
                 return Err("Upload not started".to_string());
             }
             UploadState::InProgress => {}
@@ -280,9 +280,9 @@ impl StorageData {
         metadata.chunks.clear();
         metadata.state = UploadState::Finalized;
 
-        self.storage_raw_internal_metadata.insert(data.media_hash_id.clone(), metadata.clone());
-        self.storage_raw.insert(data.media_hash_id, file_data.clone());
-        certify_asset(vec![Asset::new(metadata.file_path, file_data)]);
+        self.storage_raw_internal_metadata.insert(data.file_path.clone(), metadata.clone());
+        self.storage_raw.insert(data.file_path, file_data.clone());
+        // certify_asset(vec![Asset::new(metadata.file_path, file_data)]);
 
         Ok(finalize_upload::FinalizeUploadResp {})
     }
@@ -303,10 +303,10 @@ impl StorageData {
 
     pub fn cancel_upload(
         &mut self,
-        media_hash_id: String
+        file_path: String
     ) -> Result<cancel_upload::CancelUploadResp, String> {
         let metadata = self.storage_raw_internal_metadata
-            .remove(&media_hash_id)
+            .remove(&file_path)
             .ok_or("Upload not initialized".to_string())?;
 
         if metadata.state == UploadState::Finalized {
@@ -318,25 +318,111 @@ impl StorageData {
 
     pub fn delete_file(
         &mut self,
-        media_hash_id: String
+        file_path: String
     ) -> Result<delete_file::DeleteFileResp, String> {
         let metadata = self.storage_raw_internal_metadata
-            .remove(&media_hash_id)
+            .remove(&file_path)
             .ok_or("File not found".to_string())?;
 
         if metadata.state != UploadState::Finalized {
             trap("Cannot delete a file that is not finalized");
         }
 
-        self.storage_raw.remove(&media_hash_id);
+        self.storage_raw.remove(&file_path);
         uncertify_asset(vec![Asset::new(metadata.file_path, vec![])]);
 
         Ok(delete_file::DeleteFileResp {})
     }
 
-    // TODO GWOJDA fix this method to get the real heap size
+    pub fn cache_miss(&self, path: String) -> Result<(), String> {
+        trace(&format!("cache_miss: {:?}", path));
+
+        let free_heap_size = self.get_free_heap_size_bytes();
+
+        let metadata = self.storage_raw_internal_metadata
+            .get(&path.clone())
+            .ok_or("Upload not initialized".to_string())?;
+
+        if metadata.state != UploadState::Finalized {
+            trace(
+                &format!(
+                    "This case should never happened ! skipping non-finalized file: {:?}",
+                    path
+                )
+            );
+
+            return Err("Upload not finalized".to_string());
+        }
+
+        let file_size = metadata.file_size as u64;
+
+        if free_heap_size < file_size {
+            trace(
+                &format!(
+                    "not enough storage, need to free cache : {:?} bytes requested",
+                    file_size - free_heap_size
+                )
+            );
+            self.free_http_cache(file_size - free_heap_size)?;
+        }
+
+        let file_data = self.storage_raw.get(&path).unwrap();
+
+        trace(&format!("certify_asset metadata : {:?}", metadata));
+
+        certify_asset(vec![Asset::new(path.clone(), file_data)]);
+
+        Ok(())
+    }
+
+    fn free_http_cache(&self, requested_size: u64) -> Result<(), String> {
+        trace(&format!("free_http_cache: {:?}", requested_size));
+
+        let mut freed_size = 0;
+
+        for (key, metadata) in &self.storage_raw_internal_metadata {
+            if freed_size >= requested_size {
+                break;
+            }
+
+            if metadata.state != UploadState::Finalized {
+                trace(
+                    &format!(
+                        "This case should never happened ! skipping non-finalized file: {:?}.",
+                        key
+                    )
+                );
+
+                continue;
+            }
+
+            let file_size = metadata.file_size as u64;
+
+            let file_data = self.storage_raw.get(key).unwrap().clone();
+
+            uncertify_asset(vec![Asset::new(metadata.file_path.clone(), file_data.clone())]);
+
+            freed_size += file_size;
+        }
+
+        Ok(())
+    }
+
+    #[cfg(target_arch = "wasm32")]
     pub fn get_free_heap_size_bytes(&self) -> u64 {
         let max_heap_size_wasm32 = 4 * 1024 * 1024 * 1024; // 4Gb
-        max_heap_size_wasm32 - 3 * 1024 * 1024 * 1024 // 1Gb
+        let ret =
+            max_heap_size_wasm32 -
+            (core::arch::wasm32::memory_size(0) as u64) * WASM_PAGE_SIZE_IN_BYTES; // 1Gb
+        trace(&format!("get_free_heap_size_bytes: {:?}", ret));
+        ret
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn get_free_heap_size_bytes(&self) -> u64 {
+        let max_heap_size_wasm32 = 4 * 1024 * 1024 * 1024; // 4Gb
+        let ret = max_heap_size_wasm32 - 3 * 1024 * 1024 * 1024; // 1Gb
+        trace(&format!("get_free_heap_size_bytes: {:?}", ret));
+        ret
     }
 }

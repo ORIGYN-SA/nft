@@ -6,3 +6,4 @@ pub mod store_chunk;
 pub mod finalize_upload;
 pub mod cancel_upload;
 pub mod delete_file;
+pub mod update_cache_miss;

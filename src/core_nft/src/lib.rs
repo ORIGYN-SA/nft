@@ -15,6 +15,7 @@ pub mod queries;
 mod sub_canister_manager;
 pub mod updates;
 mod utils;
+mod jobs;
 // mod migrations;
 
 mod state;

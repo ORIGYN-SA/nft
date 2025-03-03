@@ -30,7 +30,7 @@ pub fn update_data(data: update_data::Args) -> update_data::Response {
 
 #[update(guard = "caller_is_governance_principal")]
 pub fn remove_data(data: remove_data::Args) -> remove_data::Response {
-    match mutate_state(|state| state.data.remove_data(data.hash_id)) {
+    match mutate_state(|state| state.data.remove_data(data.file_path)) {
         Ok(previous_data) =>
             Ok(remove_data::RemoveDataResp {
                 previous_data_value: previous_data,
@@ -65,7 +65,7 @@ pub fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Response
 
 #[update(guard = "caller_is_governance_principal")]
 pub fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response {
-    match mutate_state(|state| state.data.cancel_upload(data.media_hash_id)) {
+    match mutate_state(|state| state.data.cancel_upload(data.file_path)) {
         Ok(_) => Ok(cancel_upload::CancelUploadResp {}),
         Err(e) => Err((RejectionCode::CanisterError, e)),
     }
@@ -73,7 +73,7 @@ pub fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response {
 
 #[update(guard = "caller_is_governance_principal")]
 pub fn delete_file(data: delete_file::Args) -> delete_file::Response {
-    match mutate_state(|state| state.data.delete_file(data.media_hash_id)) {
+    match mutate_state(|state| state.data.delete_file(data.file_path)) {
         Ok(_) => Ok(delete_file::DeleteFileResp {}),
         Err(e) => Err((RejectionCode::CanisterError, e)),
     }

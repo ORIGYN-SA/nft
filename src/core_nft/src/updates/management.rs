@@ -189,7 +189,8 @@ pub async fn init_upload(data: init_upload::Args) -> init_upload::Response {
 
     mutate_state(|state| {
         state.data.sub_canister_manager = sub_canister_manager;
-        state.internal_filestorage.insert(data.media_hash_id.clone(), InternalFilestorageData {
+        state.internal_filestorage.insert(data.file_path.clone(), InternalFilestorageData {
+            init_timestamp: ic_cdk::api::time(),
             state: crate::state::UploadState::Init,
             canister: canister,
             path: data.file_path,
@@ -207,13 +208,17 @@ pub async fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
         e,
     ))?;
 
-    let (canister_id, file_path) = match
-        read_state(|state| { state.internal_filestorage.get(&data.media_hash_id).cloned() })
+    let (init_timestamp, canister_id, file_path) = match
+        read_state(|state| { state.internal_filestorage.get(&data.file_path).cloned() })
     {
         Some(data) => {
             match data.state {
-                crate::state::UploadState::Init => { (data.canister, data.path) }
-                crate::state::UploadState::InProgress => { (data.canister, data.path) }
+                crate::state::UploadState::Init => {
+                    (data.init_timestamp, data.canister, data.path)
+                }
+                crate::state::UploadState::InProgress => {
+                    (data.init_timestamp, data.canister, data.path)
+                }
                 crate::state::UploadState::Finalized => {
                     return Err((
                         RejectionCode::CanisterError,
@@ -233,7 +238,7 @@ pub async fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
         Some(canister) => canister,
         None => {
             mutate_state(|state| {
-                state.internal_filestorage.remove(&data.media_hash_id);
+                state.internal_filestorage.remove(&data.file_path);
             });
             return Err((
                 RejectionCode::CanisterError,
@@ -252,7 +257,8 @@ pub async fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
         }
     }
     mutate_state(|state| {
-        state.internal_filestorage.insert(data.media_hash_id.clone(), InternalFilestorageData {
+        state.internal_filestorage.insert(data.file_path.clone(), InternalFilestorageData {
+            init_timestamp: init_timestamp,
             state: crate::state::UploadState::InProgress,
             canister: canister_id,
             path: file_path,
@@ -270,15 +276,17 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
         e,
     ))?;
 
-    let (media_path, canister_id) = match
-        read_state(|state| { state.internal_filestorage.get(&data.media_hash_id).cloned() })
+    let (init_timestamp, media_path, canister_id) = match
+        read_state(|state| { state.internal_filestorage.get(&data.file_path).cloned() })
     {
         Some(data) => {
             match data.state {
                 crate::state::UploadState::Init => {
                     return Err((RejectionCode::CanisterError, "Upload didnt started".to_string()));
                 }
-                crate::state::UploadState::InProgress => { (data.path, data.canister) }
+                crate::state::UploadState::InProgress => {
+                    (data.init_timestamp, data.path, data.canister)
+                }
                 crate::state::UploadState::Finalized => {
                     return Err((
                         RejectionCode::CanisterError,
@@ -298,7 +306,7 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
         Some(canister) => canister,
         None => {
             mutate_state(|state| {
-                state.internal_filestorage.remove(&data.media_hash_id);
+                state.internal_filestorage.remove(&data.file_path);
             });
             return Err((
                 RejectionCode::CanisterError,
@@ -322,7 +330,8 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
     add_redirection(media_path.clone(), redirection_url);
 
     mutate_state(|state| {
-        state.internal_filestorage.insert(data.media_hash_id.clone(), InternalFilestorageData {
+        state.internal_filestorage.insert(data.file_path.clone(), InternalFilestorageData {
+            init_timestamp: init_timestamp,
             state: crate::state::UploadState::Finalized,
             canister: canister_id,
             path: media_path,
@@ -341,7 +350,7 @@ pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response
     ))?;
 
     let (media_path, canister_id) = match
-        read_state(|state| { state.internal_filestorage.get(&data.media_hash_id).cloned() })
+        read_state(|state| { state.internal_filestorage.get(&data.file_path).cloned() })
     {
         Some(data) => {
             match data.state {
@@ -366,7 +375,7 @@ pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response
         Some(canister) => canister,
         None => {
             mutate_state(|state| {
-                state.internal_filestorage.remove(&data.media_hash_id);
+                state.internal_filestorage.remove(&data.file_path);
             });
             return Err((
                 RejectionCode::CanisterError,
@@ -386,7 +395,7 @@ pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response
     }
 
     mutate_state(|state| {
-        state.internal_filestorage.remove(&data.media_hash_id);
+        state.internal_filestorage.remove(&data.file_path);
     });
 
     Ok(cancel_upload::CancelUploadResp {})
@@ -401,7 +410,7 @@ pub async fn delete_file(data: delete_file::Args) -> delete_file::Response {
     ))?;
 
     let (media_path, canister_id) = match
-        read_state(|state| { state.internal_filestorage.get(&data.media_hash_id).cloned() })
+        read_state(|state| { state.internal_filestorage.get(&data.file_path).cloned() })
     {
         Some(data) => {
             match data.state {
@@ -425,7 +434,7 @@ pub async fn delete_file(data: delete_file::Args) -> delete_file::Response {
         Some(canister) => canister,
         None => {
             mutate_state(|state| {
-                state.internal_filestorage.remove(&data.media_hash_id);
+                state.internal_filestorage.remove(&data.file_path);
             });
             return Err((
                 RejectionCode::CanisterError,
@@ -445,7 +454,7 @@ pub async fn delete_file(data: delete_file::Args) -> delete_file::Response {
     }
 
     mutate_state(|state| {
-        state.internal_filestorage.remove(&data.media_hash_id);
+        state.internal_filestorage.remove(&data.file_path);
     });
 
     remove_redirection(
