@@ -11,18 +11,15 @@ use crate::client::storage::{
     cancel_upload,
     delete_file,
 };
-use candid::{ Encode, Decode, CandidType, Nat };
+use candid::Nat;
 
-use reqwest::blocking::Client;
 use reqwest::blocking::ClientBuilder;
-use reqwest::blocking::Response;
 use storage_api_canister::init_upload;
 use storage_api_canister::store_chunk;
 use storage_api_canister::finalize_upload;
 use storage_api_canister::cancel_upload;
 use storage_api_canister::delete_file;
 use sha2::{ Sha256, Digest };
-use types::HttpResponse;
 use std::net::{ IpAddr, Ipv4Addr, SocketAddr };
 
 use crate::storage_suite::setup::setup::TestEnv;
@@ -30,11 +27,6 @@ use crate::{ storage_suite::setup::default_test_setup, utils::tick_n_blocks };
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use std::thread::sleep;
-use std::time::Duration;
-use types::HttpRequest;
-use serde_bytes::ByteBuf;
-use serde_json::{ from_slice, Value };
 
 #[test]
 fn test_storage_simple() {
@@ -154,6 +146,7 @@ fn test_storage_simple() {
     loop {
         // Initial request to get the chunk size from the headers
         println!("url: {:?}", url);
+        pic.tick();
         let initial_res = client.get(url.clone()).send().unwrap();
         if initial_res.status() == 307 {
             println!("location header: {:?}", initial_res.headers().get("location"));

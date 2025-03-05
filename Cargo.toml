@@ -4,18 +4,16 @@ members = [
     "src/core_nft",
     "src/storage_canister",
     "src/storage_api_canister",
-    "src/libraries/candid_gen",
-    "src/libraries/canister_client",
     "src/libraries/canister_client_macros",
     "src/libraries/canister_logger",
     "src/libraries/canister_state_macros",
     "src/libraries/canister_time",
     "src/libraries/canister_tracing_macros",
-    "src/libraries/http_request",
     "src/libraries/serializer",
     "src/libraries/stable_memory",
     "src/libraries/types",
     "src/libraries/utils",
+    "src/libraries/subcanister_manager",
     "src/external_canisters/storage_canister/c2c_client",
 ]
 resolver = "2"
@@ -41,30 +39,30 @@ ic-transport-types = "0.39.3"
 ic0 = "0.23.0"
 icrc-ledger-types = "0.1.8"
 k256 = "0.13.1"
-proc-macro2 = "1.0.93"
-quote = "1.0.33"
+proc-macro2 = "1.0.94"
+quote = "1.0.39"
 rmp-serde = "1.1.2"
-serde = "1.0.196"
-serde_bytes = "0.11.12"
+serde = "1.0.218"
+serde_bytes = "0.11.16"
 serde_cbor = "0.11.2"
-serde_json = "1.0.138"
+serde_json = "1.0.140"
 serde_with = "3.7.0"
 serde_yaml = "0.9.29"
 serde_tokenstream = "0.2.2"
 sha2 = "0.10.8"
-syn = "2.0.98"
+syn = "2.0.99"
 tracing = "0.1.40"
 tracing-attributes = "0.1.27"
 tracing-subscriber = "0.3.18"
 num-bigint = "0.4.4"
-time = { version = "0.3.36", features = [
+time = { version = "0.3.38", features = [
   "macros",
   "serde",
   "parsing",
   "formatting",
 ] }
 pocket-ic = "6.0.0"
-async-trait = "0.1.86"
+async-trait = "0.1.87"
 enum_dispatch = "0.3.13"
 typetag = "0.2.18"
 minicbor = { version = "0.25.1", features = ["alloc", "derive"] }

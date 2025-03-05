@@ -5,22 +5,18 @@ use crate::client::core_nft::{
     cancel_upload,
     delete_file,
 };
-use candid::Principal;
-use candid::{ Encode, Decode, CandidType, Nat };
+use candid::Nat;
 
-use reqwest::blocking::Client;
 use reqwest::blocking::ClientBuilder;
-use reqwest::blocking::Response;
 use storage_api_canister::init_upload;
 use storage_api_canister::store_chunk;
 use storage_api_canister::finalize_upload;
 use storage_api_canister::cancel_upload;
 use storage_api_canister::delete_file;
 use sha2::{ Sha256, Digest };
-use types::HttpResponse;
 
 use crate::core_suite::setup::setup::TestEnv;
-use crate::{ core_suite::setup::default_test_setup, utils::tick_n_blocks };
+use crate::core_suite::setup::default_test_setup;
 use std::fs::File;
 use std::io::Read;
 use std::net::{ IpAddr, Ipv4Addr, SocketAddr };
