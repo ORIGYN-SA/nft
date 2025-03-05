@@ -12,7 +12,7 @@ mod guards;
 pub mod lifecycle;
 mod memory;
 pub mod queries;
-mod sub_canister_manager;
+mod subcanister_interface;
 pub mod updates;
 mod utils;
 mod jobs;

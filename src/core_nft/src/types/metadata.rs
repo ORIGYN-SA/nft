@@ -4,11 +4,11 @@ use std::collections::HashMap;
 use storage_api_canister::types::value_custom::CustomValue as Value;
 use crate::utils::trace;
 
-use crate::{ state::{ mutate_state, read_state }, sub_canister_manager::Canister };
+use crate::{ state::{ mutate_state, read_state }, types::sub_canister::StorageCanister };
 
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct Metadata {
-    data: HashMap<String, (String, Canister)>,
+    data: HashMap<String, (String, StorageCanister)>,
 }
 
 impl Metadata {

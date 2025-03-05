@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::sub_canister_manager::StorageSubCanisterManager;
+use crate::types::sub_canister::StorageSubCanisterManager;
 use crate::types::collection_metadata::CollectionMetadata;
 use crate::types::nft::Icrc7Token;
 use crate::types::sub_canister;
@@ -108,16 +108,16 @@ impl Data {
         approval_init: Option<InitApprovalsArg>
     ) -> Self {
         let sub_canister_manager = StorageSubCanisterManager::new(
-            sub_canister::InitArgs {
+            sub_canister::ArgsStorage::Init(sub_canister::InitArgs {
                 test_mode,
                 version,
                 commit_hash: commit_hash.clone(),
                 authorized_principals: authorized_principals.clone(),
-            },
-            sub_canister::UpgradeArgs {
+            }),
+            sub_canister::ArgsStorage::Upgrade(sub_canister::UpgradeArgs {
                 version,
                 commit_hash: commit_hash.clone(),
-            },
+            }),
             ic_cdk::api::id(),
             HashMap::new(),
             vec![],
