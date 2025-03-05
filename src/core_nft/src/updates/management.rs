@@ -1,6 +1,6 @@
 use crate::guards::{ caller_is_governance_principal, GuardManagement };
 use crate::state::{ mutate_state, read_state, InternalFilestorageData };
-use crate::sub_canister_manager::Canister;
+use crate::types::sub_canister::StorageCanister;
 use crate::types::{ icrc7, management, nft };
 use crate::utils::{ check_memo, hash_string_to_u64, trace };
 use candid::types::principal;
@@ -232,7 +232,7 @@ pub async fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
         }
     };
 
-    let canister: Canister = match
+    let canister: StorageCanister = match
         read_state(|state| state.data.sub_canister_manager.get_canister(canister_id.clone()))
     {
         Some(canister) => canister,
@@ -300,7 +300,7 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
         }
     };
 
-    let canister: Canister = match
+    let canister: StorageCanister = match
         read_state(|state| state.data.sub_canister_manager.get_canister(canister_id.clone()))
     {
         Some(canister) => canister,
@@ -369,7 +369,7 @@ pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response
         }
     };
 
-    let canister: Canister = match
+    let canister: StorageCanister = match
         read_state(|state| state.data.sub_canister_manager.get_canister(canister_id.clone()))
     {
         Some(canister) => canister,
@@ -428,7 +428,7 @@ pub async fn delete_file(data: delete_file::Args) -> delete_file::Response {
         }
     };
 
-    let canister: Canister = match
+    let canister: StorageCanister = match
         read_state(|state| state.data.sub_canister_manager.get_canister(canister_id.clone()))
     {
         Some(canister) => canister,
