@@ -12,7 +12,6 @@ mod guards;
 pub mod lifecycle;
 mod memory;
 pub mod queries;
-mod subcanister_interface;
 pub mod updates;
 mod utils;
 mod jobs;

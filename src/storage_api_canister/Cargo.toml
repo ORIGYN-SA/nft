@@ -32,7 +32,7 @@ utils = { path = "../libraries/utils" }
 futures = { workspace = true }
 icrc-ledger-types = { workspace = true }
 async-trait = { workspace = true }
-http_request = { path = '../libraries/http_request' }
 enum_dispatch = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
+ic-http-certification = { workspace = true}

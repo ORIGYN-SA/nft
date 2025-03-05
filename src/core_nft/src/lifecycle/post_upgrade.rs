@@ -1,7 +1,7 @@
 use crate::lifecycle::init_canister;
 use crate::memory::get_upgrades_memory;
 use crate::state::RuntimeState;
-use crate::subcanister_interface::SubCanister;
+use subcanister_manager::SubCanister;
 use crate::Args;
 use candid::{ CandidType, Principal };
 use canfund::{

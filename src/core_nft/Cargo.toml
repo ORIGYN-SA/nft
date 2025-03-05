@@ -10,10 +10,6 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 candid = { workspace = true }
-canister_logger = { path = "../libraries/canister_logger" }
-canister_state_macros = { path = "../libraries/canister_state_macros" }
-canister_tracing_macros = { path = "../libraries/canister_tracing_macros" }
-canister_time = { path = "../libraries/canister_time" }
 ic-cdk = { workspace = true }
 ic-cdk-macros = { workspace = true }
 ic-cdk-timers = { workspace = true }
@@ -24,18 +20,23 @@ storage_canister_c2c_client = { path = "../external_canisters/storage_canister/c
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_bytes = { workspace = true }
-serializer = { path = "../libraries/serializer" }
-stable_memory = { path = "../libraries/stable_memory" }
 tracing = { workspace = true }
-types = { path = "../libraries/types" }
-utils = { path = "../libraries/utils" }
 futures = { workspace = true }
 icrc-ledger-types = { workspace = true }
 async-trait = { workspace = true }
-http_request = { path = '../libraries/http_request' }
 enum_dispatch = { workspace = true }
 storage_api_canister = { path = "../storage_api_canister", features = []}
 ic0 = { workspace = true }
 canfund = {workspace = true }
 ic-asset-certification = { workspace = true}
 ic-http-certification = { workspace = true}
+
+canister_logger = { path = "../libraries/canister_logger" }
+canister_state_macros = { path = "../libraries/canister_state_macros" }
+canister_tracing_macros = { path = "../libraries/canister_tracing_macros" }
+canister_time = { path = "../libraries/canister_time" }
+serializer = { path = "../libraries/serializer" }
+stable_memory = { path = "../libraries/stable_memory" }
+types = { path = "../libraries/types" }
+utils = { path = "../libraries/utils" }
+subcanister_manager = { path = "../libraries/subcanister_manager" }
