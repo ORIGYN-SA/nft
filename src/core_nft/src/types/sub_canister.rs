@@ -29,24 +29,19 @@ use subcanister_manager;
 const MAX_STORAGE_SIZE: u128 = 500 * 1024 * 1024 * 1024; // 500 GiB TODO maybe we should put a be less here ?
 const MAX_FILE_SIZE: u128 = 2 * 1024 * 1024 * 1024; // 2 GiB
 
-pub use storage_api_canister::lifecycle::{
-    init::InitArgs,
-    post_upgrade::UpgradeArgs,
-    Args as ArgsStorage,
-};
+pub use storage_api_canister::lifecycle::Args as ArgsStorage;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct StorageSubCanisterManager {
-    sub_canister_manager: subcanister_manager::SubCanisterManager<
-        sub_canister::ArgsStorage,
-        StorageCanister
-    >,
+    sub_canister_manager: subcanister_manager::SubCanisterManager<StorageCanister>,
+    init_args: ArgsStorage,
+    upgrade_args: ArgsStorage,
 }
 
 impl StorageSubCanisterManager {
     pub fn new(
-        init_args: sub_canister::ArgsStorage,
-        upgrade_args: sub_canister::ArgsStorage,
+        init_args: ArgsStorage,
+        upgrade_args: ArgsStorage,
         master_canister_id: Principal,
         sub_canisters: HashMap<Principal, Box<StorageCanister>>,
         controllers: Vec<Principal>,
@@ -59,8 +54,6 @@ impl StorageSubCanisterManager {
     ) -> Self {
         Self {
             sub_canister_manager: subcanister_manager::SubCanisterManager::new(
-                init_args,
-                upgrade_args,
                 master_canister_id,
                 sub_canisters,
                 controllers,
@@ -71,6 +64,8 @@ impl StorageSubCanisterManager {
                 commit_hash,
                 wasm
             ),
+            init_args,
+            upgrade_args,
         }
     }
 
@@ -104,7 +99,7 @@ impl StorageSubCanisterManager {
 
         trace(&format!("SubCanisterManager no canister available found, create a new one"));
         // if no canister has enough space, create a new one
-        match self.sub_canister_manager.create_canister().await {
+        match self.sub_canister_manager.create_canister(self.init_args.clone()).await {
             Ok(new_canister) => {
                 trace(
                     &format!(
@@ -173,7 +168,7 @@ impl StorageSubCanisterManager {
         }
 
         trace(&format!("No available canister found, creating a new one"));
-        match self.sub_canister_manager.create_canister().await {
+        match self.sub_canister_manager.create_canister(self.init_args.clone()).await {
             Ok(new_canister) => {
                 trace(&format!("Created a new canister with principal: {:?}", new_canister));
                 if
@@ -227,18 +222,16 @@ impl StorageSubCanisterManager {
 }
 
 impl subcanister_manager::SubCanister for StorageSubCanisterManager {
-    type InitArgs = sub_canister::InitArgs;
-    type UpgradeArgs = sub_canister::UpgradeArgs;
     type Canister = StorageCanister;
 
     async fn create_canister(
         &mut self
     ) -> Result<Box<impl Canister>, subcanister_manager::NewCanisterError> {
-        self.sub_canister_manager.create_canister().await
+        self.sub_canister_manager.create_canister(self.init_args.clone()).await
     }
 
     async fn update_canisters(&mut self) -> Result<(), Vec<String>> {
-        self.sub_canister_manager.update_canisters().await
+        self.sub_canister_manager.update_canisters(self.upgrade_args.clone()).await
     }
 
     fn list_canisters(&self) -> Vec<Box<impl Canister>> {

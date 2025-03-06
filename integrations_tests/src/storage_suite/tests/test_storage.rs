@@ -146,7 +146,6 @@ fn test_storage_simple() {
     loop {
         // Initial request to get the chunk size from the headers
         println!("url: {:?}", url);
-        pic.tick();
         let initial_res = client.get(url.clone()).send().unwrap();
         if initial_res.status() == 307 {
             println!("location header: {:?}", initial_res.headers().get("location"));

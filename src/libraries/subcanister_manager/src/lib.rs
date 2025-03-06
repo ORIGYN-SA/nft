@@ -27,8 +27,6 @@ pub enum NewCanisterError {
 }
 
 pub trait SubCanister {
-    type InitArgs: Send + Sync;
-    type UpgradeArgs: Send + Sync;
     type Canister: Send + Sync;
 
     fn create_canister(
@@ -40,12 +38,7 @@ pub trait SubCanister {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct SubCanisterManager<U, T>
-    where
-        T: Canister + Clone + Serialize + Debug + Send + Sync,
-        U: Clone + Serialize + CandidType + Send + Sync {
-    pub init_args: U,
-    pub upgrade_args: U,
+pub struct SubCanisterManager<T> where T: Canister + Clone + Serialize + Debug + Send + Sync {
     pub master_canister_id: Principal,
     pub sub_canisters: HashMap<Principal, Box<T>>,
     pub controllers: Vec<Principal>,
@@ -57,14 +50,8 @@ pub struct SubCanisterManager<U, T>
     pub wasm: Vec<u8>,
 }
 
-impl<U, T> SubCanisterManager<U, T>
-    where
-        T: Canister + Clone + Serialize + Debug + Send + Sync,
-        U: Clone + Serialize + CandidType + Send + Sync
-{
+impl<T> SubCanisterManager<T> where T: Canister + Clone + Serialize + Debug + Send + Sync {
     pub fn new(
-        init_args: U,
-        upgrade_args: U,
         master_canister_id: Principal,
         sub_canisters: HashMap<Principal, Box<T>>,
         mut controllers: Vec<Principal>,
@@ -79,8 +66,6 @@ impl<U, T> SubCanisterManager<U, T>
         authorized_principal.push(master_canister_id);
 
         Self {
-            init_args,
-            upgrade_args,
             master_canister_id,
             sub_canisters,
             controllers,
@@ -93,11 +78,14 @@ impl<U, T> SubCanisterManager<U, T>
         }
     }
 
-    pub fn create_canister(
-        &mut self
+    pub fn create_canister<U>(
+        &mut self,
+        init_args: U
     ) -> impl Future<Output = Result<Box<impl Canister + Debug + Clone>, NewCanisterError>> +
-        Send +
-        '_ {
+            Send +
+            '_
+        where U: Clone + Serialize + CandidType + Send + Sync + 'static
+    {
         async move {
             // find in self.sub_canisters if a canister is already created but not installed
             let mut canister_id = Principal::anonymous();
@@ -143,7 +131,7 @@ impl<U, T> SubCanisterManager<U, T>
                 );
             }
 
-            let init_args = match Encode!(&self.init_args.clone()) {
+            let init_args = match Encode!(&init_args.clone()) {
                 Ok(encoded_init_args) => encoded_init_args,
                 Err(e) => {
                     return Err(NewCanisterError::FailedToSerializeInitArgs(format!("{e}")));
@@ -172,11 +160,14 @@ impl<U, T> SubCanisterManager<U, T>
         }
     }
 
-    pub fn update_canisters(
-        &mut self
-    ) -> impl Future<Output = Result<(), Vec<String>>> + Send + '_ {
+    pub fn update_canisters<U>(
+        &mut self,
+        update_args: U
+    ) -> impl Future<Output = Result<(), Vec<String>>> + Send + '_
+        where U: Clone + Serialize + CandidType + Send + Sync + 'static
+    {
         async move {
-            let init_args = match Encode!(&self.upgrade_args.clone()) {
+            let init_args = match Encode!(&update_args.clone()) {
                 Ok(encoded_init_args) => encoded_init_args,
                 Err(e) => {
                     return Err(
