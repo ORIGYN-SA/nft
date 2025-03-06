@@ -13,6 +13,7 @@ use types::{ Cycles, TimestampMillis };
 use utils::env::{ CanisterEnv, Environment };
 use utils::memory::MemorySize;
 use std::collections::BTreeSet;
+pub use storage_api_canister::lifecycle::{ init::InitArgs, post_upgrade::UpgradeArgs };
 
 const STORAGE_WASM: &[u8] = include_bytes!(
     "../../storage_canister/wasm/storage_canister_canister.wasm.gz"
@@ -108,13 +109,13 @@ impl Data {
         approval_init: Option<InitApprovalsArg>
     ) -> Self {
         let sub_canister_manager = StorageSubCanisterManager::new(
-            sub_canister::ArgsStorage::Init(sub_canister::InitArgs {
+            sub_canister::ArgsStorage::Init(InitArgs {
                 test_mode,
                 version,
                 commit_hash: commit_hash.clone(),
                 authorized_principals: authorized_principals.clone(),
             }),
-            sub_canister::ArgsStorage::Upgrade(sub_canister::UpgradeArgs {
+            sub_canister::ArgsStorage::Upgrade(UpgradeArgs {
                 version,
                 commit_hash: commit_hash.clone(),
             }),

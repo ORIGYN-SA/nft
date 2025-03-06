@@ -39,7 +39,11 @@ async fn http_request(req: HttpRequest<'static>) -> HttpResponse<'static> {
             trace(&format!("Asset response: {:?}", asset_resp));
 
             match asset_resp {
-                Some(response) => response,
+                Some(response) => {
+                    trace(&format!("Serving body size: {:?}", response.body().len()));
+                    trace(&format!("Serving headers: {:?}", response.headers()));
+                    response
+                }
                 None => {
                     if
                         req
