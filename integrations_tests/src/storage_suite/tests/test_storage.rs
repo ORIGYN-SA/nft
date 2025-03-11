@@ -19,7 +19,12 @@ use storage_api_canister::store_chunk;
 use storage_api_canister::finalize_upload;
 use storage_api_canister::cancel_upload;
 use storage_api_canister::delete_file;
+use storage_api_canister::updates::insert_data;
+use storage_api_canister::updates::remove_data;
+use storage_api_canister::updates::update_data;
 use sha2::{ Sha256, Digest };
+use storage_api_canister::value_custom::CustomValue;
+use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
 
 use crate::storage_suite::setup::setup::TestEnv;
 use crate::{ storage_suite::setup::default_test_setup, utils::tick_n_blocks };
@@ -31,6 +36,7 @@ use http::Request;
 use ic_agent::Agent;
 use bytes::Bytes;
 use http_body_util::BodyExt;
+use std::panic::AssertUnwindSafe;
 
 #[test]
 fn test_storage_simple() {
@@ -820,20 +826,187 @@ fn test_delete_file() {
     }
 }
 
-fn assert_response_metadata(
-    response_metadata: HttpGatewayResponseMetadata,
-    expected_response_metadata: HttpGatewayResponseMetadata
-) {
-    assert_eq!(
-        response_metadata.upgraded_to_update_call,
-        expected_response_metadata.upgraded_to_update_call
-    );
-    assert_eq!(
-        response_metadata.response_verification_version,
-        expected_response_metadata.response_verification_version
-    );
-}
+#[test]
+fn test_non_governance_principal_rejection() {
+    let mut test_env: TestEnv = default_test_setup();
+    println!("test_env: {:?}", test_env);
 
-fn contains_header(header_name: &str, headers: Vec<(&str, &str)>) -> bool {
-    headers.iter().any(|(key, _)| *key == header_name)
+    let TestEnv { ref mut pic, storage_canister_id, controller, nft_owner1, nft_owner2 } = test_env;
+
+    let non_governance_principal = nft_owner1;
+
+    let file_path = "/test_non_governance.png".to_string();
+    let file_hash = "dummy_hash".to_string();
+    let file_size = 1024;
+    let chunk_data = vec![0u8; 1024];
+    let data_id = "data_id".to_string();
+    let hash_id = "hash_id".to_string();
+
+    let methods: Vec<(&str, Result<(), String>)> = vec![
+        (
+            "cancel_upload",
+            std::panic
+                ::catch_unwind(
+                    AssertUnwindSafe(|| {
+                        cancel_upload(
+                            pic,
+                            non_governance_principal,
+                            storage_canister_id,
+                            &(cancel_upload::Args { file_path: file_path.clone() })
+                        )
+                            .map(|_| ())
+                            .map_err(|e| format!("{:?}", e))
+                    })
+                )
+                .unwrap_or_else(|_| Err("panic occurred".to_string())),
+        ),
+        (
+            "delete_file",
+            std::panic
+                ::catch_unwind(
+                    AssertUnwindSafe(|| {
+                        delete_file(
+                            pic,
+                            non_governance_principal,
+                            storage_canister_id,
+                            &(delete_file::Args { file_path: file_path.clone() })
+                        )
+                            .map(|_| ())
+                            .map_err(|e| format!("{:?}", e))
+                    })
+                )
+                .unwrap_or_else(|_| Err("panic occurred".to_string())),
+        ),
+        (
+            "init_upload",
+            std::panic
+                ::catch_unwind(
+                    AssertUnwindSafe(|| {
+                        init_upload(
+                            pic,
+                            non_governance_principal,
+                            storage_canister_id,
+                            &(init_upload::Args {
+                                file_path: file_path.clone(),
+                                file_hash: file_hash.clone(),
+                                file_size,
+                                chunk_size: None,
+                            })
+                        )
+                            .map(|_| ())
+                            .map_err(|e| format!("{:?}", e))
+                    })
+                )
+                .unwrap_or_else(|_| Err("panic occurred".to_string())),
+        ),
+        (
+            "store_chunk",
+            std::panic
+                ::catch_unwind(
+                    AssertUnwindSafe(|| {
+                        store_chunk(
+                            pic,
+                            non_governance_principal,
+                            storage_canister_id,
+                            &(store_chunk::Args {
+                                file_path: file_path.clone(),
+                                chunk_id: Nat::from(0 as u64),
+                                chunk_data: chunk_data.clone(),
+                            })
+                        )
+                            .map(|_| ())
+                            .map_err(|e| format!("{:?}", e))
+                    })
+                )
+                .unwrap_or_else(|_| Err("panic occurred".to_string())),
+        ),
+        (
+            "finalize_upload",
+            std::panic
+                ::catch_unwind(
+                    AssertUnwindSafe(|| {
+                        finalize_upload(
+                            pic,
+                            non_governance_principal,
+                            storage_canister_id,
+                            &(finalize_upload::Args { file_path: file_path.clone() })
+                        )
+                            .map(|_| ())
+                            .map_err(|e| format!("{:?}", e))
+                    })
+                )
+                .unwrap_or_else(|_| Err("panic occurred".to_string())),
+        ),
+        (
+            "insert_data",
+            std::panic
+                ::catch_unwind(
+                    AssertUnwindSafe(|| {
+                        insert_data(
+                            pic,
+                            non_governance_principal,
+                            storage_canister_id,
+                            &(insert_data::Args {
+                                data: CustomValue(Icrc3Value::Text("test".to_string())),
+                                data_id: data_id.clone(),
+                                nft_id: Some(Nat::from(1 as u64)),
+                            })
+                        )
+                            .map(|_| ())
+                            .map_err(|e| format!("{:?}", e))
+                    })
+                )
+                .unwrap_or_else(|_| Err("panic occurred".to_string())),
+        ),
+        (
+            "remove_data",
+            std::panic
+                ::catch_unwind(
+                    AssertUnwindSafe(|| {
+                        remove_data(
+                            pic,
+                            non_governance_principal,
+                            storage_canister_id,
+                            &(remove_data::Args { file_path: file_path.clone() })
+                        )
+                            .map(|_| ())
+                            .map_err(|e| format!("{:?}", e))
+                    })
+                )
+                .unwrap_or_else(|_| Err("panic occurred".to_string())),
+        ),
+        (
+            "update_data",
+            std::panic
+                ::catch_unwind(
+                    AssertUnwindSafe(|| {
+                        update_data(
+                            pic,
+                            non_governance_principal,
+                            storage_canister_id,
+                            &(update_data::Args {
+                                hash_id: hash_id.clone(),
+                                data: CustomValue(Icrc3Value::Text("test".to_string())),
+                            })
+                        )
+                            .map(|_| ())
+                            .map_err(|e| format!("{:?}", e))
+                    })
+                )
+                .unwrap_or_else(|_| Err("panic occurred".to_string())),
+        )
+    ];
+
+    for (method_name, result) in methods {
+        match result {
+            Ok(_) => {
+                println!("{} should not be allowed for non-governance principal", method_name);
+                assert!(false);
+            }
+            Err(e) => {
+                println!("Expected error on {} for non-governance principal: {:?}", method_name, e);
+                assert!(true);
+            }
+        }
+    }
 }
