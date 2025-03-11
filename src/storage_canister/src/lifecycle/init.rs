@@ -20,7 +20,7 @@ fn init(args: Args) {
 
             let mut data = Data::new(init_args.authorized_principals);
 
-            if init_args.test_mode {
+            if env.is_test_mode() {
                 data.authorized_principals.push(env.caller());
             }
 

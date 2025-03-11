@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use candid::{ CandidType, Encode, Principal };
-use pocket_ic::{ PocketIc, UserError, WasmResult };
+use pocket_ic::{ PocketIc, RejectResponse };
 use serde::de::DeserializeOwned;
 use types::CanisterId;
 
@@ -34,11 +34,11 @@ pub fn execute_update<P: CandidType, R: CandidType + DeserializeOwned>(
 }
 
 pub fn unwrap_response<R: CandidType + DeserializeOwned>(
-    response: Result<WasmResult, UserError>
+    response: Result<Vec<u8>, RejectResponse>
 ) -> R {
-    match response.unwrap() {
-        WasmResult::Reply(bytes) => candid::decode_one(&bytes).unwrap(),
-        WasmResult::Reject(error) => panic!("FATAL ERROR: {error}"),
+    match response {
+        Ok(response) => candid::decode_one(&response).unwrap(),
+        Err(reject) => panic!("Reject response: {:?}", reject),
     }
 }
 

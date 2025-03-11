@@ -327,6 +327,7 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
     }
 
     let redirection_url = format!("https://{}.raw.icp0.io{}", canister_id, media_path.clone());
+
     add_redirection(media_path.clone(), redirection_url);
 
     mutate_state(|state| {

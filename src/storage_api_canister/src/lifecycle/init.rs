@@ -1,4 +1,4 @@
-use candid::{ CandidType, Principal };
+use candid::{ CandidType, Nat, Principal };
 use serde::{ Deserialize, Serialize };
 use types::BuildVersion;
 

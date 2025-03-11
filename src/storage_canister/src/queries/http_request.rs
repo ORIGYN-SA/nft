@@ -56,10 +56,12 @@ async fn http_request(req: HttpRequest<'static>) -> HttpResponse<'static> {
                                     v.contains(ic_cdk::api::id().to_string().as_str())
                             )
                     {
+                        trace("Cache miss but referer is self, returning 404");
                         return HttpResponse::builder()
                             .with_status_code(StatusCode::NOT_FOUND)
                             .build();
                     } else {
+                        trace("Cache miss, asking for upgrade call");
                         return HttpResponse::builder().with_upgrade(true).build();
                     }
                 }

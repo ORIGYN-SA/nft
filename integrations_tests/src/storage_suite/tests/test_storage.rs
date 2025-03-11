@@ -13,20 +13,24 @@ use crate::client::storage::{
 };
 use candid::Nat;
 
-use reqwest::blocking::ClientBuilder;
+use http::StatusCode;
 use storage_api_canister::init_upload;
 use storage_api_canister::store_chunk;
 use storage_api_canister::finalize_upload;
 use storage_api_canister::cancel_upload;
 use storage_api_canister::delete_file;
 use sha2::{ Sha256, Digest };
-use std::net::{ IpAddr, Ipv4Addr, SocketAddr };
 
 use crate::storage_suite::setup::setup::TestEnv;
 use crate::{ storage_suite::setup::default_test_setup, utils::tick_n_blocks };
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use ic_http_gateway::{ HttpGatewayClient, HttpGatewayRequestArgs, HttpGatewayResponseMetadata };
+use http::Request;
+use ic_agent::Agent;
+use bytes::Bytes;
+use http_body_util::BodyExt;
 
 #[test]
 fn test_storage_simple() {
@@ -119,109 +123,110 @@ fn test_storage_simple() {
         }
     }
 
-    let endpoint = pic.make_live(None);
-    println!("gateway url: {:?}", endpoint);
-    let mut url = endpoint.clone();
+    let rt = tokio::runtime::Runtime::new().unwrap();
 
-    let client = ClientBuilder::new()
-        .resolve(
-            "uqqxf-5h777-77774-qaaaa-cai.raw.localhost",
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), url.port().unwrap())
-        )
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .unwrap();
-
-    let gateway_host = endpoint.host().unwrap();
-    let host = format!("{}.raw.{}", storage_canister_id, gateway_host);
-    url.set_host(Some(&host)).unwrap();
-    url.set_path("/test.png");
+    let url = pic.auto_progress();
     println!("url: {:?}", url);
+    println!(
+        "request : {:?}",
+        Request::builder().uri(format!("/test.png").as_str()).body(Bytes::new()).unwrap()
+    );
 
-    let mut received_bytes = Vec::new();
-    let mut start = 0;
-    let mut chunk_size = 1024 * 1024; // Default chunk size
-    let max_retries = 5;
+    let agent = Agent::builder().with_url(url).build().unwrap();
+    rt.block_on(async {
+        agent.fetch_root_key().await.unwrap();
+    });
+    let http_gateway = HttpGatewayClient::builder().with_agent(agent).build().unwrap();
 
-    loop {
-        // Initial request to get the chunk size from the headers
-        println!("url: {:?}", url);
-        let initial_res = client.get(url.clone()).send().unwrap();
-        if initial_res.status() == 307 {
-            println!("location header: {:?}", initial_res.headers().get("location"));
-            if let Some(location) = initial_res.headers().get("location") {
-                let location_str = location.to_str().unwrap();
-                let sub_canister_id = location_str
-                    .split('.')
-                    .next()
+    let response = rt.block_on(async { http_gateway
+            .request(HttpGatewayRequestArgs {
+                canister_id: storage_canister_id.clone(),
+                canister_request: Request::builder()
+                    .uri(format!("/test.png").as_str())
+                    .body(Bytes::new())
+                    .unwrap(),
+            })
+            .send().await });
+
+    let response_headers = response.canister_response
+        .headers()
+        .iter()
+        .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
+        .collect::<Vec<(&str, &str)>>();
+
+    assert_eq!(response.canister_response.status(), 307);
+    let expected_headers = vec![(
+        "location",
+        "https://uqqxf-5h777-77774-qaaaa-cai.raw.icp0.io/test.png",
+    )];
+
+    for (key, value) in expected_headers {
+        assert!(response_headers.contains(&(key, value)));
+    }
+
+    if response.canister_response.status() == 307 {
+        if let Some(location) = response.canister_response.headers().get("location") {
+            let location_str = location.to_str().unwrap();
+
+            let redirected_response = rt.block_on(async { http_gateway
+                    .request(HttpGatewayRequestArgs {
+                        canister_id: storage_canister_id.clone(),
+                        canister_request: Request::builder()
+                            .uri(location_str)
+                            .body(Bytes::new())
+                            .unwrap(),
+                    })
+                    .send().await });
+
+            let redirected_response_headers = redirected_response.canister_response
+                .headers()
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
+                .collect::<Vec<(&str, &str)>>();
+
+            assert!(redirected_response.canister_response.status() == 200);
+            assert_eq!(redirected_response.canister_response.status(), 200);
+
+            let expected_headers = vec![
+                ("strict-transport-security", "max-age=31536000; includeSubDomains"),
+                ("x-frame-options", "DENY"),
+                ("x-content-type-options", "nosniff"),
+                (
+                    "content-security-policy",
+                    "default-src 'self'; img-src 'self' data:; form-action 'self'; object-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests; block-all-mixed-content",
+                ),
+                ("referrer-policy", "no-referrer"),
+                (
+                    "permissions-policy",
+                    "accelerometer=(),ambient-light-sensor=(),autoplay=(),battery=(),camera=(),display-capture=(),document-domain=(),encrypted-media=(),fullscreen=(),gamepad=(),geolocation=(),gyroscope=(),layout-animations=(self),legacy-image-formats=(self),magnetometer=(),microphone=(),midi=(),oversized-images=(self),payment=(),picture-in-picture=(),publickey-credentials-get=(),speaker-selection=(),sync-xhr=(self),unoptimized-images=(self),unsized-media=(self),usb=(),screen-wake-lock=(),web-share=(),xr-spatial-tracking=()",
+                ),
+                ("cross-origin-embedder-policy", "require-corp"),
+                ("cross-origin-opener-policy", "same-origin"),
+                ("cache-control", "public, max-age=31536000, immutable"),
+                ("content-type", "image/png"),
+                ("content-length", "6205837")
+            ];
+
+            println!("redirected_response_headers: {:?}", redirected_response_headers);
+            for (key, value) in expected_headers {
+                println!("key: {}, value: {}", key, value);
+                assert!(redirected_response_headers.contains(&(key, value)));
+            }
+
+            rt.block_on(async {
+                let body = redirected_response.canister_response
+                    .into_body()
+                    .collect().await
                     .unwrap()
-                    .split('/')
-                    .last()
-                    .unwrap();
-                let host = format!("{}.raw.{}", sub_canister_id, gateway_host);
+                    .to_bytes()
+                    .to_vec();
 
-                url.set_host(Some(&host)).unwrap();
-                continue;
-            }
-        } else if initial_res.status() == 206 {
-            if let Some(content_range) = initial_res.headers().get("content-range") {
-                let content_range_str = content_range.to_str().unwrap();
-                if let Some(range) = content_range_str.split('/').next() {
-                    println!("content-range: {:?}", range);
-                    let parts: Vec<&str> = range.split(' ').nth(1).unwrap().split('-').collect();
-                    println!("parts: {:?}", parts);
-                    if parts.len() == 2 {
-                        let start_range: usize = parts[0].parse().unwrap();
-                        let end_range: usize = parts[1].parse().unwrap();
-                        chunk_size = end_range - start_range + 1;
-                    }
-                }
-            }
-            break;
-        } else {
-            panic!("Failed to get initial response: {:?}", initial_res);
+                assert_eq!(body, buffer);
+            });
         }
+    } else {
+        panic!("Expected 307 status code");
     }
-
-    while start < buffer.len() {
-        let end = (start + chunk_size - 1).min(buffer.len() - 1);
-        let range_header = format!("bytes={}-{}", start, end);
-        println!("range_header: {:?}", range_header);
-
-        let res = client.get(url.clone()).header("Range", range_header.clone()).send();
-
-        match res {
-            Ok(mut response) => {
-                println!("res: {:?}", response);
-
-                if response.status() == 206 {
-                    let mut chunk = Vec::new();
-                    response.copy_to(&mut chunk).unwrap();
-                    received_bytes.extend_from_slice(&chunk);
-                    start += chunk_size;
-                }
-            }
-            Err(e) => {
-                panic!("Failed to get response after {} retries: {:?}", max_retries, e);
-            }
-        }
-    }
-
-    pic.stop_live();
-
-    // Check file size
-    assert_eq!(
-        buffer.len(),
-        received_bytes.len(),
-        "Uploaded image size does not match the original image size"
-    );
-
-    // Check file content
-    assert_eq!(
-        buffer,
-        received_bytes,
-        "Uploaded image content does not match the original image content"
-    );
 }
 
 #[test]
@@ -693,10 +698,7 @@ fn test_delete_file() {
     hasher.update(&buffer);
     let file_hash = hasher.finalize();
 
-    let file_type = "image/png".to_string();
-    let media_hash_id = "test_delete.png".to_string();
-
-    let init_upload_resp = init_upload(
+    let _ = init_upload(
         pic,
         controller,
         storage_canister_id,
@@ -708,15 +710,13 @@ fn test_delete_file() {
         })
     );
 
-    println!("init_upload_resp: {:?}", init_upload_resp);
-
     let mut offset = 0;
     let chunk_size = 1024 * 1024;
     let mut chunk_index = 0;
 
     while offset < buffer.len() {
         let chunk = &buffer[offset..(offset + (chunk_size as usize)).min(buffer.len())];
-        let store_chunk_resp = store_chunk(
+        let _ = store_chunk(
             pic,
             controller,
             storage_canister_id,
@@ -726,8 +726,6 @@ fn test_delete_file() {
                 chunk_data: chunk.to_vec(),
             })
         );
-
-        println!("store chunk resp {:?}", store_chunk_resp);
 
         offset += chunk_size as usize;
         chunk_index += 1;
@@ -752,40 +750,34 @@ fn test_delete_file() {
         }
     }
 
-    {
-        let endpoint = pic.make_live(None);
-        let mut url = endpoint.clone();
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let url = pic.auto_progress();
+    println!("url: {:?}", url);
 
-        let client = ClientBuilder::new()
-            .resolve(
-                "uqqxf-5h777-77774-qaaaa-cai.raw.localhost",
-                SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), url.port().unwrap())
-            )
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .unwrap();
+    let agent = Agent::builder().with_url(url).build().unwrap();
+    rt.block_on(async {
+        agent.fetch_root_key().await.unwrap();
+    });
+    let http_gateway = HttpGatewayClient::builder().with_agent(agent).build().unwrap();
 
-        let gateway_host = endpoint.host().unwrap();
-        let host = format!("{}.raw.{}", storage_canister_id, gateway_host);
-        url.set_host(Some(&host)).unwrap();
-        url.set_path("/test_delete.png");
+    // Initial request to get the file
+    let response = rt.block_on(async { http_gateway
+            .request(HttpGatewayRequestArgs {
+                canister_id: storage_canister_id.clone(),
+                canister_request: Request::builder()
+                    .uri(format!("/test_delete.png").as_str())
+                    .body(Bytes::new())
+                    .unwrap(),
+            })
+            .send().await });
 
-        // Initial request to get the chunk size from the headers
-        let initial_res = client.get(url.clone()).send().unwrap();
-
-        match initial_res {
-            response => {
-                println!("initial_res: {:?}", response);
-
-                if response.status().is_success() || response.status().is_redirection() {
-                    println!("File is accessible");
-                } else {
-                    panic!("File should be accessible");
-                }
-            }
+    match response.canister_response.status() {
+        StatusCode::OK | StatusCode::TEMPORARY_REDIRECT => {
+            println!("File is accessible");
         }
-
-        pic.stop_live();
+        _ => {
+            panic!("File should be accessible");
+        }
     }
 
     let delete_file_resp = delete_file(
@@ -807,37 +799,41 @@ fn test_delete_file() {
         }
     }
 
-    let endpoint = pic.make_live(None);
-    let mut url = endpoint.clone();
-
     // Attempt to get the deleted file
-    let client = ClientBuilder::new()
-        .resolve(
-            "uqqxf-5h777-77774-qaaaa-cai.raw.localhost",
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), url.port().unwrap())
-        )
-        .build()
-        .unwrap();
+    let response = rt.block_on(async { http_gateway
+            .request(HttpGatewayRequestArgs {
+                canister_id: storage_canister_id.clone(),
+                canister_request: Request::builder()
+                    .uri(format!("/test_delete.png").as_str())
+                    .body(Bytes::new())
+                    .unwrap(),
+            })
+            .send().await });
 
-    let gateway_host = endpoint.host().unwrap();
-    let host = format!("{}.raw.{}", storage_canister_id, gateway_host);
-    url.set_host(Some(&host)).unwrap();
-    url.set_path("/test_delete.png");
-
-    // Initial request to get the chunk size from the headers
-    let initial_res = client.get(url.clone()).send().unwrap();
-
-    match initial_res {
-        response => {
-            println!("initial_res: {:?}", response);
-
-            if response.status().is_client_error() || response.status().is_server_error() {
-                println!("File not found or server error");
-            } else {
-                panic!("File should not be found after deletion");
-            }
+    match response.canister_response.status() {
+        StatusCode::OK | StatusCode::TEMPORARY_REDIRECT => {
+            panic!("File should not be found after deletion");
+        }
+        _ => {
+            println!("File not found or server error");
         }
     }
+}
 
-    pic.stop_live();
+fn assert_response_metadata(
+    response_metadata: HttpGatewayResponseMetadata,
+    expected_response_metadata: HttpGatewayResponseMetadata
+) {
+    assert_eq!(
+        response_metadata.upgraded_to_update_call,
+        expected_response_metadata.upgraded_to_update_call
+    );
+    assert_eq!(
+        response_metadata.response_verification_version,
+        expected_response_metadata.response_verification_version
+    );
+}
+
+fn contains_header(header_name: &str, headers: Vec<(&str, &str)>) -> bool {
+    headers.iter().any(|(key, _)| *key == header_name)
 }

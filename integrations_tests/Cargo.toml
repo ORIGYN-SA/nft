@@ -26,3 +26,8 @@ ic-cdk = { workspace = true }
 reqwest = "0.12.12"
 tokio = { version = "1.43.0", features = ["full"] }
 ic-agent = { version = "0.39.3"}
+ic-http-gateway = { version = "0.2.0"}
+http = "1.2.0"
+bytes = "1.1.0"
+http-body-util = "0.1.2"
+url = "2.5.4"
