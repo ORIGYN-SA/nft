@@ -1,4 +1,4 @@
-use crate::lifecycle::init_canister;
+use crate::{ lifecycle::init_canister, utils::trace };
 use crate::memory::get_upgrades_memory;
 use crate::state::RuntimeState;
 use storage_api_canister::Args;
@@ -27,6 +27,7 @@ fn post_upgrade(args: Args) {
                 "Cannot upgrade the canister with an Init argument. Please provide an Upgrade argument."
             ),
         Args::Upgrade(upgrade_args) => {
+            trace("Post-upgrade started");
             let memory = get_upgrades_memory();
             let reader = get_reader(&memory);
 
@@ -48,9 +49,10 @@ fn post_upgrade(args: Args) {
 
             canister_logger::init_with_logs(state.env.is_test_mode(), logs, traces);
             init_canister(state);
-            certify_all_assets();
+            // certify_all_assets();
 
             info!(version = %upgrade_args.version, "Post-upgrade complete");
+            trace("Post-upgrade complete");
         }
     }
 }

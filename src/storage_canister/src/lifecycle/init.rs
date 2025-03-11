@@ -27,7 +27,7 @@ fn init(args: Args) {
             let runtime_state = RuntimeState::new(env, data);
 
             init_canister(runtime_state);
-            certify_all_assets();
+            // certify_all_assets();
 
             info!("Init complete.")
         }
