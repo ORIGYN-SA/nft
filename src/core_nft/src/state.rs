@@ -110,7 +110,7 @@ impl Data {
     ) -> Self {
         let sub_canister_manager = StorageSubCanisterManager::new(
             sub_canister::ArgsStorage::Init(InitArgs {
-                test_mode,
+                test_mode: test_mode.clone(),
                 version,
                 commit_hash: commit_hash.clone(),
                 authorized_principals: authorized_principals.clone(),
@@ -125,7 +125,7 @@ impl Data {
             authorized_principals.clone(),
             2_000_000_000_000,
             2_000_000_000_000,
-            test_mode,
+            test_mode.clone(),
             commit_hash.clone(),
             STORAGE_WASM.to_vec()
         );

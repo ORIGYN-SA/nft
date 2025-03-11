@@ -82,7 +82,7 @@ fn init(args: Args) {
                 init_args.approval_init
             );
 
-            if init_args.test_mode {
+            if env.is_test_mode() {
                 data.authorized_principals.push(env.caller());
             }
 

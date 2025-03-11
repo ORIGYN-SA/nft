@@ -53,6 +53,7 @@ pub fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_transfe
             Ok(_) => {}
             Err(e) => {
                 txn_results[index] = Some(Err((RejectionCode::CanisterError, e)));
+                continue;
             }
         }
 
@@ -82,6 +83,8 @@ pub fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_transfe
         nft.transfer(arg.to.clone());
 
         mutate_state(|state| state.data.update_token_by_id(&nft.token_id, &nft));
+
+        txn_results[index] = Some(Ok(()));
 
         // let txn_id = log_transaction();
         // txn_results[index] = Some(Ok(txn_id));

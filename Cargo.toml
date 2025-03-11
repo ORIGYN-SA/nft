@@ -61,7 +61,7 @@ time = { version = "0.3.39", features = [
   "parsing",
   "formatting",
 ] }
-pocket-ic = "6.0.0"
+pocket-ic = "7.0.0"
 async-trait = "0.1.87"
 enum_dispatch = "0.3.13"
 typetag = "0.2.18"

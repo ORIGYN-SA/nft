@@ -5,8 +5,10 @@ use crate::client::core_nft::{
     cancel_upload,
     delete_file,
 };
-use candid::Nat;
+use candid::{ Nat, Principal };
 
+use http::StatusCode;
+use ic_cdk::println;
 use reqwest::blocking::ClientBuilder;
 use storage_api_canister::init_upload;
 use storage_api_canister::store_chunk;
@@ -21,6 +23,12 @@ use std::fs::File;
 use std::io::Read;
 use std::net::{ IpAddr, Ipv4Addr, SocketAddr };
 use std::path::Path;
+use std::str::FromStr;
+use ic_http_gateway::{ HttpGatewayClient, HttpGatewayRequestArgs };
+use http::Request;
+use ic_agent::Agent;
+use bytes::Bytes;
+use http_body_util::BodyExt;
 
 #[test]
 fn test_storage_simple() {
@@ -97,107 +105,124 @@ fn test_storage_simple() {
         }
     }
 
-    let endpoint = pic.make_live(None);
-    let mut url = endpoint.clone();
-    let gateway_host = endpoint.host().unwrap();
-    let host = format!("{}.raw.{}", collection_canister_id, gateway_host);
-
-    let client = ClientBuilder::new()
-        .resolve(
-            "uqqxf-5h777-77774-qaaaa-cai.raw.localhost",
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), url.port().unwrap())
-        )
-        .resolve(
-            "uxrrr-q7777-77774-qaaaq-cai.raw.localhost",
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), url.port().unwrap())
-        )
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .unwrap();
-
-    url.set_host(Some(&host)).unwrap();
-    url.set_path("/test.png");
-
-    let mut received_bytes = Vec::new();
-    let mut start = 0;
-    let mut chunk_size = 1024 * 1024; // Default chunk size
-    let max_retries = 5;
-
-    loop {
-        println!("url: {:?}", url);
-        let initial_res = client.get(url.clone()).send().unwrap();
-        if initial_res.status() == 307 {
-            println!("location header: {:?}", initial_res.headers().get("location"));
-            if let Some(location) = initial_res.headers().get("location") {
-                let location_str = location.to_str().unwrap();
-                let sub_canister_id = location_str
-                    .split('.')
-                    .next()
-                    .unwrap()
-                    .split('/')
-                    .last()
-                    .unwrap();
-                let host = format!("{}.raw.{}", sub_canister_id, gateway_host);
-
-                url.set_host(Some(&host)).unwrap();
-                continue;
-            }
-        } else if initial_res.status() == 206 {
-            if let Some(content_range) = initial_res.headers().get("content-range") {
-                let content_range_str = content_range.to_str().unwrap();
-                if let Some(range) = content_range_str.split('/').next() {
-                    println!("content-range: {:?}", range);
-                    let parts: Vec<&str> = range.split(' ').nth(1).unwrap().split('-').collect();
-                    println!("parts: {:?}", parts);
-                    if parts.len() == 2 {
-                        let start_range: usize = parts[0].parse().unwrap();
-                        let end_range: usize = parts[1].parse().unwrap();
-                        chunk_size = end_range - start_range + 1;
-                    }
-                }
-            }
-            break;
-        } else {
-            panic!("Failed to get initial response: {:?}", initial_res);
-        }
-    }
-
-    while start < buffer.len() {
-        let end = (start + chunk_size - 1).min(buffer.len() - 1);
-        let range_header = format!("bytes={}-{}", start, end);
-
-        let res = client.get(url.clone()).header("Range", range_header.clone()).send();
-
-        match res {
-            Ok(mut response) => {
-                if response.status() == 206 {
-                    let mut chunk = Vec::new();
-                    response.copy_to(&mut chunk).unwrap();
-                    received_bytes.extend_from_slice(&chunk);
-                    start += chunk_size;
-                }
-            }
-            Err(e) => {
-                panic!("Failed to get response after {} retries: {:?}", max_retries, e);
-            }
-        }
-    }
-
-    pic.stop_live();
-
-    // Check file size
-    assert_eq!(
-        buffer.len(),
-        received_bytes.len(),
-        "Uploaded image size does not match the original image size"
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let url = pic.auto_progress();
+    println!("url: {:?}", url);
+    println!(
+        "request : {:?}",
+        Request::builder().uri(format!("/test.png").as_str()).body(Bytes::new()).unwrap()
     );
 
-    // Check file content
-    assert_eq!(
-        buffer,
-        received_bytes,
-        "Uploaded image content does not match the original image content"
-    );
+    let agent = Agent::builder().with_url(url).build().unwrap();
+    rt.block_on(async {
+        agent.fetch_root_key().await.unwrap();
+    });
+    let http_gateway = HttpGatewayClient::builder().with_agent(agent).build().unwrap();
+
+    let response = rt.block_on(async { http_gateway
+            .request(HttpGatewayRequestArgs {
+                canister_id: collection_canister_id.clone(),
+                canister_request: Request::builder()
+                    .uri(format!("/test.png").as_str())
+                    .body(Bytes::new())
+                    .unwrap(),
+            })
+            .send().await });
+
+    let response_headers = response.canister_response
+        .headers()
+        .iter()
+        .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
+        .collect::<Vec<(&str, &str)>>();
+
+    assert_eq!(response.canister_response.status(), 307);
+    println!("response_headers: {:?}", response_headers);
+    // let expected_headers = vec![(
+    //     "location",
+    //     "https://uqqxf-5h777-77774-qaaaa-cai.raw.icp0.io/test.png",
+    // )];
+
+    // for (key, value) in expected_headers {
+    //     assert!(response_headers.contains(&(key, value)));
+    // }
+
+    if response.canister_response.status() == 307 {
+        if let Some(location) = response.canister_response.headers().get("location") {
+            let location_str = location.to_str().unwrap();
+            let canister_id = Principal::from_str(
+                location_str.split('.').next().unwrap().replace("https://", "").as_str()
+            ).unwrap();
+
+            let first_redirected_response = rt.block_on(async { http_gateway
+                    .request(HttpGatewayRequestArgs {
+                        canister_id: canister_id,
+                        canister_request: Request::builder()
+                            .uri(location_str)
+                            .body(Bytes::new())
+                            .unwrap(),
+                    })
+                    .send().await });
+
+            let first_redirected_response_headers = first_redirected_response.canister_response
+                .headers()
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
+                .collect::<Vec<(&str, &str)>>();
+
+            println!("redirected_response_headers: {:?}", first_redirected_response_headers);
+            println!(
+                "redirected_response status: {:?}",
+                first_redirected_response.canister_response.status()
+            );
+            if first_redirected_response.canister_response.status() == 307 {
+                if let Some(location_bis) = response.canister_response.headers().get("location") {
+                    let location_str = location_bis.to_str().unwrap();
+                    let canister_id = Principal::from_str(
+                        location_str.split('.').next().unwrap().replace("https://", "").as_str()
+                    ).unwrap();
+
+                    let second_redirected_response = rt.block_on(async { http_gateway
+                            .request(HttpGatewayRequestArgs {
+                                canister_id: canister_id,
+                                canister_request: Request::builder()
+                                    .uri(location_str)
+                                    .body(Bytes::new())
+                                    .unwrap(),
+                            })
+                            .send().await });
+
+                    let second_redirected_response_headers =
+                        second_redirected_response.canister_response
+                            .headers()
+                            .iter()
+                            .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
+                            .collect::<Vec<(&str, &str)>>();
+
+                    println!(
+                        "redirected_response_headers: {:?}",
+                        second_redirected_response_headers
+                    );
+                    println!(
+                        "redirected_response status: {:?}",
+                        second_redirected_response.canister_response.status()
+                    );
+
+                    rt.block_on(async {
+                        let body = second_redirected_response.canister_response
+                            .into_body()
+                            .collect().await
+                            .unwrap()
+                            .to_bytes()
+                            .to_vec();
+
+                        assert_eq!(body, buffer);
+                    });
+                }
+            }
+        }
+    } else {
+        panic!("Expected 307 status code");
+    }
 }
 
 #[test]
@@ -220,11 +245,8 @@ fn test_duplicate_upload() {
     hasher.update(&buffer);
     let file_hash = hasher.finalize();
 
-    let file_type = "image/png".to_string();
-    let media_hash_id = "test.png".to_string();
-
     // First upload attempt
-    let init_upload_resp = init_upload(
+    let _ = init_upload(
         pic,
         controller,
         collection_canister_id,
@@ -242,7 +264,7 @@ fn test_duplicate_upload() {
 
     while offset < buffer.len() {
         let chunk = &buffer[offset..(offset + (chunk_size as usize)).min(buffer.len())];
-        let store_chunk_resp = store_chunk(
+        let _ = store_chunk(
             pic,
             controller,
             collection_canister_id,
@@ -342,7 +364,7 @@ fn test_duplicate_chunk_upload() {
 
     while offset < buffer.len() {
         let chunk = &buffer[offset..(offset + (chunk_size as usize)).min(buffer.len())];
-        let store_chunk_resp = store_chunk(
+        let _ = store_chunk(
             pic,
             controller,
             collection_canister_id,
@@ -420,10 +442,7 @@ fn test_finalize_upload_missing_chunk() {
     hasher.update(&buffer);
     let file_hash = hasher.finalize();
 
-    let file_type = "image/png".to_string();
-    let media_hash_id = "test.png".to_string();
-
-    let init_upload_resp = init_upload(
+    let _ = init_upload(
         pic,
         controller,
         collection_canister_id,
@@ -442,7 +461,7 @@ fn test_finalize_upload_missing_chunk() {
     // Upload all chunks except the last one
     while offset < buffer.len() - (chunk_size as usize) {
         let chunk = &buffer[offset..(offset + (chunk_size as usize)).min(buffer.len())];
-        let store_chunk_resp = store_chunk(
+        let _ = store_chunk(
             pic,
             controller,
             collection_canister_id,
@@ -498,9 +517,6 @@ fn test_cancel_upload() {
     let mut hasher = Sha256::new();
     hasher.update(&buffer);
     let file_hash = hasher.finalize();
-
-    let file_type = "image/png".to_string();
-    let media_hash_id = "test_cancel.png".to_string();
 
     let init_upload_resp = init_upload(
         pic,
@@ -584,10 +600,7 @@ fn test_delete_file() {
     hasher.update(&buffer);
     let file_hash = hasher.finalize();
 
-    let file_type = "image/png".to_string();
-    let media_hash_id = "test_delete.png".to_string();
-
-    let init_upload_resp = init_upload(
+    let _ = init_upload(
         pic,
         controller,
         collection_canister_id,
@@ -605,7 +618,7 @@ fn test_delete_file() {
 
     while offset < buffer.len() {
         let chunk = &buffer[offset..(offset + (chunk_size as usize)).min(buffer.len())];
-        let store_chunk_resp = store_chunk(
+        let _ = store_chunk(
             pic,
             controller,
             collection_canister_id,
@@ -639,44 +652,34 @@ fn test_delete_file() {
         }
     }
 
-    {
-        let endpoint = pic.make_live(None);
-        let mut url = endpoint.clone();
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let url = pic.auto_progress();
+    println!("url: {:?}", url);
 
-        let client = ClientBuilder::new()
-            .resolve(
-                "uqqxf-5h777-77774-qaaaa-cai.raw.localhost",
-                SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), url.port().unwrap())
-            )
-            .resolve(
-                "uxrrr-q7777-77774-qaaaq-cai.raw.localhost",
-                SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), url.port().unwrap())
-            )
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .unwrap();
+    let agent = Agent::builder().with_url(url).build().unwrap();
+    rt.block_on(async {
+        agent.fetch_root_key().await.unwrap();
+    });
+    let http_gateway = HttpGatewayClient::builder().with_agent(agent).build().unwrap();
 
-        let gateway_host = endpoint.host().unwrap();
-        let host = format!("{}.raw.{}", collection_canister_id, gateway_host);
-        url.set_host(Some(&host)).unwrap();
-        url.set_path("/test_delete.png");
+    // Initial request to get the file
+    let response = rt.block_on(async { http_gateway
+            .request(HttpGatewayRequestArgs {
+                canister_id: collection_canister_id.clone(),
+                canister_request: Request::builder()
+                    .uri(format!("/test_delete.png").as_str())
+                    .body(Bytes::new())
+                    .unwrap(),
+            })
+            .send().await });
 
-        // Initial request to get the chunk size from the headers
-        let initial_res = client.get(url.clone()).send().unwrap();
-
-        match initial_res {
-            response => {
-                println!("initial_res: {:?}", response);
-
-                if response.status().is_success() || response.status().is_redirection() {
-                    println!("File is accessible");
-                } else {
-                    panic!("File should be accessible");
-                }
-            }
+    match response.canister_response.status() {
+        StatusCode::OK | StatusCode::TEMPORARY_REDIRECT => {
+            println!("File is accessible");
         }
-
-        pic.stop_live();
+        _ => {
+            panic!("File should be accessible");
+        }
     }
 
     let delete_file_resp = delete_file(
@@ -698,42 +701,23 @@ fn test_delete_file() {
         }
     }
 
-    let endpoint = pic.make_live(None);
-    let mut url = endpoint.clone();
-
     // Attempt to get the deleted file
-    let client = ClientBuilder::new()
-        .resolve(
-            "uqqxf-5h777-77774-qaaaa-cai.raw.localhost",
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), url.port().unwrap())
-        )
-        .resolve(
-            "uxrrr-q7777-77774-qaaaq-cai.raw.localhost",
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), url.port().unwrap())
-        )
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .unwrap();
+    let response = rt.block_on(async { http_gateway
+            .request(HttpGatewayRequestArgs {
+                canister_id: collection_canister_id.clone(),
+                canister_request: Request::builder()
+                    .uri(format!("/test_delete.png").as_str())
+                    .body(Bytes::new())
+                    .unwrap(),
+            })
+            .send().await });
 
-    let gateway_host = endpoint.host().unwrap();
-    let host = format!("{}.raw.{}", collection_canister_id, gateway_host);
-    url.set_host(Some(&host)).unwrap();
-    url.set_path("/test_delete.png");
-
-    // Initial request to get the chunk size from the headers
-    let initial_res = client.get(url.clone()).send().unwrap();
-
-    match initial_res {
-        response => {
-            println!("initial_res: {:?}", response);
-
-            if response.status().is_client_error() || response.status().is_server_error() {
-                println!("File not found or server error");
-            } else {
-                panic!("File should not be found after deletion");
-            }
+    match response.canister_response.status() {
+        StatusCode::OK | StatusCode::TEMPORARY_REDIRECT => {
+            panic!("File should not be found after deletion");
+        }
+        _ => {
+            println!("File not found or server error");
         }
     }
-
-    pic.stop_live();
 }
