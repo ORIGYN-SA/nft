@@ -1,20 +1,23 @@
 use crate::lifecycle::init_canister;
 use crate::memory::get_upgrades_memory;
 use crate::state::RuntimeState;
-use subcanister_manager::SubCanister;
 use crate::Args;
-use candid::{ CandidType, Principal };
+use candid::{CandidType, Principal};
 use canfund::{
-    manager::{ options::{ CyclesThreshold, FundManagerOptions, FundStrategy }, RegisterOpts },
+    manager::{
+        options::{CyclesThreshold, FundManagerOptions, FundStrategy},
+        RegisterOpts,
+    },
     operations::fetch::FetchCyclesBalanceFromCanisterStatus,
     FundManager,
 };
 use canister_logger::LogEntry;
 use canister_tracing_macros::trace;
 use ic_cdk_macros::post_upgrade;
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
 use stable_memory::get_reader;
 use std::sync::Arc;
+use subcanister_manager::SubCanister;
 use tracing::info;
 use types::BuildVersion;
 
@@ -24,22 +27,19 @@ fn initialize(canister_id_lst: Vec<Principal>) {
 
     let funding_config = FundManagerOptions::new()
         .with_interval_secs(12 * 60 * 60)
-        .with_strategy(
-            FundStrategy::BelowThreshold(
-                CyclesThreshold::new()
-                    .with_min_cycles(125_000_000_000)
-                    .with_fund_cycles(250_000_000_000)
-            )
-        );
+        .with_strategy(FundStrategy::BelowThreshold(
+            CyclesThreshold::new()
+                .with_min_cycles(125_000_000_000)
+                .with_fund_cycles(250_000_000_000),
+        ));
 
     fund_manager.with_options(funding_config);
 
     for canister_id in canister_id_lst {
         fund_manager.register(
             canister_id,
-            RegisterOpts::new().with_cycles_fetcher(
-                Arc::new(FetchCyclesBalanceFromCanisterStatus::new())
-            )
+            RegisterOpts::new()
+                .with_cycles_fetcher(Arc::new(FetchCyclesBalanceFromCanisterStatus::new())),
         );
     }
 

@@ -1,5 +1,5 @@
-use crate::state::read_state;
 use crate::state::mutate_state;
+use crate::state::read_state;
 use candid::Principal;
 use std::marker::PhantomData;
 
@@ -21,7 +21,7 @@ impl GuardManagement {
         mutate_state(|s| {
             if s.principal_guards.len() >= MAX_CONCURRENT {
                 return Err(
-                    "Service is already running a management query, try again shortly".into()
+                    "Service is already running a management query, try again shortly".into(),
                 );
             }
             s.principal_guards.insert(principal);

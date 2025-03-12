@@ -1,47 +1,55 @@
 use crate::client::core_nft::{
-    init_upload,
-    store_chunk,
-    finalize_upload,
-    cancel_upload,
-    delete_file,
+    cancel_upload, delete_file, finalize_upload, init_upload, store_chunk,
 };
-use candid::{ Nat, Principal };
+use candid::{Nat, Principal};
 
 use http::StatusCode;
 use ic_cdk::println;
-use reqwest::blocking::ClientBuilder;
-use storage_api_canister::init_upload;
-use storage_api_canister::store_chunk;
-use storage_api_canister::finalize_upload;
+use sha2::{Digest, Sha256};
 use storage_api_canister::cancel_upload;
 use storage_api_canister::delete_file;
-use sha2::{ Sha256, Digest };
+use storage_api_canister::finalize_upload;
+use storage_api_canister::init_upload;
+use storage_api_canister::store_chunk;
 
-use crate::core_suite::setup::setup::TestEnv;
 use crate::core_suite::setup::default_test_setup;
+use crate::core_suite::setup::setup::TestEnv;
+use crate::utils::upload_file;
+use bytes::Bytes;
+use http::Request;
+use http_body_util::BodyExt;
+use ic_agent::Agent;
+use ic_http_gateway::{HttpGatewayClient, HttpGatewayRequestArgs};
 use std::fs::File;
 use std::io::Read;
-use std::net::{ IpAddr, Ipv4Addr, SocketAddr };
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::Path;
 use std::str::FromStr;
-use ic_http_gateway::{ HttpGatewayClient, HttpGatewayRequestArgs };
-use http::Request;
-use ic_agent::Agent;
-use bytes::Bytes;
-use http_body_util::BodyExt;
 
 #[test]
 fn test_storage_simple() {
     let mut test_env: TestEnv = default_test_setup();
     println!("test_env: {:?}", test_env);
 
-    let TestEnv { ref mut pic, collection_canister_id, controller, nft_owner1, nft_owner2 } =
-        test_env;
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
 
-    let file_path = Path::new("./src/storage_suite/assets/test.png");
-    let mut file = File::open(&file_path).expect("Failed to open file");
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer).expect("Failed to read file");
+    let file_path = "./src/storage_suite/assets/test.png";
+    let upload_path = "/test.png";
+
+    let buffer = upload_file(
+        pic,
+        controller,
+        collection_canister_id,
+        file_path,
+        upload_path,
+    )
+    .expect("Upload failed");
 
     let file_size = buffer.len() as u64;
 
@@ -62,7 +70,7 @@ fn test_storage_simple() {
             file_hash: format!("{:x}", file_hash),
             file_size,
             chunk_size: None,
-        })
+        }),
     );
 
     let mut offset = 0;
@@ -79,7 +87,7 @@ fn test_storage_simple() {
                 file_path: "/test.png".to_string(),
                 chunk_id: Nat::from(chunk_index as u64),
                 chunk_data: chunk.to_vec(),
-            })
+            }),
         );
 
         offset += chunk_size as usize;
@@ -92,7 +100,7 @@ fn test_storage_simple() {
         collection_canister_id,
         &(finalize_upload::Args {
             file_path: "/test.png".to_string(),
-        })
+        }),
     );
 
     match finalize_upload_resp {
@@ -110,16 +118,23 @@ fn test_storage_simple() {
     println!("url: {:?}", url);
     println!(
         "request : {:?}",
-        Request::builder().uri(format!("/test.png").as_str()).body(Bytes::new()).unwrap()
+        Request::builder()
+            .uri(format!("/test.png").as_str())
+            .body(Bytes::new())
+            .unwrap()
     );
 
     let agent = Agent::builder().with_url(url).build().unwrap();
     rt.block_on(async {
         agent.fetch_root_key().await.unwrap();
     });
-    let http_gateway = HttpGatewayClient::builder().with_agent(agent).build().unwrap();
+    let http_gateway = HttpGatewayClient::builder()
+        .with_agent(agent)
+        .build()
+        .unwrap();
 
-    let response = rt.block_on(async { http_gateway
+    let response = rt.block_on(async {
+        http_gateway
             .request(HttpGatewayRequestArgs {
                 canister_id: collection_canister_id.clone(),
                 canister_request: Request::builder()
@@ -127,9 +142,12 @@ fn test_storage_simple() {
                     .body(Bytes::new())
                     .unwrap(),
             })
-            .send().await });
+            .send()
+            .await
+    });
 
-    let response_headers = response.canister_response
+    let response_headers = response
+        .canister_response
         .headers()
         .iter()
         .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
@@ -150,10 +168,17 @@ fn test_storage_simple() {
         if let Some(location) = response.canister_response.headers().get("location") {
             let location_str = location.to_str().unwrap();
             let canister_id = Principal::from_str(
-                location_str.split('.').next().unwrap().replace("https://", "").as_str()
-            ).unwrap();
+                location_str
+                    .split('.')
+                    .next()
+                    .unwrap()
+                    .replace("https://", "")
+                    .as_str(),
+            )
+            .unwrap();
 
-            let first_redirected_response = rt.block_on(async { http_gateway
+            let first_redirected_response = rt.block_on(async {
+                http_gateway
                     .request(HttpGatewayRequestArgs {
                         canister_id: canister_id,
                         canister_request: Request::builder()
@@ -161,27 +186,44 @@ fn test_storage_simple() {
                             .body(Bytes::new())
                             .unwrap(),
                     })
-                    .send().await });
+                    .send()
+                    .await
+            });
 
-            let first_redirected_response_headers = first_redirected_response.canister_response
+            let first_redirected_response_headers = first_redirected_response
+                .canister_response
                 .headers()
                 .iter()
                 .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
                 .collect::<Vec<(&str, &str)>>();
 
-            println!("redirected_response_headers: {:?}", first_redirected_response_headers);
+            println!(
+                "redirected_response_headers: {:?}",
+                first_redirected_response_headers
+            );
             println!(
                 "redirected_response status: {:?}",
                 first_redirected_response.canister_response.status()
             );
             if first_redirected_response.canister_response.status() == 307 {
-                if let Some(location_bis) = response.canister_response.headers().get("location") {
+                if let Some(location_bis) = first_redirected_response
+                    .canister_response
+                    .headers()
+                    .get("location")
+                {
                     let location_str = location_bis.to_str().unwrap();
                     let canister_id = Principal::from_str(
-                        location_str.split('.').next().unwrap().replace("https://", "").as_str()
-                    ).unwrap();
+                        location_str
+                            .split('.')
+                            .next()
+                            .unwrap()
+                            .replace("https://", "")
+                            .as_str(),
+                    )
+                    .unwrap();
 
-                    let second_redirected_response = rt.block_on(async { http_gateway
+                    let second_redirected_response = rt.block_on(async {
+                        http_gateway
                             .request(HttpGatewayRequestArgs {
                                 canister_id: canister_id,
                                 canister_request: Request::builder()
@@ -189,14 +231,16 @@ fn test_storage_simple() {
                                     .body(Bytes::new())
                                     .unwrap(),
                             })
-                            .send().await });
+                            .send()
+                            .await
+                    });
 
-                    let second_redirected_response_headers =
-                        second_redirected_response.canister_response
-                            .headers()
-                            .iter()
-                            .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
-                            .collect::<Vec<(&str, &str)>>();
+                    let second_redirected_response_headers = second_redirected_response
+                        .canister_response
+                        .headers()
+                        .iter()
+                        .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
+                        .collect::<Vec<(&str, &str)>>();
 
                     println!(
                         "redirected_response_headers: {:?}",
@@ -208,9 +252,11 @@ fn test_storage_simple() {
                     );
 
                     rt.block_on(async {
-                        let body = second_redirected_response.canister_response
+                        let body = second_redirected_response
+                            .canister_response
                             .into_body()
-                            .collect().await
+                            .collect()
+                            .await
                             .unwrap()
                             .to_bytes()
                             .to_vec();
@@ -230,73 +276,26 @@ fn test_duplicate_upload() {
     let mut test_env: TestEnv = default_test_setup();
     println!("test_env: {:?}", test_env);
 
-    let TestEnv { ref mut pic, collection_canister_id, controller, nft_owner1, nft_owner2 } =
-        test_env;
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
 
-    let file_path = Path::new("./src/storage_suite/assets/test.png");
-    let mut file = File::open(&file_path).expect("Failed to open file");
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer).expect("Failed to read file");
-
-    let file_size = buffer.len() as u64;
-
-    // Calculate SHA-256 hash
-    let mut hasher = Sha256::new();
-    hasher.update(&buffer);
-    let file_hash = hasher.finalize();
+    let file_path = "./src/storage_suite/assets/test.png";
+    let upload_path = "/test.png";
 
     // First upload attempt
-    let _ = init_upload(
+    upload_file(
         pic,
         controller,
         collection_canister_id,
-        &(init_upload::Args {
-            file_path: "/test.png".to_string(),
-            file_hash: format!("{:x}", file_hash),
-            file_size,
-            chunk_size: None,
-        })
-    );
-
-    let mut offset = 0;
-    let chunk_size = 1024 * 1024;
-    let mut chunk_index = 0;
-
-    while offset < buffer.len() {
-        let chunk = &buffer[offset..(offset + (chunk_size as usize)).min(buffer.len())];
-        let _ = store_chunk(
-            pic,
-            controller,
-            collection_canister_id,
-            &(store_chunk::Args {
-                file_path: "/test.png".to_string(),
-                chunk_id: Nat::from(chunk_index as u64),
-                chunk_data: chunk.to_vec(),
-            })
-        );
-
-        offset += chunk_size as usize;
-        chunk_index += 1;
-    }
-
-    let finalize_upload_resp = finalize_upload(
-        pic,
-        controller,
-        collection_canister_id,
-        &(finalize_upload::Args {
-            file_path: "/test.png".to_string(),
-        })
-    );
-
-    match finalize_upload_resp {
-        Ok(resp) => {
-            println!("finalize_upload_resp: {:?}", resp);
-        }
-        Err(e) => {
-            println!("finalize_upload_resp error: {:?}", e);
-            assert!(false);
-        }
-    }
+        file_path,
+        upload_path,
+    )
+    .expect("First upload failed");
 
     // Second upload attempt with the same file
     let init_upload_resp_2 = init_upload(
@@ -304,11 +303,11 @@ fn test_duplicate_upload() {
         controller,
         collection_canister_id,
         &(init_upload::Args {
-            file_path: "/test.png".to_string(),
-            file_hash: format!("{:x}", file_hash),
-            file_size,
+            file_path: upload_path.to_string(),
+            file_hash: "dummy_hash".to_string(),
+            file_size: 1024,
             chunk_size: None,
-        })
+        }),
     );
 
     match init_upload_resp_2 {
@@ -328,8 +327,13 @@ fn test_duplicate_chunk_upload() {
     let mut test_env: TestEnv = default_test_setup();
     println!("test_env: {:?}", test_env);
 
-    let TestEnv { ref mut pic, collection_canister_id, controller, nft_owner1, nft_owner2 } =
-        test_env;
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
 
     let file_path = Path::new("./src/storage_suite/assets/test.png");
     let mut file = File::open(&file_path).expect("Failed to open file");
@@ -355,7 +359,7 @@ fn test_duplicate_chunk_upload() {
             file_hash: format!("{:x}", file_hash),
             file_size,
             chunk_size: None,
-        })
+        }),
     );
 
     let mut offset = 0;
@@ -372,7 +376,7 @@ fn test_duplicate_chunk_upload() {
                 file_path: "/test.png".to_string(),
                 chunk_id: Nat::from(chunk_index as u64),
                 chunk_data: chunk.to_vec(),
-            })
+            }),
         );
 
         // Attempt to upload the same chunk again
@@ -384,7 +388,7 @@ fn test_duplicate_chunk_upload() {
                 file_path: "/test.png".to_string(),
                 chunk_id: Nat::from(chunk_index as u64),
                 chunk_data: chunk.to_vec(),
-            })
+            }),
         );
 
         match duplicate_chunk_resp {
@@ -408,7 +412,7 @@ fn test_duplicate_chunk_upload() {
         collection_canister_id,
         &(finalize_upload::Args {
             file_path: "/test.png".to_string(),
-        })
+        }),
     );
 
     match finalize_upload_resp {
@@ -427,8 +431,13 @@ fn test_finalize_upload_missing_chunk() {
     let mut test_env: TestEnv = default_test_setup();
     println!("test_env: {:?}", test_env);
 
-    let TestEnv { ref mut pic, collection_canister_id, controller, nft_owner1, nft_owner2 } =
-        test_env;
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
 
     let file_path = Path::new("./src/storage_suite/assets/test.png");
     let mut file = File::open(&file_path).expect("Failed to open file");
@@ -451,7 +460,7 @@ fn test_finalize_upload_missing_chunk() {
             file_hash: format!("{:x}", file_hash),
             file_size,
             chunk_size: None,
-        })
+        }),
     );
 
     let mut offset = 0;
@@ -469,7 +478,7 @@ fn test_finalize_upload_missing_chunk() {
                 file_path: "/test.png".to_string(),
                 chunk_id: Nat::from(chunk_index as u64),
                 chunk_data: chunk.to_vec(),
-            })
+            }),
         );
 
         offset += chunk_size as usize;
@@ -483,7 +492,7 @@ fn test_finalize_upload_missing_chunk() {
         collection_canister_id,
         &(finalize_upload::Args {
             file_path: "/test.png".to_string(),
-        })
+        }),
     );
 
     match finalize_upload_resp {
@@ -492,7 +501,10 @@ fn test_finalize_upload_missing_chunk() {
             assert!(false);
         }
         Err(e) => {
-            println!("Expected error on finalize upload with missing chunk: {:?}", e);
+            println!(
+                "Expected error on finalize upload with missing chunk: {:?}",
+                e
+            );
             assert!(true);
         }
     }
@@ -503,8 +515,13 @@ fn test_cancel_upload() {
     let mut test_env: TestEnv = default_test_setup();
     println!("test_env: {:?}", test_env);
 
-    let TestEnv { ref mut pic, collection_canister_id, controller, nft_owner1, nft_owner2 } =
-        test_env;
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
 
     let file_path = Path::new("./src/storage_suite/assets/test.png");
     let mut file = File::open(&file_path).expect("Failed to open file");
@@ -527,7 +544,7 @@ fn test_cancel_upload() {
             file_hash: format!("{:x}", file_hash),
             file_size,
             chunk_size: None,
-        })
+        }),
     );
 
     match init_upload_resp {
@@ -545,7 +562,7 @@ fn test_cancel_upload() {
         collection_canister_id,
         &(cancel_upload::Args {
             file_path: "/test_cancel.png".to_string(),
-        })
+        }),
     );
 
     match cancel_upload_resp {
@@ -565,7 +582,7 @@ fn test_cancel_upload() {
         collection_canister_id,
         &(finalize_upload::Args {
             file_path: "/test.png".to_string(),
-        })
+        }),
     );
 
     match finalize_upload_resp {
@@ -574,7 +591,10 @@ fn test_cancel_upload() {
             assert!(false);
         }
         Err(e) => {
-            println!("Expected error on finalize upload for a canceled upload: {:?}", e);
+            println!(
+                "Expected error on finalize upload for a canceled upload: {:?}",
+                e
+            );
             assert!(true);
         }
     }
@@ -585,72 +605,25 @@ fn test_delete_file() {
     let mut test_env: TestEnv = default_test_setup();
     println!("test_env: {:?}", test_env);
 
-    let TestEnv { ref mut pic, collection_canister_id, controller, nft_owner1, nft_owner2 } =
-        test_env;
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
 
-    let file_path = Path::new("./src/storage_suite/assets/test.png");
-    let mut file = File::open(&file_path).expect("Failed to open file");
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer).expect("Failed to read file");
+    let file_path = "./src/storage_suite/assets/test.png";
+    let upload_path = "/test_delete.png";
 
-    let file_size = buffer.len() as u64;
-
-    // Calculate SHA-256 hash
-    let mut hasher = Sha256::new();
-    hasher.update(&buffer);
-    let file_hash = hasher.finalize();
-
-    let _ = init_upload(
+    let buffer = upload_file(
         pic,
         controller,
         collection_canister_id,
-        &(init_upload::Args {
-            file_path: "/test_delete.png".to_string(),
-            file_hash: format!("{:x}", file_hash),
-            file_size,
-            chunk_size: None,
-        })
-    );
-
-    let mut offset = 0;
-    let chunk_size = 1024 * 1024;
-    let mut chunk_index = 0;
-
-    while offset < buffer.len() {
-        let chunk = &buffer[offset..(offset + (chunk_size as usize)).min(buffer.len())];
-        let _ = store_chunk(
-            pic,
-            controller,
-            collection_canister_id,
-            &(store_chunk::Args {
-                file_path: "/test_delete.png".to_string(),
-                chunk_id: Nat::from(chunk_index as u64),
-                chunk_data: chunk.to_vec(),
-            })
-        );
-
-        offset += chunk_size as usize;
-        chunk_index += 1;
-    }
-
-    let finalize_upload_resp = finalize_upload(
-        pic,
-        controller,
-        collection_canister_id,
-        &(finalize_upload::Args {
-            file_path: "/test_delete.png".to_string(),
-        })
-    );
-
-    match finalize_upload_resp {
-        Ok(resp) => {
-            println!("finalize_upload_resp: {:?}", resp);
-        }
-        Err(e) => {
-            println!("finalize_upload_resp error: {:?}", e);
-            assert!(false);
-        }
-    }
+        file_path,
+        upload_path,
+    )
+    .expect("Upload failed");
 
     let rt = tokio::runtime::Runtime::new().unwrap();
     let url = pic.auto_progress();
@@ -660,10 +633,14 @@ fn test_delete_file() {
     rt.block_on(async {
         agent.fetch_root_key().await.unwrap();
     });
-    let http_gateway = HttpGatewayClient::builder().with_agent(agent).build().unwrap();
+    let http_gateway = HttpGatewayClient::builder()
+        .with_agent(agent)
+        .build()
+        .unwrap();
 
     // Initial request to get the file
-    let response = rt.block_on(async { http_gateway
+    let response = rt.block_on(async {
+        http_gateway
             .request(HttpGatewayRequestArgs {
                 canister_id: collection_canister_id.clone(),
                 canister_request: Request::builder()
@@ -671,7 +648,9 @@ fn test_delete_file() {
                     .body(Bytes::new())
                     .unwrap(),
             })
-            .send().await });
+            .send()
+            .await
+    });
 
     match response.canister_response.status() {
         StatusCode::OK | StatusCode::TEMPORARY_REDIRECT => {
@@ -688,7 +667,7 @@ fn test_delete_file() {
         collection_canister_id,
         &(delete_file::Args {
             file_path: "/test_delete.png".to_string(),
-        })
+        }),
     );
 
     match delete_file_resp {
@@ -702,7 +681,8 @@ fn test_delete_file() {
     }
 
     // Attempt to get the deleted file
-    let response = rt.block_on(async { http_gateway
+    let response = rt.block_on(async {
+        http_gateway
             .request(HttpGatewayRequestArgs {
                 canister_id: collection_canister_id.clone(),
                 canister_request: Request::builder()
@@ -710,7 +690,9 @@ fn test_delete_file() {
                     .body(Bytes::new())
                     .unwrap(),
             })
-            .send().await });
+            .send()
+            .await
+    });
 
     match response.canister_response.status() {
         StatusCode::OK | StatusCode::TEMPORARY_REDIRECT => {
@@ -720,4 +702,203 @@ fn test_delete_file() {
             println!("File not found or server error");
         }
     }
+}
+
+#[test]
+fn test_management_scalability() {
+    let mut test_env: TestEnv = default_test_setup();
+    println!("test_env: {:?}", test_env);
+
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let file_path = "./src/storage_suite/assets/test.png";
+    let mut uploaded_buffers = Vec::new();
+    let mut unique_canisters = std::collections::HashSet::new();
+
+    // Upload 4 files - should all succeed by creating new canisters as needed
+    // With 15MB limit per canister and 6.2MB per file, each canister can hold 2 files
+    // So we expect 2 canisters to be created for 4 files
+    for i in 0..4 {
+        let upload_path = format!("/test_scalability_{}.png", i);
+
+        let result = upload_file(
+            pic,
+            controller,
+            collection_canister_id,
+            file_path,
+            &upload_path,
+        );
+
+        match result {
+            Ok(buffer) => {
+                uploaded_buffers.push((upload_path.clone(), buffer));
+            }
+            Err(e) => {
+                panic!("Expected all uploads to succeed with auto-scaling, but upload {} failed with: {}", i, e);
+            }
+        }
+    }
+
+    // Verify we have exactly 4 successful uploads
+    assert_eq!(
+        uploaded_buffers.len(),
+        4,
+        "Expected exactly 4 successful uploads"
+    );
+
+    // Verify that all uploaded files are accessible
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let url = pic.auto_progress();
+    println!("url: {:?}", url);
+
+    let agent = Agent::builder().with_url(url).build().unwrap();
+    rt.block_on(async {
+        agent.fetch_root_key().await.unwrap();
+    });
+    let http_gateway = HttpGatewayClient::builder()
+        .with_agent(agent)
+        .build()
+        .unwrap();
+
+    // Verify each uploaded file
+    for (upload_path, original_buffer) in uploaded_buffers {
+        println!("Verifying file at path: {}", upload_path);
+
+        let response = rt.block_on(async {
+            http_gateway
+                .request(HttpGatewayRequestArgs {
+                    canister_id: collection_canister_id.clone(),
+                    canister_request: Request::builder()
+                        .uri(upload_path.as_str())
+                        .body(Bytes::new())
+                        .unwrap(),
+                })
+                .send()
+                .await
+        });
+
+        let response_headers = response
+            .canister_response
+            .headers()
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
+            .collect::<Vec<(&str, &str)>>();
+
+        assert_eq!(response.canister_response.status(), 307);
+
+        if let Some(location) = response.canister_response.headers().get("location") {
+            let location_str = location.to_str().unwrap();
+            let canister_id = Principal::from_str(
+                location_str
+                    .split('.')
+                    .next()
+                    .unwrap()
+                    .replace("https://", "")
+                    .as_str(),
+            )
+            .unwrap();
+
+            // Track the first canister_id
+            unique_canisters.insert(canister_id.clone().to_string());
+
+            let first_redirected_response = rt.block_on(async {
+                http_gateway
+                    .request(HttpGatewayRequestArgs {
+                        canister_id: canister_id,
+                        canister_request: Request::builder()
+                            .uri(location_str)
+                            .body(Bytes::new())
+                            .unwrap(),
+                    })
+                    .send()
+                    .await
+            });
+
+            let first_redirected_response_headers = first_redirected_response
+                .canister_response
+                .headers()
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
+                .collect::<Vec<(&str, &str)>>();
+
+            if first_redirected_response.canister_response.status() == 307 {
+                if let Some(location_bis) = first_redirected_response
+                    .canister_response
+                    .headers()
+                    .get("location")
+                {
+                    let location_str = location_bis.to_str().unwrap();
+                    let canister_id = Principal::from_str(
+                        location_str
+                            .split('.')
+                            .next()
+                            .unwrap()
+                            .replace("https://", "")
+                            .as_str(),
+                    )
+                    .unwrap();
+
+                    // Track the second canister_id
+                    unique_canisters.insert(canister_id.clone().to_string());
+
+                    let second_redirected_response = rt.block_on(async {
+                        http_gateway
+                            .request(HttpGatewayRequestArgs {
+                                canister_id: canister_id,
+                                canister_request: Request::builder()
+                                    .uri(location_str)
+                                    .body(Bytes::new())
+                                    .unwrap(),
+                            })
+                            .send()
+                            .await
+                    });
+
+                    let second_redirected_response_headers = second_redirected_response
+                        .canister_response
+                        .headers()
+                        .iter()
+                        .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
+                        .collect::<Vec<(&str, &str)>>();
+
+                    rt.block_on(async {
+                        let body = second_redirected_response
+                            .canister_response
+                            .into_body()
+                            .collect()
+                            .await
+                            .unwrap()
+                            .to_bytes()
+                            .to_vec();
+
+                        assert_eq!(
+                            body, original_buffer,
+                            "File content mismatch for {}",
+                            upload_path
+                        );
+                    });
+                }
+            }
+        } else {
+            panic!("No redirect location found for {}", upload_path);
+        }
+    }
+
+    // Verify that exactly 2 unique canisters were used
+    println!("Unique canisters used: {:?}", unique_canisters);
+    assert_eq!(
+        unique_canisters.len(),
+        2,
+        "Expected exactly 2 unique canisters to be created, but found {}",
+        unique_canisters.len()
+    );
+
+    // Note: Each file is 6.2MB and the limit is 15MB per canister in test mode,
+    // so each canister can hold 2 files. With 4 files, we should have 2 canisters.
 }

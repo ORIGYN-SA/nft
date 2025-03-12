@@ -1,13 +1,13 @@
-use candid::{ CandidType, Nat, Principal };
+use candid::{CandidType, Nat, Principal};
 use canister_state_macros::canister_state;
-use storage_api_canister::{ cancel_upload, delete_file, finalize_upload, init_upload, store_chunk };
+use storage_api_canister::{cancel_upload, delete_file, finalize_upload, init_upload, store_chunk};
 // use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
 use crate::types::storage;
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
 use storage_api_canister::types::value_custom::CustomValue as Value;
 use types::BuildVersion;
-use types::{ Cycles, TimestampMillis };
-use utils::env::{ CanisterEnv, Environment };
+use types::{Cycles, TimestampMillis};
+use utils::env::{CanisterEnv, Environment};
 use utils::memory::MemorySize;
 
 canister_state!(RuntimeState);
@@ -51,10 +51,10 @@ pub struct Data {
 
 impl Data {
     #[allow(clippy::too_many_arguments)]
-    pub fn new(authorized_principals: Vec<Principal>) -> Self {
+    pub fn new(authorized_principals: Vec<Principal>, max_storage_size_wasm32: u128) -> Self {
         Self {
             authorized_principals: authorized_principals.into_iter().collect(),
-            storage: storage::StorageData::default(),
+            storage: storage::StorageData::new(max_storage_size_wasm32),
             http_cache: HttpCache::default(),
         }
     }
@@ -63,7 +63,7 @@ impl Data {
         &mut self,
         data: Value,
         data_id: String,
-        nft_id: Option<Nat>
+        nft_id: Option<Nat>,
     ) -> Result<String, String> {
         self.storage.insert_data(data, data_id, nft_id)
     }
@@ -71,7 +71,7 @@ impl Data {
     pub fn update_data(
         &mut self,
         hash_id: String,
-        data: Value
+        data: Value,
     ) -> Result<(String, Option<Value>), String> {
         self.storage.update_data(hash_id, data)
     }
@@ -88,35 +88,35 @@ impl Data {
 impl Data {
     pub fn init_upload(
         &mut self,
-        data: init_upload::Args
+        data: init_upload::Args,
     ) -> Result<init_upload::InitUploadResp, String> {
         self.storage.init_upload(data)
     }
 
     pub fn store_chunk(
         &mut self,
-        data: store_chunk::Args
+        data: store_chunk::Args,
     ) -> Result<store_chunk::StoreChunkResp, String> {
         self.storage.store_chunk(data)
     }
 
     pub fn finalize_upload(
         &mut self,
-        data: finalize_upload::Args
+        data: finalize_upload::Args,
     ) -> Result<finalize_upload::FinalizeUploadResp, String> {
         self.storage.finalize_upload(data)
     }
 
     pub fn cancel_upload(
         &mut self,
-        media_hash_id: String
+        media_hash_id: String,
     ) -> Result<cancel_upload::CancelUploadResp, String> {
         self.storage.cancel_upload(media_hash_id)
     }
 
     pub fn delete_file(
         &mut self,
-        media_hash_id: String
+        media_hash_id: String,
     ) -> Result<delete_file::DeleteFileResp, String> {
         self.storage.delete_file(media_hash_id)
     }

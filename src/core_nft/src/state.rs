@@ -1,23 +1,22 @@
 use std::collections::HashMap;
 
-use crate::types::sub_canister::StorageSubCanisterManager;
 use crate::types::collection_metadata::CollectionMetadata;
 use crate::types::nft::Icrc7Token;
 use crate::types::sub_canister;
-use candid::{ CandidType, Nat, Principal };
+use crate::types::sub_canister::StorageSubCanisterManager;
+use candid::{CandidType, Nat, Principal};
 use canister_state_macros::canister_state;
 use icrc_ledger_types::icrc1::account::Account;
-use serde::{ Deserialize, Serialize };
-use types::{ BuildVersion, TimestampNanos };
-use types::{ Cycles, TimestampMillis };
-use utils::env::{ CanisterEnv, Environment };
-use utils::memory::MemorySize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
-pub use storage_api_canister::lifecycle::{ init::InitArgs, post_upgrade::UpgradeArgs };
+pub use storage_api_canister::lifecycle::{init::InitArgs, post_upgrade::UpgradeArgs};
+use types::{BuildVersion, TimestampNanos};
+use types::{Cycles, TimestampMillis};
+use utils::env::{CanisterEnv, Environment};
+use utils::memory::MemorySize;
 
-const STORAGE_WASM: &[u8] = include_bytes!(
-    "../../storage_canister/wasm/storage_canister_canister.wasm.gz"
-);
+const STORAGE_WASM: &[u8] =
+    include_bytes!("../../storage_canister/wasm/storage_canister_canister.wasm.gz");
 
 canister_state!(RuntimeState);
 
@@ -106,7 +105,7 @@ impl Data {
         max_canister_storage_threshold: Option<Nat>,
         permitted_drift: Option<Nat>,
         collection_metadata: CollectionMetadata,
-        approval_init: Option<InitApprovalsArg>
+        approval_init: Option<InitApprovalsArg>,
     ) -> Self {
         let sub_canister_manager = StorageSubCanisterManager::new(
             sub_canister::ArgsStorage::Init(InitArgs {
@@ -127,7 +126,7 @@ impl Data {
             2_000_000_000_000,
             test_mode.clone(),
             commit_hash.clone(),
-            STORAGE_WASM.to_vec()
+            STORAGE_WASM.to_vec(),
         );
 
         Self {
@@ -163,15 +162,19 @@ impl Data {
     }
 
     pub fn add_token(&mut self, token: &Icrc7Token) {
-        self.tokens_list.insert(token.clone().token_id, token.clone());
+        self.tokens_list
+            .insert(token.clone().token_id, token.clone());
     }
 
     pub fn owner_of(&self, token_id: &Nat) -> Option<Account> {
-        self.tokens_list.get(token_id).map(|token| token.token_owner.clone())
+        self.tokens_list
+            .get(token_id)
+            .map(|token| token.token_owner.clone())
     }
 
     pub fn tokens_balance_of(&self, owner: &Account) -> Nat {
-        let count = self.tokens_list
+        let count = self
+            .tokens_list
             .values()
             .filter(|token| &token.token_owner == owner)
             .count() as u64;

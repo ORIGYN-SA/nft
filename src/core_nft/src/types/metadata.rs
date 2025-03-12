@@ -1,10 +1,13 @@
-use candid::{ CandidType, Nat };
-use serde::{ Deserialize, Serialize };
+use crate::utils::trace;
+use candid::{CandidType, Nat};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use storage_api_canister::types::value_custom::CustomValue as Value;
-use crate::utils::trace;
 
-use crate::{ state::{ mutate_state, read_state }, types::sub_canister::StorageCanister };
+use crate::{
+    state::{mutate_state, read_state},
+    types::sub_canister::StorageCanister,
+};
 
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct Metadata {
@@ -34,7 +37,10 @@ impl Metadata {
         trace(&format!("Inserting data: {:?}", data_id));
         let mut sub_canister_manager = read_state(|state| state.data.sub_canister_manager.clone());
 
-        match sub_canister_manager.insert_data(data.clone(), data_id.clone(), nft_id.clone()).await {
+        match sub_canister_manager
+            .insert_data(data.clone(), data_id.clone(), nft_id.clone())
+            .await
+        {
             Ok((hash_id, canister)) => {
                 self.data.insert(data_id, (hash_id, canister));
             }

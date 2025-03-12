@@ -3,19 +3,19 @@ use std::collections::HashMap;
 use crate::lifecycle::init_canister;
 use crate::lifecycle::Args;
 use crate::state::InitApprovalsArg;
-use crate::state::{ Data, RuntimeState };
+use crate::state::{Data, RuntimeState};
 use crate::types::collection_metadata;
 use crate::types::collection_metadata::CollectionMetadata;
+use crate::types::http::certify_all_assets;
 use candid::Principal;
-use candid::{ CandidType, Nat };
+use candid::{CandidType, Nat};
 use canister_tracing_macros::trace;
 use ic_cdk_macros::init;
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
 use storage_api_canister::value_custom::CustomValue as Value;
 use tracing::info;
 use types::BuildVersion;
-use utils::env::{ CanisterEnv, Environment };
-use crate::types::http::certify_all_assets;
+use utils::env::{CanisterEnv, Environment};
 
 #[derive(CandidType, Serialize, Deserialize, Debug)]
 pub struct InitArgs {
@@ -51,11 +51,10 @@ fn init(args: Args) {
             let env = CanisterEnv::new(
                 init_args.test_mode,
                 init_args.version,
-                init_args.commit_hash.clone()
+                init_args.commit_hash.clone(),
             );
-            let collection_metadata: CollectionMetadata = CollectionMetadata::from(
-                init_args.collection_metadata
-            );
+            let collection_metadata: CollectionMetadata =
+                CollectionMetadata::from(init_args.collection_metadata);
             // let collection_metadata = CollectionMetadata::new();
 
             let mut data = Data::new(
@@ -79,7 +78,7 @@ fn init(args: Args) {
                 init_args.permitted_drift,
                 init_args.max_canister_storage_threshold,
                 collection_metadata,
-                init_args.approval_init
+                init_args.approval_init,
             );
 
             if env.is_test_mode() {

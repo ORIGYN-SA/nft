@@ -3,9 +3,9 @@ use crate::utils::random_principal;
 use candid::CandidType;
 use candid::Deserialize;
 use candid::Principal;
+use pocket_ic::{PocketIc, PocketIcBuilder};
 use storage_api_canister::init::InitArgs;
 use storage_api_canister::lifecycle::Args;
-use pocket_ic::{ PocketIc, PocketIcBuilder };
 use types::BuildVersion;
 use types::CanisterId;
 
@@ -100,13 +100,16 @@ impl TestEnvBuilder {
             &mut pic,
             self.collection_id,
             storage_init_args,
-            self.controller
+            self.controller,
         );
 
         pic.tick();
         pic.advance_time(Duration::from_millis(MINUTE_IN_MS * 30));
 
-        println!("buyback_burn_canister_id: {}", storage_canister_id.to_text());
+        println!(
+            "buyback_burn_canister_id: {}",
+            storage_canister_id.to_text()
+        );
 
         TestEnv {
             controller: self.controller,
