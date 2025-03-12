@@ -5,7 +5,7 @@ use candid::Deserialize;
 use candid::Principal;
 use core_nft::init::InitArgs;
 use core_nft::lifecycle::Args;
-use pocket_ic::{ PocketIc, PocketIcBuilder };
+use pocket_ic::{PocketIc, PocketIcBuilder};
 use types::BuildVersion;
 use types::CanisterId;
 
@@ -113,17 +113,16 @@ impl TestEnvBuilder {
             approval_init: None,
         });
 
-        let collection_canister_id = setup_core_canister(
-            &mut pic,
-            self.collection_id,
-            nft_init_args,
-            self.controller
-        );
+        let collection_canister_id =
+            setup_core_canister(&mut pic, self.collection_id, nft_init_args, self.controller);
 
         pic.tick();
         pic.advance_time(Duration::from_millis(MINUTE_IN_MS * 30));
 
-        println!("buyback_burn_canister_id: {}", collection_canister_id.to_text());
+        println!(
+            "buyback_burn_canister_id: {}",
+            collection_canister_id.to_text()
+        );
 
         TestEnv {
             controller: self.controller,

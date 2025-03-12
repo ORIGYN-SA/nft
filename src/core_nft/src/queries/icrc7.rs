@@ -30,7 +30,10 @@ pub fn icrc7_description() -> icrc7::icrc7_description::Response {
 #[query]
 pub fn icrc7_logo() -> icrc7::icrc7_logo::Response {
     if let Some(_) = read_state(|state| state.data.logo.clone()) {
-        Some(format!("https://{}.raw.icp0.io/logo", ic_cdk::id().to_text()))
+        Some(format!(
+            "https://{}.raw.icp0.io/logo",
+            ic_cdk::id().to_text()
+        ))
     } else {
         None
     }
@@ -88,7 +91,7 @@ pub fn icrc7_permitted_drift() -> icrc7::icrc7_permitted_drift::Response {
 
 #[update]
 pub async fn icrc7_token_metadata(
-    token_ids: icrc7::icrc7_token_metadata::Args
+    token_ids: icrc7::icrc7_token_metadata::Args,
 ) -> icrc7::icrc7_token_metadata::Response {
     let mut ret = Vec::new();
     for token_id in token_ids {
@@ -120,7 +123,7 @@ pub fn icrc7_owner_of(token_ids: icrc7::icrc7_owner_of::Args) -> icrc7::icrc7_ow
 
 #[query]
 pub fn icrc7_balance_of(
-    accounts: icrc7::icrc7_balance_of::Args
+    accounts: icrc7::icrc7_balance_of::Args,
 ) -> icrc7::icrc7_balance_of::Response {
     read_state(|state| {
         accounts
@@ -134,15 +137,18 @@ pub fn icrc7_balance_of(
 pub fn icrc7_tokens(args: icrc7::icrc7_tokens::Args) -> icrc7::icrc7_tokens::Response {
     read_state(|state| {
         let prev = args.0.unwrap_or(Nat::from(0 as u64));
-        let take: usize = usize
-            ::try_from(
-                args.1.unwrap_or_else(|| {
-                    state.data.default_take_value
+        let take: usize = usize::try_from(
+            args.1
+                .unwrap_or_else(|| {
+                    state
+                        .data
+                        .default_take_value
                         .clone()
                         .unwrap_or(Nat::from(icrc7::DEFAULT_TAKE_VALUE))
-                }).0
-            )
-            .unwrap_or(icrc7::DEFAULT_TAKE_VALUE);
+                })
+                .0,
+        )
+        .unwrap_or(icrc7::DEFAULT_TAKE_VALUE);
 
         let mut tokens: Vec<_> = state.data.tokens_list.keys().cloned().collect();
         tokens.sort();
@@ -159,15 +165,17 @@ pub fn icrc7_tokens_of(args: icrc7::icrc7_tokens_of::Args) -> icrc7::icrc7_token
     read_state(|state| {
         let (account, prev, take) = args;
         let prev = prev.unwrap_or(Nat::from(0 as u64));
-        let take: usize = usize
-            ::try_from(
-                take.unwrap_or_else(|| {
-                    state.data.default_take_value
-                        .clone()
-                        .unwrap_or(Nat::from(icrc7::DEFAULT_TAKE_VALUE))
-                }).0
-            )
-            .unwrap_or(icrc7::DEFAULT_TAKE_VALUE);
+        let take: usize = usize::try_from(
+            take.unwrap_or_else(|| {
+                state
+                    .data
+                    .default_take_value
+                    .clone()
+                    .unwrap_or(Nat::from(icrc7::DEFAULT_TAKE_VALUE))
+            })
+            .0,
+        )
+        .unwrap_or(icrc7::DEFAULT_TAKE_VALUE);
 
         let mut tokens: Vec<Nat> = state.data.tokens_ids_of_account(&account);
         tokens.sort();

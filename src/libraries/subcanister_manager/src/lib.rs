@@ -1,23 +1,16 @@
 use std::collections::HashMap;
 use std::future::Future;
 
-use candid::{ CandidType, Encode, Nat, Principal };
+use candid::{CandidType, Encode, Nat, Principal};
 use ic_cdk::api::management_canister::main::{
-    create_canister,
-    install_code,
-    start_canister,
-    stop_canister,
-    CanisterIdRecord,
-    CanisterInstallMode,
-    CanisterSettings,
-    CreateCanisterArgument,
-    InstallCodeArgument,
+    create_canister, install_code, start_canister, stop_canister, CanisterIdRecord,
+    CanisterInstallMode, CanisterSettings, CreateCanisterArgument, InstallCodeArgument,
     LogVisibility,
 };
-use serde::{ Deserialize, Serialize };
-use utils::retry_async::retry_async;
-use std::fmt::Debug;
+use serde::{Deserialize, Serialize};
 use std::any::Any;
+use std::fmt::Debug;
+use utils::retry_async::retry_async;
 
 #[derive(Debug)]
 pub enum NewCanisterError {
@@ -30,7 +23,7 @@ pub trait SubCanister {
     type Canister: Send + Sync;
 
     fn create_canister(
-        &mut self
+        &mut self,
     ) -> impl Future<Output = Result<Box<impl Canister>, NewCanisterError>> + Send + '_; // Explicitly capture lifetime
     fn update_canisters(&mut self) -> impl Future<Output = Result<(), Vec<String>>> + Send + '_; // Explicitly capture lifetime
     fn list_canisters(&self) -> Vec<Box<impl Canister>>;
@@ -38,7 +31,10 @@ pub trait SubCanister {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
-pub struct SubCanisterManager<T> where T: Canister + Clone + Serialize + Debug + Send + Sync {
+pub struct SubCanisterManager<T>
+where
+    T: Canister + Clone + Serialize + Debug + Send + Sync,
+{
     pub master_canister_id: Principal,
     pub sub_canisters: HashMap<Principal, Box<T>>,
     pub controllers: Vec<Principal>,
@@ -50,7 +46,10 @@ pub struct SubCanisterManager<T> where T: Canister + Clone + Serialize + Debug +
     pub wasm: Vec<u8>,
 }
 
-impl<T> SubCanisterManager<T> where T: Canister + Clone + Serialize + Debug + Send + Sync {
+impl<T> SubCanisterManager<T>
+where
+    T: Canister + Clone + Serialize + Debug + Send + Sync,
+{
     pub fn new(
         master_canister_id: Principal,
         sub_canisters: HashMap<Principal, Box<T>>,
@@ -60,7 +59,7 @@ impl<T> SubCanisterManager<T> where T: Canister + Clone + Serialize + Debug + Se
         reserved_cycles: u128,
         test_mode: bool,
         commit_hash: String,
-        wasm: Vec<u8>
+        wasm: Vec<u8>,
     ) -> Self {
         controllers.push(master_canister_id);
         authorized_principal.push(master_canister_id);
@@ -80,11 +79,10 @@ impl<T> SubCanisterManager<T> where T: Canister + Clone + Serialize + Debug + Se
 
     pub fn create_canister<U>(
         &mut self,
-        init_args: U
-    ) -> impl Future<Output = Result<Box<impl Canister + Debug + Clone>, NewCanisterError>> +
-            Send +
-            '_
-        where U: Clone + Serialize + CandidType + Send + Sync + 'static
+        init_args: U,
+    ) -> impl Future<Output = Result<Box<impl Canister + Debug + Clone>, NewCanisterError>> + Send + '_
+    where
+        U: Clone + Serialize + CandidType + Send + Sync + 'static,
     {
         async move {
             // find in self.sub_canisters if a canister is already created but not installed
@@ -109,15 +107,18 @@ impl<T> SubCanisterManager<T> where T: Canister + Clone + Serialize + Debug + Se
                     wasm_memory_limit: None, // use default of 3GB
                 };
                 // Step 1: Create the canister
-                canister_id = match
-                    retry_async(|| {
+                canister_id = match retry_async(
+                    || {
                         create_canister(
                             CreateCanisterArgument {
                                 settings: Some(settings.clone()),
                             },
-                            self.initial_cycles as u128
+                            self.initial_cycles as u128,
                         )
-                    }, 3).await
+                    },
+                    3,
+                )
+                .await
                 {
                     Ok(canister) => canister.0.canister_id,
                     Err(e) => {
@@ -127,7 +128,7 @@ impl<T> SubCanisterManager<T> where T: Canister + Clone + Serialize + Debug + Se
 
                 self.sub_canisters.insert(
                     canister_id,
-                    Box::new(T::new(canister_id, CanisterState::Created))
+                    Box::new(T::new(canister_id, CanisterState::Created)),
                 );
             }
 
@@ -162,34 +163,38 @@ impl<T> SubCanisterManager<T> where T: Canister + Clone + Serialize + Debug + Se
 
     pub fn update_canisters<U>(
         &mut self,
-        update_args: U
+        update_args: U,
     ) -> impl Future<Output = Result<(), Vec<String>>> + Send + '_
-        where U: Clone + Serialize + CandidType + Send + Sync + 'static
+    where
+        U: Clone + Serialize + CandidType + Send + Sync + 'static,
     {
         async move {
             let init_args = match Encode!(&update_args.clone()) {
                 Ok(encoded_init_args) => encoded_init_args,
                 Err(e) => {
-                    return Err(
-                        vec![format!("ERROR : failed to create init args with error - {e}")]
-                    );
+                    return Err(vec![format!(
+                        "ERROR : failed to create init args with error - {e}"
+                    )]);
                 }
             };
 
             let mut canister_upgrade_errors = vec![];
 
             for (canister_id, _) in self.sub_canisters.clone().iter() {
-                match
-                    retry_async(|| {
+                match retry_async(
+                    || {
                         stop_canister(CanisterIdRecord {
                             canister_id: *canister_id,
                         })
-                    }, 3).await
+                    },
+                    3,
+                )
+                .await
                 {
                     Ok(_) => {
                         self.sub_canisters.insert(
                             *canister_id,
-                            Box::new(T::new(*canister_id, CanisterState::Stopped))
+                            Box::new(T::new(*canister_id, CanisterState::Stopped)),
                         );
                     }
                     Err(e) => {
@@ -219,17 +224,20 @@ impl<T> SubCanisterManager<T> where T: Canister + Clone + Serialize + Debug + Se
 
                 match result {
                     Ok(_) => {
-                        match
-                            retry_async(|| {
+                        match retry_async(
+                            || {
                                 start_canister(CanisterIdRecord {
                                     canister_id: *canister_id,
                                 })
-                            }, 3).await
+                            },
+                            3,
+                        )
+                        .await
                         {
                             Ok(_) => {
                                 self.sub_canisters.insert(
                                     *canister_id,
-                                    Box::new(T::new(*canister_id, CanisterState::Installed))
+                                    Box::new(T::new(*canister_id, CanisterState::Installed)),
                                 );
                             }
                             Err(e) => {

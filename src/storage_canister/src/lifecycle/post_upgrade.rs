@@ -1,16 +1,16 @@
-use crate::{ lifecycle::init_canister, utils::trace };
 use crate::memory::get_upgrades_memory;
 use crate::state::RuntimeState;
-use storage_api_canister::Args;
+use crate::types::http::certify_all_assets;
+use crate::{lifecycle::init_canister, utils::trace};
 use candid::CandidType;
 use canister_logger::LogEntry;
 use canister_tracing_macros::trace;
 use ic_cdk_macros::post_upgrade;
-use serde::{ Deserialize, Serialize };
+use serde::{Deserialize, Serialize};
 use stable_memory::get_reader;
+use storage_api_canister::Args;
 use tracing::info;
 use types::BuildVersion;
-use crate::types::http::certify_all_assets;
 
 #[derive(CandidType, Serialize, Deserialize, Debug)]
 pub struct UpgradeArgs {

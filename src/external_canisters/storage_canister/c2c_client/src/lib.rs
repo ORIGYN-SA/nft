@@ -1,15 +1,14 @@
 use canister_client::generate_candid_c2c_call;
-use storage_api_canister::get_data::{ Args as GetDataArgs, Response as GetDataResponse };
-use storage_api_canister::get_storage_size::{
-    Args as GetStorageSizeArgs,
-    Response as GetStorageSizeResponse,
-};
-use storage_api_canister::insert_data::{ Args as InsertDataArgs, Response as InsertDataResponse };
-use storage_api_canister::init_upload;
-use storage_api_canister::store_chunk;
-use storage_api_canister::finalize_upload;
 use storage_api_canister::cancel_upload;
 use storage_api_canister::delete_file;
+use storage_api_canister::finalize_upload;
+use storage_api_canister::get_data::{Args as GetDataArgs, Response as GetDataResponse};
+use storage_api_canister::get_storage_size::{
+    Args as GetStorageSizeArgs, Response as GetStorageSizeResponse,
+};
+use storage_api_canister::init_upload;
+use storage_api_canister::insert_data::{Args as InsertDataArgs, Response as InsertDataResponse};
+use storage_api_canister::store_chunk;
 
 pub mod get_storage_size {
     use super::*;

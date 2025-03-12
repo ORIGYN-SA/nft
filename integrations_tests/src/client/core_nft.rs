@@ -1,35 +1,15 @@
-use crate::{ generate_pocket_query_call, generate_pocket_update_call };
+use crate::{generate_pocket_query_call, generate_pocket_update_call};
 
 use core_nft::types::icrc7::{
-    icrc7_atomic_batch_transfers,
-    icrc7_balance_of,
-    icrc7_collection_metadata,
-    icrc7_default_take_value,
-    icrc7_description,
-    icrc7_logo,
-    icrc7_max_memo_size,
-    icrc7_max_query_batch_size,
-    icrc7_max_take_value,
-    icrc7_max_update_batch_size,
-    icrc7_name,
-    icrc7_owner_of,
-    icrc7_permitted_drift,
-    icrc7_supply_cap,
-    icrc7_symbol,
-    icrc7_token_metadata,
-    icrc7_tokens,
-    icrc7_tokens_of,
-    icrc7_total_supply,
-    icrc7_transfer,
-    icrc7_tx_window,
+    icrc7_atomic_batch_transfers, icrc7_balance_of, icrc7_collection_metadata,
+    icrc7_default_take_value, icrc7_description, icrc7_logo, icrc7_max_memo_size,
+    icrc7_max_query_batch_size, icrc7_max_take_value, icrc7_max_update_batch_size, icrc7_name,
+    icrc7_owner_of, icrc7_permitted_drift, icrc7_supply_cap, icrc7_symbol, icrc7_token_metadata,
+    icrc7_tokens, icrc7_tokens_of, icrc7_total_supply, icrc7_transfer, icrc7_tx_window,
 };
-use core_nft::types::management::{ mint, update_minting_authorities, update_nft_metadata };
+use core_nft::types::management::{mint, update_minting_authorities, update_nft_metadata};
 use storage_api_canister::updates::{
-    finalize_upload,
-    init_upload,
-    store_chunk,
-    cancel_upload,
-    delete_file,
+    cancel_upload, delete_file, finalize_upload, init_upload, store_chunk,
 };
 
 generate_pocket_query_call!(icrc7_collection_metadata);

@@ -1,13 +1,10 @@
-use ic_asset_certification::{ Asset, AssetConfig, AssetEncoding, AssetRouter };
+use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetRouter};
 use ic_cdk::api::set_certified_data;
 use ic_http_certification::{
-    HeaderField,
-    HttpCertification,
-    HttpCertificationPath,
-    HttpCertificationTree,
+    HeaderField, HttpCertification, HttpCertificationPath, HttpCertificationTree,
     HttpCertificationTreeEntry,
 };
-use std::{ cell::RefCell, rc::Rc };
+use std::{cell::RefCell, rc::Rc};
 
 use crate::state::read_state;
 
@@ -33,173 +30,191 @@ fn get_asset_config() -> Vec<AssetConfig> {
     // 1. Define the asset certification configurations.
     let encodings = vec![
         AssetEncoding::Brotli.default_config(),
-        AssetEncoding::Gzip.default_config()
+        AssetEncoding::Gzip.default_config(),
     ];
 
     let asset_configs = vec![
         AssetConfig::Pattern {
             pattern: "**/*.png".to_string(),
             content_type: Some("image/png".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), IMMUTABLE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
             pattern: "**/*.jpeg".to_string(),
             content_type: Some("image/jpeg".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), IMMUTABLE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
             pattern: "**/*.jpg".to_string(),
             content_type: Some("image/jpeg".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), IMMUTABLE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
             pattern: "**/*.gif".to_string(),
             content_type: Some("image/gif".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), IMMUTABLE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
             pattern: "**/*.svg".to_string(),
             content_type: Some("image/svg+xml".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), IMMUTABLE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
             pattern: "**/*.mp3".to_string(),
             content_type: Some("audio/mpeg".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), IMMUTABLE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: vec![],
         },
         AssetConfig::Pattern {
             pattern: "**/*.mp4".to_string(),
             content_type: Some("video/mp4".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), IMMUTABLE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: vec![],
         },
         AssetConfig::Pattern {
             pattern: "**/*.html".to_string(),
             content_type: Some("text/html".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), NO_CACHE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
             pattern: "**/*.css".to_string(),
             content_type: Some("text/css".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), NO_CACHE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
             pattern: "**/*.js".to_string(),
             content_type: Some("application/javascript".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), NO_CACHE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
             pattern: "**/*.json".to_string(),
             content_type: Some("application/json".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), NO_CACHE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
             pattern: "**/*.xml".to_string(),
             content_type: Some("application/xml".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), NO_CACHE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
             pattern: "**/*.txt".to_string(),
             content_type: Some("text/plain".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), NO_CACHE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
             pattern: "**/*.woff".to_string(),
             content_type: Some("font/woff".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), IMMUTABLE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
             pattern: "**/*.woff2".to_string(),
             content_type: Some("font/woff2".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), IMMUTABLE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
             pattern: "**/*.ttf".to_string(),
             content_type: Some("font/ttf".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), IMMUTABLE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
             pattern: "**/*.eot".to_string(),
             content_type: Some("application/vnd.ms-fontobject".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), IMMUTABLE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
             pattern: "**/*.otf".to_string(),
             content_type: Some("font/otf".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), IMMUTABLE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: encodings.clone(),
         },
         AssetConfig::Pattern {
             pattern: "**/*.ico".to_string(),
             content_type: Some("image/x-icon".to_string()), // updated content_type
-            headers: get_asset_headers(
-                vec![("cache-control".to_string(), IMMUTABLE_ASSET_CACHE_CONTROL.to_string())]
-            ),
+            headers: get_asset_headers(vec![(
+                "cache-control".to_string(),
+                IMMUTABLE_ASSET_CACHE_CONTROL.to_string(),
+            )]),
             encodings: encodings.clone(),
-        }
-        // AssetConfig::Redirect {
-        //     from: "/old-url".to_string(),
-        //     to: "/".to_string(),
-        //     kind: AssetRedirectKind::Permanent,
-        //     headers: get_asset_headers(
-        //         vec![
-        //             ("content-type".to_string(), "text/plain".to_string()),
-        //             ("cache-control".to_string(), NO_CACHE_ASSET_CACHE_CONTROL.to_string())
-        //         ]
-        //     ),
-        // }
+        }, // AssetConfig::Redirect {
+           //     from: "/old-url".to_string(),
+           //     to: "/".to_string(),
+           //     kind: AssetRedirectKind::Permanent,
+           //     headers: get_asset_headers(
+           //         vec![
+           //             ("content-type".to_string(), "text/plain".to_string()),
+           //             ("cache-control".to_string(), NO_CACHE_ASSET_CACHE_CONTROL.to_string())
+           //         ]
+           //     ),
+           // }
     ];
 
     asset_configs
@@ -240,7 +255,10 @@ pub fn certify_all_assets() {
     let mut assets = Vec::new();
     read_state(|state| {
         for (internal_metadata, raw_content) in state.data.storage.get_all_files() {
-            assets.push(Asset::new(internal_metadata.file_path.clone(), raw_content.clone()));
+            assets.push(Asset::new(
+                internal_metadata.file_path.clone(),
+                raw_content.clone(),
+            ));
         }
     });
 
@@ -250,10 +268,8 @@ pub fn certify_all_assets() {
 
         let metrics_tree_path = HttpCertificationPath::exact("/metrics");
         let metrics_certification = HttpCertification::skip();
-        let metrics_tree_entry = HttpCertificationTreeEntry::new(
-            metrics_tree_path,
-            metrics_certification
-        );
+        let metrics_tree_entry =
+            HttpCertificationTreeEntry::new(metrics_tree_path, metrics_certification);
         tree.insert(&metrics_tree_entry);
 
         let logs_tree_path = HttpCertificationPath::exact("/logs");
@@ -263,10 +279,8 @@ pub fn certify_all_assets() {
 
         let trace_tree_path = HttpCertificationPath::exact("/trace");
         let trace_certification = HttpCertification::skip();
-        let trace_tree_entry = HttpCertificationTreeEntry::new(
-            trace_tree_path,
-            trace_certification
-        );
+        let trace_tree_entry =
+            HttpCertificationTreeEntry::new(trace_tree_path, trace_certification);
         tree.insert(&trace_tree_entry);
     });
 

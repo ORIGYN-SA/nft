@@ -1,12 +1,12 @@
 use super::NftMetadata;
-use candid::{ CandidType, Decode, Encode, Nat };
-use ic_stable_structures::{ storable::Bound, Storable };
-use icrc_ledger_types::{ icrc::generic_value::ICRC3Value as Icrc3Value, icrc1::account::Account };
-use serde::{ Deserialize, Serialize };
-use tracing::info;
 use crate::utils::trace;
+use candid::{CandidType, Decode, Encode, Nat};
+use ic_stable_structures::{storable::Bound, Storable};
+use icrc_ledger_types::{icrc::generic_value::ICRC3Value as Icrc3Value, icrc1::account::Account};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use storage_api_canister::types::value_custom::CustomValue as Value;
+use tracing::info;
 
 pub type Icrc7TokenMetadata = HashMap<String, Icrc3Value>;
 
@@ -38,7 +38,7 @@ impl Icrc7Token {
         token_name: String,
         token_description: Option<String>,
         token_logo: Option<String>,
-        token_owner: Account
+        token_owner: Account,
     ) -> Self {
         Self {
             token_id,
@@ -68,10 +68,14 @@ impl Icrc7Token {
         trace(&format!("nft token_metadata"));
 
         self.token_metadata
-            .get_all_data().await
+            .get_all_data()
+            .await
             .iter()
             .for_each(|(key, value)| {
-                trace(&format!("nft token_metadata - key: {:?}, value: {:?}", key, value));
+                trace(&format!(
+                    "nft token_metadata - key: {:?}, value: {:?}",
+                    key, value
+                ));
                 metadata.insert(key.clone(), value.0.clone());
             });
         metadata
@@ -81,11 +85,9 @@ impl Icrc7Token {
         info!("Adding metadata to token: {:?}", metadata);
         trace(&format!("nft add_metadata"));
         for (key, value) in metadata.iter() {
-            self.token_metadata.insert_data(
-                self.token_id.clone(),
-                key.clone(),
-                Value(value.clone())
-            ).await;
+            self.token_metadata
+                .insert_data(self.token_id.clone(), key.clone(), Value(value.clone()))
+                .await;
         }
         trace(&format!("nft add_metadata - finished"));
     }

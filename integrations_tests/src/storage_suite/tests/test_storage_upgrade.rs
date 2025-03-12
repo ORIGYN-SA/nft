@@ -1,52 +1,49 @@
 use crate::client::storage::{
-    get_data,
-    insert_data,
-    http_request,
-    remove_data,
-    update_data,
-    get_storage_size,
-    init_upload,
-    store_chunk,
-    finalize_upload,
-    cancel_upload,
-    delete_file,
+    cancel_upload, delete_file, finalize_upload, get_data, get_storage_size, http_request,
+    init_upload, insert_data, remove_data, store_chunk, update_data,
 };
 use crate::storage_suite::setup::setup_storage::upgrade_storage_canister;
 use candid::Nat;
+use storage_api_canister::lifecycle::Args;
 use storage_api_canister::post_upgrade::UpgradeArgs;
 use types::BuildVersion;
-use storage_api_canister::lifecycle::Args;
 
 use http::StatusCode;
-use storage_api_canister::init_upload;
-use storage_api_canister::store_chunk;
-use storage_api_canister::finalize_upload;
+use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
+use sha2::{Digest, Sha256};
 use storage_api_canister::cancel_upload;
 use storage_api_canister::delete_file;
+use storage_api_canister::finalize_upload;
+use storage_api_canister::init_upload;
+use storage_api_canister::store_chunk;
 use storage_api_canister::updates::insert_data;
 use storage_api_canister::updates::remove_data;
 use storage_api_canister::updates::update_data;
-use sha2::{ Sha256, Digest };
 use storage_api_canister::value_custom::CustomValue;
-use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
 
 use crate::storage_suite::setup::setup::TestEnv;
-use crate::{ storage_suite::setup::default_test_setup, utils::tick_n_blocks };
+use crate::{storage_suite::setup::default_test_setup, utils::tick_n_blocks};
+use bytes::Bytes;
+use http::Request;
+use http_body_util::BodyExt;
+use ic_agent::Agent;
+use ic_http_gateway::{HttpGatewayClient, HttpGatewayRequestArgs, HttpGatewayResponseMetadata};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use ic_http_gateway::{ HttpGatewayClient, HttpGatewayRequestArgs, HttpGatewayResponseMetadata };
-use http::Request;
-use ic_agent::Agent;
-use bytes::Bytes;
-use http_body_util::BodyExt;
 
 #[test]
 fn test_storage_after_update_simple() {
     let mut test_env: TestEnv = default_test_setup();
     println!("test_env: {:?}", test_env);
 
-    let TestEnv { ref mut pic, storage_canister_id, controller, nft_owner1, nft_owner2 } = test_env;
+    let TestEnv {
+        ref mut pic,
+        storage_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
 
     let file_path = Path::new("./src/storage_suite/assets/test.png");
     let mut file = File::open(&file_path).expect("Failed to open file");
@@ -72,7 +69,7 @@ fn test_storage_after_update_simple() {
             file_hash: format!("{:x}", file_hash),
             file_size,
             chunk_size: None,
-        })
+        }),
     );
 
     match init_upload_resp {
@@ -98,7 +95,7 @@ fn test_storage_after_update_simple() {
                 file_path: "/test.png".to_string(),
                 chunk_id: Nat::from(chunk_index as u64),
                 chunk_data: chunk.to_vec(),
-            })
+            }),
         );
 
         match store_chunk_resp {
@@ -120,7 +117,7 @@ fn test_storage_after_update_simple() {
         storage_canister_id,
         &(finalize_upload::Args {
             file_path: "/test.png".to_string(),
-        })
+        }),
     );
 
     match finalize_upload_resp {
@@ -145,16 +142,23 @@ fn test_storage_after_update_simple() {
     println!("url: {:?}", url);
     println!(
         "request : {:?}",
-        Request::builder().uri(format!("/test.png").as_str()).body(Bytes::new()).unwrap()
+        Request::builder()
+            .uri(format!("/test.png").as_str())
+            .body(Bytes::new())
+            .unwrap()
     );
 
     let agent = Agent::builder().with_url(url).build().unwrap();
     rt.block_on(async {
         agent.fetch_root_key().await.unwrap();
     });
-    let http_gateway = HttpGatewayClient::builder().with_agent(agent).build().unwrap();
+    let http_gateway = HttpGatewayClient::builder()
+        .with_agent(agent)
+        .build()
+        .unwrap();
 
-    let response = rt.block_on(async { http_gateway
+    let response = rt.block_on(async {
+        http_gateway
             .request(HttpGatewayRequestArgs {
                 canister_id: storage_canister_id.clone(),
                 canister_request: Request::builder()
@@ -162,9 +166,12 @@ fn test_storage_after_update_simple() {
                     .body(Bytes::new())
                     .unwrap(),
             })
-            .send().await });
+            .send()
+            .await
+    });
 
-    let response_headers = response.canister_response
+    let response_headers = response
+        .canister_response
         .headers()
         .iter()
         .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
@@ -184,7 +191,8 @@ fn test_storage_after_update_simple() {
         if let Some(location) = response.canister_response.headers().get("location") {
             let location_str = location.to_str().unwrap();
 
-            let redirected_response = rt.block_on(async { http_gateway
+            let redirected_response = rt.block_on(async {
+                http_gateway
                     .request(HttpGatewayRequestArgs {
                         canister_id: storage_canister_id.clone(),
                         canister_request: Request::builder()
@@ -192,9 +200,12 @@ fn test_storage_after_update_simple() {
                             .body(Bytes::new())
                             .unwrap(),
                     })
-                    .send().await });
+                    .send()
+                    .await
+            });
 
-            let redirected_response_headers = redirected_response.canister_response
+            let redirected_response_headers = redirected_response
+                .canister_response
                 .headers()
                 .iter()
                 .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
@@ -223,16 +234,21 @@ fn test_storage_after_update_simple() {
                 ("content-length", "6205837")
             ];
 
-            println!("redirected_response_headers: {:?}", redirected_response_headers);
+            println!(
+                "redirected_response_headers: {:?}",
+                redirected_response_headers
+            );
             for (key, value) in expected_headers {
                 println!("key: {}, value: {}", key, value);
                 assert!(redirected_response_headers.contains(&(key, value)));
             }
 
             rt.block_on(async {
-                let body = redirected_response.canister_response
+                let body = redirected_response
+                    .canister_response
                     .into_body()
-                    .collect().await
+                    .collect()
+                    .await
                     .unwrap()
                     .to_bytes()
                     .to_vec();

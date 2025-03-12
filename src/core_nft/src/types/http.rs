@@ -1,15 +1,12 @@
-use ic_asset_certification::{ Asset, AssetConfig, AssetEncoding, AssetRouter, AssetRedirectKind };
+use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetRedirectKind, AssetRouter};
 use ic_cdk::api::set_certified_data;
 use ic_http_certification::{
-    HeaderField,
-    HttpCertification,
-    HttpCertificationPath,
-    HttpCertificationTree,
+    HeaderField, HttpCertification, HttpCertificationPath, HttpCertificationTree,
     HttpCertificationTreeEntry,
 };
-use std::{ cell::RefCell, rc::Rc };
+use std::{cell::RefCell, rc::Rc};
 
-use crate::{ state::read_state, utils::trace };
+use crate::{state::read_state, utils::trace};
 
 thread_local! {
     pub static HTTP_TREE: Rc<RefCell<HttpCertificationTree>> = Default::default();
@@ -30,17 +27,21 @@ const IMMUTABLE_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable
 pub const NO_CACHE_ASSET_CACHE_CONTROL: &str = "public, no-cache, no-store";
 
 pub fn add_redirection(from_url: String, to_url: String) -> Option<()> {
-    trace(&format!("add_redirection: from_url: {}, to_url: {}", from_url, to_url));
+    trace(&format!(
+        "add_redirection: from_url: {}, to_url: {}",
+        from_url, to_url
+    ));
     let asset_configs = vec![AssetConfig::Redirect {
         from: from_url,
         to: to_url,
         kind: AssetRedirectKind::Temporary,
-        headers: get_asset_headers(
-            vec![
-                ("content-type".to_string(), "text/plain".to_string()),
-                ("cache-control".to_string(), NO_CACHE_ASSET_CACHE_CONTROL.to_string())
-            ]
-        ),
+        headers: get_asset_headers(vec![
+            ("content-type".to_string(), "text/plain".to_string()),
+            (
+                "cache-control".to_string(),
+                NO_CACHE_ASSET_CACHE_CONTROL.to_string(),
+            ),
+        ]),
     }];
 
     ASSET_ROUTER.with_borrow_mut(|asset_router| {
@@ -84,10 +85,8 @@ pub fn certify_all_assets() {
 
         let metrics_tree_path = HttpCertificationPath::exact("/metrics");
         let metrics_certification = HttpCertification::skip();
-        let metrics_tree_entry = HttpCertificationTreeEntry::new(
-            metrics_tree_path,
-            metrics_certification
-        );
+        let metrics_tree_entry =
+            HttpCertificationTreeEntry::new(metrics_tree_path, metrics_certification);
         tree.insert(&metrics_tree_entry);
 
         let logs_tree_path = HttpCertificationPath::exact("/logs");
@@ -97,10 +96,8 @@ pub fn certify_all_assets() {
 
         let trace_tree_path = HttpCertificationPath::exact("/trace");
         let trace_certification = HttpCertification::skip();
-        let trace_tree_entry = HttpCertificationTreeEntry::new(
-            trace_tree_path,
-            trace_certification
-        );
+        let trace_tree_entry =
+            HttpCertificationTreeEntry::new(trace_tree_path, trace_certification);
         tree.insert(&trace_tree_entry);
     });
 
