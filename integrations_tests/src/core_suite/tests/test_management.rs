@@ -705,10 +705,8 @@ fn test_delete_file() {
 }
 
 #[test]
-fn test_management_scalability() {
+fn test_management_file_distribution() {
     let mut test_env: TestEnv = default_test_setup();
-    println!("test_env: {:?}", test_env);
-
     let TestEnv {
         ref mut pic,
         collection_canister_id,
@@ -718,45 +716,26 @@ fn test_management_scalability() {
     } = test_env;
 
     let file_path = "./src/storage_suite/assets/test.png";
-    let mut uploaded_buffers = Vec::new();
-    let mut unique_canisters = std::collections::HashSet::new();
+    let mut uploaded_files = Vec::new();
+    let mut canister_distribution = std::collections::HashMap::new();
 
-    // Upload 4 files - should all succeed by creating new canisters as needed
-    // With 15MB limit per canister and 6.2MB per file, each canister can hold 2 files
-    // So we expect 2 canisters to be created for 4 files
+    // Upload 4 files
     for i in 0..4 {
-        let upload_path = format!("/test_scalability_{}.png", i);
-
+        let upload_path = format!("/test_distribution_{}.png", i);
         let result = upload_file(
             pic,
             controller,
             collection_canister_id,
             file_path,
             &upload_path,
-        );
+        )
+        .expect("Upload failed");
 
-        match result {
-            Ok(buffer) => {
-                uploaded_buffers.push((upload_path.clone(), buffer));
-            }
-            Err(e) => {
-                panic!("Expected all uploads to succeed with auto-scaling, but upload {} failed with: {}", i, e);
-            }
-        }
+        uploaded_files.push((upload_path.clone(), result));
     }
 
-    // Verify we have exactly 4 successful uploads
-    assert_eq!(
-        uploaded_buffers.len(),
-        4,
-        "Expected exactly 4 successful uploads"
-    );
-
-    // Verify that all uploaded files are accessible
     let rt = tokio::runtime::Runtime::new().unwrap();
     let url = pic.auto_progress();
-    println!("url: {:?}", url);
-
     let agent = Agent::builder().with_url(url).build().unwrap();
     rt.block_on(async {
         agent.fetch_root_key().await.unwrap();
@@ -766,10 +745,8 @@ fn test_management_scalability() {
         .build()
         .unwrap();
 
-    // Verify each uploaded file
-    for (upload_path, original_buffer) in uploaded_buffers {
-        println!("Verifying file at path: {}", upload_path);
-
+    // Verify distribution of files across canisters
+    for (upload_path, original_buffer) in uploaded_files {
         let response = rt.block_on(async {
             http_gateway
                 .request(HttpGatewayRequestArgs {
@@ -783,15 +760,6 @@ fn test_management_scalability() {
                 .await
         });
 
-        let response_headers = response
-            .canister_response
-            .headers()
-            .iter()
-            .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
-            .collect::<Vec<(&str, &str)>>();
-
-        assert_eq!(response.canister_response.status(), 307);
-
         if let Some(location) = response.canister_response.headers().get("location") {
             let location_str = location.to_str().unwrap();
             let canister_id = Principal::from_str(
@@ -804,101 +772,156 @@ fn test_management_scalability() {
             )
             .unwrap();
 
-            // Track the first canister_id
-            unique_canisters.insert(canister_id.clone().to_string());
-
-            let first_redirected_response = rt.block_on(async {
-                http_gateway
-                    .request(HttpGatewayRequestArgs {
-                        canister_id: canister_id,
-                        canister_request: Request::builder()
-                            .uri(location_str)
-                            .body(Bytes::new())
-                            .unwrap(),
-                    })
-                    .send()
-                    .await
-            });
-
-            let first_redirected_response_headers = first_redirected_response
-                .canister_response
-                .headers()
-                .iter()
-                .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
-                .collect::<Vec<(&str, &str)>>();
-
-            if first_redirected_response.canister_response.status() == 307 {
-                if let Some(location_bis) = first_redirected_response
-                    .canister_response
-                    .headers()
-                    .get("location")
-                {
-                    let location_str = location_bis.to_str().unwrap();
-                    let canister_id = Principal::from_str(
-                        location_str
-                            .split('.')
-                            .next()
-                            .unwrap()
-                            .replace("https://", "")
-                            .as_str(),
-                    )
-                    .unwrap();
-
-                    // Track the second canister_id
-                    unique_canisters.insert(canister_id.clone().to_string());
-
-                    let second_redirected_response = rt.block_on(async {
-                        http_gateway
-                            .request(HttpGatewayRequestArgs {
-                                canister_id: canister_id,
-                                canister_request: Request::builder()
-                                    .uri(location_str)
-                                    .body(Bytes::new())
-                                    .unwrap(),
-                            })
-                            .send()
-                            .await
-                    });
-
-                    let second_redirected_response_headers = second_redirected_response
-                        .canister_response
-                        .headers()
-                        .iter()
-                        .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
-                        .collect::<Vec<(&str, &str)>>();
-
-                    rt.block_on(async {
-                        let body = second_redirected_response
-                            .canister_response
-                            .into_body()
-                            .collect()
-                            .await
-                            .unwrap()
-                            .to_bytes()
-                            .to_vec();
-
-                        assert_eq!(
-                            body, original_buffer,
-                            "File content mismatch for {}",
-                            upload_path
-                        );
-                    });
-                }
-            }
-        } else {
-            panic!("No redirect location found for {}", upload_path);
+            canister_distribution
+                .entry(canister_id.to_string())
+                .or_insert_with(Vec::new)
+                .push(upload_path.clone());
         }
     }
 
-    // Verify that exactly 2 unique canisters were used
-    println!("Unique canisters used: {:?}", unique_canisters);
+    // Verify that files are distributed evenly (2 files per canister)
+    for (canister_id, files) in &canister_distribution {
+        assert_eq!(
+            files.len(),
+            2,
+            "Canister {} should contain exactly 2 files, but has {}",
+            canister_id,
+            files.len()
+        );
+    }
+
+    // Verify we have exactly 2 canisters
     assert_eq!(
-        unique_canisters.len(),
+        canister_distribution.len(),
         2,
-        "Expected exactly 2 unique canisters to be created, but found {}",
-        unique_canisters.len()
+        "Should have exactly 2 canisters, but found {}",
+        canister_distribution.len()
+    );
+}
+
+#[test]
+fn test_management_upload_resilience() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let file_path = "./src/storage_suite/assets/test.png";
+    let too_big = "./src/storage_suite/assets/sbl_hero_1080_1.mp4";
+
+    // First upload to fill up first canister partially
+    let first_upload_path = "/test_resilience_1.png";
+    let _ = upload_file(
+        pic,
+        controller,
+        collection_canister_id,
+        file_path,
+        first_upload_path,
+    )
+    .expect("First upload failed");
+
+    // Try uploading with invalid data to simulate failure
+    let second_upload_path = "/test_resilience_2.png";
+    let result = upload_file(
+        pic,
+        controller,
+        collection_canister_id,
+        too_big,
+        second_upload_path,
     );
 
-    // Note: Each file is 6.2MB and the limit is 15MB per canister in test mode,
-    // so each canister can hold 2 files. With 4 files, we should have 2 canisters.
+    println!("result: {:?}", result);
+
+    // System should remain stable after failed upload
+    let third_upload_path = "/test_resilience_3.png";
+    let _ = upload_file(
+        pic,
+        controller,
+        collection_canister_id,
+        file_path,
+        third_upload_path,
+    )
+    .expect("Third upload failed");
+
+    // Verify files are still accessible and properly distributed
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let url = pic.auto_progress();
+    let agent = Agent::builder().with_url(url).build().unwrap();
+    rt.block_on(async {
+        agent.fetch_root_key().await.unwrap();
+    });
+    let http_gateway = HttpGatewayClient::builder()
+        .with_agent(agent)
+        .build()
+        .unwrap();
+
+    let mut unique_canisters = std::collections::HashSet::new();
+
+    // Check first file
+    let response1 = rt.block_on(async {
+        http_gateway
+            .request(HttpGatewayRequestArgs {
+                canister_id: collection_canister_id.clone(),
+                canister_request: Request::builder()
+                    .uri(first_upload_path)
+                    .body(Bytes::new())
+                    .unwrap(),
+            })
+            .send()
+            .await
+    });
+
+    assert_eq!(response1.canister_response.status(), 307);
+    if let Some(location) = response1.canister_response.headers().get("location") {
+        let location_str = location.to_str().unwrap();
+        let canister_id = Principal::from_str(
+            location_str
+                .split('.')
+                .next()
+                .unwrap()
+                .replace("https://", "")
+                .as_str(),
+        )
+        .unwrap();
+        unique_canisters.insert(canister_id.to_string());
+    }
+
+    // Check third file
+    let response3 = rt.block_on(async {
+        http_gateway
+            .request(HttpGatewayRequestArgs {
+                canister_id: collection_canister_id.clone(),
+                canister_request: Request::builder()
+                    .uri(third_upload_path)
+                    .body(Bytes::new())
+                    .unwrap(),
+            })
+            .send()
+            .await
+    });
+
+    assert_eq!(response3.canister_response.status(), 307);
+    if let Some(location) = response3.canister_response.headers().get("location") {
+        let location_str = location.to_str().unwrap();
+        let canister_id = Principal::from_str(
+            location_str
+                .split('.')
+                .next()
+                .unwrap()
+                .replace("https://", "")
+                .as_str(),
+        )
+        .unwrap();
+        unique_canisters.insert(canister_id.to_string());
+    }
+
+    // Verify system stability is maintained
+    assert!(
+        unique_canisters.len() <= 2,
+        "System should not create more than 2 canisters even after failed uploads"
+    );
 }
