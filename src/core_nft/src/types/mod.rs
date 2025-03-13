@@ -1,4 +1,5 @@
 pub mod collection_metadata;
+pub mod fund_manager;
 pub mod http;
 pub mod icrc37;
 pub mod icrc7;
@@ -9,6 +10,7 @@ pub mod nft_metadata;
 pub mod sub_canister;
 
 pub use collection_metadata::*;
+pub use fund_manager::*;
 pub use icrc37::*;
 pub use icrc7::*;
 pub use management::*;
