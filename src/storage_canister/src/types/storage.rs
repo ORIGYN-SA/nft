@@ -219,7 +219,7 @@ impl StorageData {
             }
             UploadState::InProgress => (),
             UploadState::Finalized => {
-                return Err("Upload already finalized".to_string());
+                return Err("Storage - store_chunk - Upload already finalized".to_string());
             }
         }
 
@@ -251,17 +251,17 @@ impl StorageData {
         let mut metadata = self
             .storage_raw_internal_metadata
             .remove(&data.file_path.clone())
-            .ok_or("Upload not initialized".to_string())?;
+            .ok_or("Storage - finalize_upload - Upload not initialized".to_string())?;
 
         match metadata.state {
             UploadState::Init => {
                 self.storage_raw_internal_metadata
                     .insert(data.file_path.clone(), metadata);
-                return Err("Upload not started".to_string());
+                return Err("Storage - finalize_upload - Upload not started".to_string());
             }
             UploadState::InProgress => {}
             UploadState::Finalized => {
-                return Err("Upload already finalized".to_string());
+                return Err("Storage - finalize_upload - Upload already finalized".to_string());
             }
         }
 
@@ -269,7 +269,10 @@ impl StorageData {
         let received_size = metadata.received_size as u128;
 
         if received_size != file_size {
-            return Err("Incomplete upload. Upload failed, try again.".to_string());
+            return Err(
+                "Storage - finalize_upload - Incomplete upload. Upload failed, try again."
+                    .to_string(),
+            );
         }
 
         let mut file_data = Vec::with_capacity(file_size as usize);
@@ -278,7 +281,10 @@ impl StorageData {
         }
 
         if (file_data.len() as u64) != metadata.file_size {
-            return Err("File size mismatch. Upload failed, try again.".to_string());
+            return Err(
+                "Storage - finalize_upload - File size mismatch. Upload failed, try again."
+                    .to_string(),
+            );
         }
 
         let mut hasher = Sha256::new();
@@ -286,7 +292,10 @@ impl StorageData {
         let calculated_hash = hex::encode(hasher.finalize());
 
         if calculated_hash != metadata.file_hash {
-            return Err("File hash mismatch. Upload failed, try again.".to_string());
+            return Err(
+                "Storage - finalize_upload - File hash mismatch. Upload failed, try again."
+                    .to_string(),
+            );
         }
 
         metadata.chunks.clear();

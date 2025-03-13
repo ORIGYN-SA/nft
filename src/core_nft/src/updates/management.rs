@@ -227,7 +227,7 @@ pub async fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
                 crate::state::UploadState::Finalized => {
                     return Err((
                         RejectionCode::CanisterError,
-                        "Upload already finalized".to_string(),
+                        "Core - store_chunk - Upload already finalized".to_string(),
                     ));
                 }
             },
@@ -281,6 +281,7 @@ pub async fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
 
 #[update(guard = "caller_is_governance_principal")]
 pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Response {
+    trace(&format!("Finalizing upload: {:?}", data));
     let caller = ic_cdk::caller();
     let _guard_principal =
         GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
@@ -300,7 +301,7 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
                 crate::state::UploadState::Finalized => {
                     return Err((
                         RejectionCode::CanisterError,
-                        "Upload already finalized".to_string(),
+                        "Core - finalize_upload - Upload already finalized".to_string(),
                     ));
                 }
             },
@@ -372,7 +373,7 @@ pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response
                 crate::state::UploadState::Finalized => {
                     return Err((
                         RejectionCode::CanisterError,
-                        "Upload already finalized".to_string(),
+                        "Core - cancel_upload - Upload already finalized".to_string(),
                     ));
                 }
             },
