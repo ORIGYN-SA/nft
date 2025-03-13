@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::types::sub_canister;
+use crate::state::mutate_state;
+use crate::state::read_state;
+use crate::types::fund_manager::add_canisters_to_fund_manager;
 use crate::utils::trace;
 use candid::{CandidType, Nat, Principal};
 use ic_cdk::api::management_canister::main::{canister_status, CanisterIdRecord};
@@ -24,6 +26,8 @@ const MAX_STORAGE_SIZE: u128 = 500 * 1024 * 1024 * 1024; // 500 GiB TODO maybe w
 const MAX_FILE_SIZE: u128 = 2 * 1024 * 1024 * 1024; // 2 GiB
 
 pub use storage_api_canister::lifecycle::Args as ArgsStorage;
+
+use super::fund_manager;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct StorageSubCanisterManager {
@@ -124,6 +128,12 @@ impl StorageSubCanisterManager {
                                 "SubCanisterManager inserted data with hash_id : {:?}",
                                 hash_id
                             ));
+                            mutate_state(|state| {
+                                add_canisters_to_fund_manager(
+                                    &mut state.data.fund_manager,
+                                    vec![storage_canister.canister_id()],
+                                );
+                            });
                             Ok((hash_id, storage_canister.clone()))
                         }
                         Err(e) => Err(format!("{e:?}")),
@@ -181,6 +191,13 @@ impl StorageSubCanisterManager {
                     match storage_canister.init_upload(data.clone()).await {
                         Ok(_) => {
                             trace(&format!("Initialized upload"));
+                            mutate_state(|state| {
+                                add_canisters_to_fund_manager(
+                                    &mut state.data.fund_manager,
+                                    vec![storage_canister.canister_id()],
+                                );
+                            });
+
                             Ok((
                                 init_upload::InitUploadResp {},
                                 storage_canister.canister_id(),

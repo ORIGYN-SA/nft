@@ -5,6 +5,7 @@ use crate::types::nft::Icrc7Token;
 use crate::types::sub_canister;
 use crate::types::sub_canister::StorageSubCanisterManager;
 use candid::{CandidType, Nat, Principal};
+use canfund::FundManager;
 use canister_state_macros::canister_state;
 use icrc_ledger_types::icrc1::account::Account;
 use serde::{Deserialize, Serialize};
@@ -57,7 +58,7 @@ impl RuntimeState {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct Data {
     pub authorized_principals: Vec<Principal>,
     pub minting_authorities: Vec<Principal>,
@@ -79,6 +80,8 @@ pub struct Data {
     pub tokens_list: HashMap<Nat, Icrc7Token>,
     pub approval_init: Option<InitApprovalsArg>,
     pub sub_canister_manager: StorageSubCanisterManager,
+    #[serde(skip)]
+    pub fund_manager: FundManager,
     // pub archive_init: Option<InitArchiveArg>,
 }
 
@@ -129,6 +132,8 @@ impl Data {
             STORAGE_WASM.to_vec(),
         );
 
+        let mut fund_manager = FundManager::new();
+
         Self {
             authorized_principals: authorized_principals.into_iter().collect(),
             minting_authorities: minting_authorities.into_iter().collect(),
@@ -150,6 +155,7 @@ impl Data {
             tokens_list: HashMap::new(),
             approval_init,
             sub_canister_manager,
+            fund_manager,
         }
     }
 
@@ -200,6 +206,34 @@ impl Data {
 
     pub fn total_supply(&self) -> Nat {
         Nat::from(self.tokens_list.len() as u64)
+    }
+}
+
+impl Clone for Data {
+    fn clone(&self) -> Self {
+        Self {
+            authorized_principals: self.authorized_principals.clone(),
+            minting_authorities: self.minting_authorities.clone(),
+            description: self.description.clone(),
+            symbol: self.symbol.clone(),
+            name: self.name.clone(),
+            logo: self.logo.clone(),
+            supply_cap: self.supply_cap.clone(),
+            max_query_batch_size: self.max_query_batch_size.clone(),
+            max_update_batch_size: self.max_update_batch_size.clone(),
+            max_take_value: self.max_take_value.clone(),
+            default_take_value: self.default_take_value.clone(),
+            max_memo_size: self.max_memo_size.clone(),
+            atomic_batch_transfers: self.atomic_batch_transfers.clone(),
+            tx_window: self.tx_window.clone(),
+            permitted_drift: self.permitted_drift.clone(),
+            max_canister_storage_threshold: self.max_canister_storage_threshold.clone(),
+            collection_metadata: self.collection_metadata.clone(),
+            tokens_list: self.tokens_list.clone(),
+            approval_init: self.approval_init.clone(),
+            sub_canister_manager: self.sub_canister_manager.clone(),
+            fund_manager: FundManager::new(),
+        }
     }
 }
 

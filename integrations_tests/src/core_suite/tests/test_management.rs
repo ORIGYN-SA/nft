@@ -22,9 +22,9 @@ use ic_agent::Agent;
 use ic_http_gateway::{HttpGatewayClient, HttpGatewayRequestArgs};
 use std::fs::File;
 use std::io::Read;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::Path;
 use std::str::FromStr;
+use std::time::Duration;
 
 #[test]
 fn test_storage_simple() {
@@ -924,4 +924,159 @@ fn test_management_upload_resilience() {
         unique_canisters.len() <= 2,
         "System should not create more than 2 canisters even after failed uploads"
     );
+}
+
+#[test]
+fn test_management_cycles() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let file_path = "./src/storage_suite/assets/test.png";
+    let mut canister_cycles = std::collections::HashMap::new();
+
+    // Record initial cycles of the collection canister
+    let initial_collection_cycles = pic.cycle_balance(collection_canister_id);
+    println!(
+        "Initial collection canister cycles: {}",
+        initial_collection_cycles
+    );
+
+    // Upload first file - should create first storage canister
+    let first_upload_path = "/test_cycles_1.png";
+    let _ = upload_file(
+        pic,
+        controller,
+        collection_canister_id,
+        file_path,
+        first_upload_path,
+    )
+    .expect("First upload failed");
+
+    // Get the first storage canister ID and record its cycles
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let url = pic.auto_progress();
+    let agent = Agent::builder().with_url(url).build().unwrap();
+    rt.block_on(async {
+        agent.fetch_root_key().await.unwrap();
+    });
+    let http_gateway = HttpGatewayClient::builder()
+        .with_agent(agent)
+        .build()
+        .unwrap();
+
+    let response = rt.block_on(async {
+        http_gateway
+            .request(HttpGatewayRequestArgs {
+                canister_id: collection_canister_id.clone(),
+                canister_request: Request::builder()
+                    .uri(first_upload_path)
+                    .body(Bytes::new())
+                    .unwrap(),
+            })
+            .send()
+            .await
+    });
+
+    pic.advance_time(Duration::from_secs(120));
+    pic.tick();
+    pic.advance_time(Duration::from_secs(120));
+    pic.tick();
+
+    if let Some(location) = response.canister_response.headers().get("location") {
+        let location_str = location.to_str().unwrap();
+        let first_storage_canister = Principal::from_str(
+            location_str
+                .split('.')
+                .next()
+                .unwrap()
+                .replace("https://", "")
+                .as_str(),
+        )
+        .unwrap();
+
+        let first_storage_cycles = pic.cycle_balance(first_storage_canister);
+        canister_cycles.insert(first_storage_canister.to_string(), first_storage_cycles);
+        println!("First storage canister cycles: {}", first_storage_cycles);
+    }
+
+    // Upload more files until we create a second canister
+    for i in 2..5 {
+        let upload_path = format!("/test_cycles_{}.png", i);
+        let _ = upload_file(
+            pic,
+            controller,
+            collection_canister_id,
+            file_path,
+            &upload_path,
+        )
+        .expect("Upload failed");
+
+        // Check the response to detect new canister creation
+        let response = rt.block_on(async {
+            http_gateway
+                .request(HttpGatewayRequestArgs {
+                    canister_id: collection_canister_id.clone(),
+                    canister_request: Request::builder()
+                        .uri(upload_path.as_str())
+                        .body(Bytes::new())
+                        .unwrap(),
+                })
+                .send()
+                .await
+        });
+
+        if let Some(location) = response.canister_response.headers().get("location") {
+            let location_str = location.to_str().unwrap();
+            let storage_canister = Principal::from_str(
+                location_str
+                    .split('.')
+                    .next()
+                    .unwrap()
+                    .replace("https://", "")
+                    .as_str(),
+            )
+            .unwrap();
+
+            if !canister_cycles.contains_key(&storage_canister.to_string()) {
+                let storage_cycles = pic.cycle_balance(storage_canister);
+                canister_cycles.insert(storage_canister.to_string(), storage_cycles);
+                println!("New storage canister cycles: {}", storage_cycles);
+            }
+        }
+    }
+
+    // Verify cycles management
+    let final_collection_cycles = pic.cycle_balance(collection_canister_id);
+    println!(
+        "Final collection canister cycles: {}",
+        final_collection_cycles
+    );
+
+    // Verify cycles were spent from collection canister
+    assert!(
+        final_collection_cycles < initial_collection_cycles,
+        "Collection canister should have spent cycles"
+    );
+
+    // Verify each storage canister has sufficient cycles
+    for (canister_id, cycles) in &canister_cycles {
+        assert!(
+            *cycles >= 1_000_000_000_000, // 1T cycles minimum threshold
+            "Storage canister {} has insufficient cycles: {}",
+            canister_id,
+            cycles
+        );
+    }
+
+    // Print final cycle distribution
+    println!("Final cycle distribution:");
+    for (canister_id, cycles) in &canister_cycles {
+        println!("Canister {}: {} cycles", canister_id, cycles);
+    }
 }
