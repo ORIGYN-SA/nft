@@ -1,5 +1,6 @@
 use crate::types::nft;
 use crate::utils::check_memo;
+use crate::utils::trace;
 use crate::{
     state::{mutate_state, read_state},
     types::icrc7,
@@ -11,23 +12,31 @@ use icrc_ledger_types::icrc1::account::Account;
 
 #[update]
 pub fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_transfer::Response {
-    if args.len() == 0 {
+    if args.is_empty() {
         return vec![Some(Err((
             RejectionCode::CanisterError,
             "No argument provided".to_string(),
         )))];
     }
 
-    let max_update_batch_size: usize = read_state(|state| {
-        let nat_max_update_batch_size = state
-            .data
-            .max_query_batch_size
-            .clone()
-            .unwrap_or(Nat::from(icrc7::DEFAULT_MAX_UPDATE_BATCH_SIZE));
-        usize::try_from(nat_max_update_batch_size.0).unwrap()
-    });
+    // Lecture des paramètres de configuration
+    let (max_update_batch_size, atomic_batch_transfers, tx_window, permitted_drift) =
+        read_state(|state| {
+            (
+                state
+                    .data
+                    .max_update_batch_size
+                    .clone()
+                    .unwrap_or(Nat::from(icrc7::DEFAULT_MAX_UPDATE_BATCH_SIZE)),
+                state.data.atomic_batch_transfers.unwrap_or(false),
+                state.data.tx_window.clone(),
+                state.data.permitted_drift.clone(),
+            )
+        });
 
-    if args.len() > max_update_batch_size {
+    // Vérification de la taille du batch
+    let max_batch_size = usize::try_from(max_update_batch_size.0).unwrap();
+    if args.len() > max_batch_size {
         return vec![Some(Err((
             RejectionCode::CanisterError,
             "Exceed Max allowed Update Batch Size".to_string(),
@@ -76,6 +85,19 @@ pub fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_transfe
             continue;
         }
 
+        let anonymous_account = Account {
+            owner: Principal::anonymous(),
+            subaccount: None,
+        };
+
+        if arg.to == anonymous_account {
+            txn_results[index] = Some(Err((
+                RejectionCode::CanisterError,
+                "Invalid recipient".to_string(),
+            )));
+            continue;
+        }
+
         if nft.token_owner == arg.to {
             txn_results[index] = Some(Err((
                 RejectionCode::CanisterError,
@@ -85,6 +107,30 @@ pub fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_transfe
         }
 
         let time = arg.created_at_time.unwrap_or(current_time);
+        trace(&format!("time: {:?}", time));
+
+        let drift = permitted_drift
+            .clone()
+            .map(|d| u64::try_from(d.0).unwrap())
+            .unwrap_or(icrc7::DEFAULT_PERMITTED_DRIFT);
+
+        if time > current_time + drift {
+            txn_results[index] = Some(Err((
+                RejectionCode::CanisterError,
+                format!("CreatedInFuture {{ ledger_time: {} }}", current_time),
+            )));
+            continue;
+        }
+
+        let tx_window = tx_window
+            .clone()
+            .map(|d| u64::try_from(d.0).unwrap())
+            .unwrap_or(icrc7::DEFAULT_TX_WINDOW);
+
+        if time < current_time.saturating_sub(tx_window + drift) {
+            txn_results[index] = Some(Err((RejectionCode::CanisterError, "TooOld".to_string())));
+            continue;
+        }
 
         nft.transfer(arg.to.clone());
 
@@ -92,8 +138,11 @@ pub fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_transfe
 
         txn_results[index] = Some(Ok(()));
 
+        // TODO: Impl transactions logging ICRC3
+
         // let txn_id = log_transaction();
         // txn_results[index] = Some(Ok(txn_id));
     }
-    return txn_results;
+
+    txn_results
 }

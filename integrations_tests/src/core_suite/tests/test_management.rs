@@ -51,68 +51,6 @@ fn test_storage_simple() {
     )
     .expect("Upload failed");
 
-    let file_size = buffer.len() as u64;
-
-    // Calculate SHA-256 hash
-    let mut hasher = Sha256::new();
-    hasher.update(&buffer);
-    let file_hash = hasher.finalize();
-
-    let file_type = "image/png".to_string();
-    let media_hash_id = "test.png".to_string();
-
-    let init_upload_resp = init_upload(
-        pic,
-        controller,
-        collection_canister_id,
-        &(init_upload::Args {
-            file_path: "/test.png".to_string(),
-            file_hash: format!("{:x}", file_hash),
-            file_size,
-            chunk_size: None,
-        }),
-    );
-
-    let mut offset = 0;
-    let chunk_size = 1024 * 1024;
-    let mut chunk_index = 0;
-
-    while offset < buffer.len() {
-        let chunk = &buffer[offset..(offset + (chunk_size as usize)).min(buffer.len())];
-        let store_chunk_resp = store_chunk(
-            pic,
-            controller,
-            collection_canister_id,
-            &(store_chunk::Args {
-                file_path: "/test.png".to_string(),
-                chunk_id: Nat::from(chunk_index as u64),
-                chunk_data: chunk.to_vec(),
-            }),
-        );
-
-        offset += chunk_size as usize;
-        chunk_index += 1;
-    }
-
-    let finalize_upload_resp = finalize_upload(
-        pic,
-        controller,
-        collection_canister_id,
-        &(finalize_upload::Args {
-            file_path: "/test.png".to_string(),
-        }),
-    );
-
-    match finalize_upload_resp {
-        Ok(resp) => {
-            println!("finalize_upload_resp: {:?}", resp);
-        }
-        Err(e) => {
-            println!("finalize_upload_resp error: {:?}", e);
-            assert!(false);
-        }
-    }
-
     let rt = tokio::runtime::Runtime::new().unwrap();
     let url = pic.auto_progress();
     println!("url: {:?}", url);

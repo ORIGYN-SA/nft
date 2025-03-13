@@ -14,6 +14,7 @@ use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
 use icrc_ledger_types::icrc1::account::Account;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::core_suite::setup::setup::TestEnv;
 use crate::{core_suite::setup::default_test_setup, utils::tick_n_blocks};
@@ -1374,4 +1375,410 @@ fn test_icrc7_balance_of() {
     );
     println!("balance_of_owner2: {:?}", balance_of_owner2);
     assert_eq!(balance_of_owner2[0], Nat::from(1 as u64));
+}
+
+#[test]
+fn test_icrc7_transfer_batch() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let mut token_ids = Vec::new();
+    for i in 0..3 {
+        let mint_return = mint_nft(
+            pic,
+            format!("test{}", i),
+            Account {
+                owner: nft_owner1,
+                subaccount: None,
+            },
+            controller,
+            collection_canister_id,
+        );
+        if let Ok(token_id) = mint_return {
+            token_ids.push(token_id);
+        }
+    }
+
+    let transfer_args: Vec<icrc7::TransferArg> = token_ids
+        .iter()
+        .map(|token_id| icrc7::TransferArg {
+            to: Account {
+                owner: nft_owner2,
+                subaccount: None,
+            },
+            token_id: token_id.clone(),
+            memo: None,
+            from_subaccount: None,
+            created_at_time: None,
+        })
+        .collect();
+
+    let transfer_response = icrc7_transfer(pic, nft_owner1, collection_canister_id, &transfer_args);
+
+    for response in transfer_response {
+        assert!(response.is_some() && response.unwrap().is_ok());
+    }
+
+    for token_id in token_ids {
+        let owner_of = icrc7_owner_of(pic, controller, collection_canister_id, &vec![token_id]);
+        assert_eq!(
+            owner_of[0],
+            Some(Account {
+                owner: nft_owner2,
+                subaccount: None
+            })
+        );
+    }
+}
+
+#[test]
+fn test_icrc7_transfer_invalid_recipient() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let mint_return = mint_nft(
+        pic,
+        "test1".to_string(),
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+    );
+
+    match mint_return {
+        Ok(token_id) => {
+            let transfer_args = icrc7::TransferArg {
+                to: Account {
+                    owner: Principal::anonymous(),
+                    subaccount: None,
+                },
+                token_id: token_id.clone(),
+                memo: None,
+                from_subaccount: None,
+                created_at_time: None,
+            };
+
+            let transfer_response = icrc7_transfer(
+                pic,
+                nft_owner1,
+                collection_canister_id,
+                &vec![transfer_args],
+            );
+
+            println!("transfer_response: {:?}", transfer_response);
+
+            assert!(
+                transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err()
+            );
+            assert_eq!(
+                transfer_response[0]
+                    .as_ref()
+                    .unwrap()
+                    .as_ref()
+                    .err()
+                    .unwrap()
+                    .1,
+                "Invalid recipient".to_string()
+            );
+        }
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
+    }
+}
+
+#[test]
+fn test_icrc7_transfer_permitted_drift() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let mint_return = mint_nft(
+        pic,
+        "test1".to_string(),
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+    );
+
+    match mint_return {
+        Ok(token_id) => {
+            let nanos = pic
+                .get_time()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64;
+            let future_time = nanos + 100_000_000;
+
+            let transfer_args = icrc7::TransferArg {
+                to: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                token_id: token_id.clone(),
+                memo: None,
+                from_subaccount: None,
+                created_at_time: Some(future_time),
+            };
+
+            let transfer_response = icrc7_transfer(
+                pic,
+                nft_owner1,
+                collection_canister_id,
+                &vec![transfer_args],
+            );
+
+            assert!(
+                transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err()
+            );
+            assert!(transfer_response[0]
+                .as_ref()
+                .unwrap()
+                .as_ref()
+                .err()
+                .unwrap()
+                .1
+                .contains("CreatedInFuture"));
+        }
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
+    }
+}
+
+#[test]
+fn test_icrc7_transfer_within_permitted_drift() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let mint_return = mint_nft(
+        pic,
+        "test1".to_string(),
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+    );
+
+    match mint_return {
+        Ok(token_id) => {
+            let nanos = pic
+                .get_time()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64;
+            let future_time = nanos + 10_000_000;
+            let transfer_args = icrc7::TransferArg {
+                to: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                token_id: token_id.clone(),
+                memo: None,
+                from_subaccount: None,
+                created_at_time: Some(future_time),
+            };
+
+            let transfer_response = icrc7_transfer(
+                pic,
+                nft_owner1,
+                collection_canister_id,
+                &vec![transfer_args],
+            );
+
+            println!("transfer_response: {:?}", transfer_response);
+
+            assert!(
+                transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_ok()
+            );
+
+            let owner_of = icrc7_owner_of(pic, controller, collection_canister_id, &vec![token_id]);
+            assert_eq!(
+                owner_of[0],
+                Some(Account {
+                    owner: nft_owner2,
+                    subaccount: None
+                })
+            );
+        }
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
+    }
+}
+
+#[test]
+fn test_icrc7_transfer_too_old() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let mint_return = mint_nft(
+        pic,
+        "test1".to_string(),
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+    );
+
+    match mint_return {
+        Ok(token_id) => {
+            let nanos = pic
+                .get_time()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64;
+            let old_time = nanos - 3_600_000_000_000;
+            println!("old_time: {:?}", old_time);
+            let transfer_args = icrc7::TransferArg {
+                to: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                token_id: token_id.clone(),
+                memo: None,
+                from_subaccount: None,
+                created_at_time: Some(old_time),
+            };
+
+            let transfer_response = icrc7_transfer(
+                pic,
+                nft_owner1,
+                collection_canister_id,
+                &vec![transfer_args],
+            );
+
+            println!("transfer_response: {:?}", transfer_response);
+
+            assert!(
+                transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err()
+            );
+            assert_eq!(
+                transfer_response[0]
+                    .as_ref()
+                    .unwrap()
+                    .as_ref()
+                    .err()
+                    .unwrap()
+                    .1,
+                "TooOld".to_string()
+            );
+        }
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
+    }
+}
+
+#[test]
+fn test_icrc7_transfer_old_but_valid() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let mint_return = mint_nft(
+        pic,
+        "test1".to_string(),
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+    );
+
+    match mint_return {
+        Ok(token_id) => {
+            let nanos = pic
+                .get_time()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64;
+            let old_time = nanos - 5_000_000_000; // 5 seconds
+            println!("old_time: {:?}", old_time);
+            let transfer_args = icrc7::TransferArg {
+                to: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                token_id: token_id.clone(),
+                memo: None,
+                from_subaccount: None,
+                created_at_time: Some(old_time),
+            };
+
+            let transfer_response = icrc7_transfer(
+                pic,
+                nft_owner1,
+                collection_canister_id,
+                &vec![transfer_args],
+            );
+
+            println!("transfer_response: {:?}", transfer_response);
+
+            assert!(
+                transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_ok()
+            );
+
+            let owner_of = icrc7_owner_of(pic, controller, collection_canister_id, &vec![token_id]);
+            assert_eq!(
+                owner_of[0],
+                Some(Account {
+                    owner: nft_owner2,
+                    subaccount: None
+                })
+            );
+        }
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
+    }
 }
