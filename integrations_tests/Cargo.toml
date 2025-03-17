@@ -8,9 +8,11 @@ edition = "2021"
 pocket-ic = { workspace = true}
 candid = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-types = { path = "../src/libraries/types" }
-utils = { path = '../src/libraries/utils' }
-canister_time = { path = '../src/libraries/canister_time' }
+
+bity-ic-types = { workspace = true }
+bity-ic-utils = { workspace = true }
+bity-ic-canister-time = { workspace = true }
+
 icrc-ledger-types = { workspace = true }
 icrc-ledger-types-ic-main-repo =  { package = "icrc-ledger-types", git = "https://github.com/dfinity/ic.git", rev = "1488a310043f6a0907f4a84ba7af00e3d90d16eb" }
 ic-ledger-types = { workspace = true }

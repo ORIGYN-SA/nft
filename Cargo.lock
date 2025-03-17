@@ -92,7 +92,7 @@ checksum = "d556ec1359574147ec0c4fc5eb525f3f23263a592b1a9c07e0a75b427de55c97"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -202,6 +202,134 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f68f53c83ab957f72c32642f3868eec03eb974d1fb82e453128456482613d36"
 
 [[package]]
+name = "bity-ic-candid-gen"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23f8b4742ab2c770ff0a315dc17cab6ae766d3b56609a95b88d793cee21252e8"
+dependencies = [
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
+name = "bity-ic-canister-client"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05f97e64c72ad2f299b469a1c2a7044a7cf1bbeab2a7a3fbafad0908d8842a05"
+dependencies = [
+ "bity-ic-types",
+ "candid",
+ "ic-cdk",
+ "tracing",
+]
+
+[[package]]
+name = "bity-ic-canister-logger"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e55c9d43bd8f20882fe5e7680dc8844eb586039dbf991ef6fbf8b797044ea91"
+dependencies = [
+ "bity-ic-canister-time",
+ "candid",
+ "serde",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "bity-ic-canister-state-macros"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7164d24683a9dd3789d739eba534e510cbf0bc71da733fc975d472e54e85022"
+
+[[package]]
+name = "bity-ic-canister-time"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2b478178b7a12077ff913efbf0e955e2ccac47c5b7ee3017557239428fdce87"
+dependencies = [
+ "bity-ic-types",
+ "ic-cdk",
+ "ic-cdk-timers",
+ "ic0",
+]
+
+[[package]]
+name = "bity-ic-canister-tracing-macros"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "375491e009dff3d2496671b78a1851e0f8365cbb036428ab74c533e13f0e9766"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
+name = "bity-ic-serializer"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37d955c0b2a8161e824ae5565501e912d6e4f9eb678eb6ba4976a6e27857dea7"
+dependencies = [
+ "rmp-serde",
+ "serde",
+]
+
+[[package]]
+name = "bity-ic-stable-memory"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b03f42d556b406c039b7f2b8d655667a5b252f901ca1fa25d506c274b57613c6"
+dependencies = [
+ "ic-cdk",
+ "ic-stable-structures",
+]
+
+[[package]]
+name = "bity-ic-subcanister-manager"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6884c8b23f6fd1186a3e7e30b38545b00aa973fb4a27e8b8bd8b46faca56cb3"
+dependencies = [
+ "bity-ic-utils",
+ "candid",
+ "ic-cdk",
+ "serde",
+]
+
+[[package]]
+name = "bity-ic-types"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9aa6cbdb85decd1d1fb7369de04cc7b7d491f56b3e46e5ead13d27fb112ea59d"
+dependencies = [
+ "candid",
+ "ic-stable-structures",
+ "icrc-ledger-types 0.1.8",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
+name = "bity-ic-utils"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4a26047a2fd791b3684ae0119df7eb7bf1e35bef115845d74430ecae772769c"
+dependencies = [
+ "bity-ic-canister-time",
+ "bity-ic-stable-memory",
+ "bity-ic-types",
+ "candid",
+ "hex",
+ "ic-cdk",
+ "ic-cdk-timers",
+ "icrc-ledger-types 0.1.8",
+ "serde",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -284,7 +412,7 @@ dependencies = [
  "darling",
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -325,15 +453,7 @@ dependencies = [
  "lazy_static",
  "proc-macro2",
  "quote",
- "syn 2.0.99",
-]
-
-[[package]]
-name = "candid_gen"
-version = "0.1.0"
-dependencies = [
- "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -353,59 +473,6 @@ dependencies = [
  "serde",
  "serde_bytes",
  "thiserror 1.0.69",
-]
-
-[[package]]
-name = "canister_client"
-version = "0.1.0"
-dependencies = [
- "candid",
- "canister_client_macros",
- "ic-cdk",
- "tracing",
-]
-
-[[package]]
-name = "canister_client_macros"
-version = "0.1.0"
-dependencies = [
- "candid",
- "ic-cdk",
- "types",
-]
-
-[[package]]
-name = "canister_logger"
-version = "0.1.0"
-dependencies = [
- "candid",
- "canister_time",
- "serde",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "canister_state_macros"
-version = "0.1.0"
-
-[[package]]
-name = "canister_time"
-version = "0.1.0"
-dependencies = [
- "ic-cdk",
- "ic-cdk-timers",
- "ic0",
- "types",
-]
-
-[[package]]
-name = "canister_tracing_macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.99",
 ]
 
 [[package]]
@@ -475,12 +542,17 @@ name = "core_nft"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bity-ic-canister-logger",
+ "bity-ic-canister-state-macros",
+ "bity-ic-canister-time",
+ "bity-ic-canister-tracing-macros",
+ "bity-ic-serializer",
+ "bity-ic-stable-memory",
+ "bity-ic-subcanister-manager",
+ "bity-ic-types",
+ "bity-ic-utils",
  "candid",
  "canfund",
- "canister_logger",
- "canister_state_macros",
- "canister_time",
- "canister_tracing_macros",
  "enum_dispatch",
  "futures",
  "ic-asset-certification",
@@ -496,14 +568,9 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
- "serializer",
- "stable_memory",
  "storage_api_canister",
  "storage_canister_c2c_client",
- "subcanister_manager",
  "tracing",
- "types",
- "utils",
 ]
 
 [[package]]
@@ -595,7 +662,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "strsim",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -606,7 +673,7 @@ checksum = "d336a2a514f6ccccaa3e09b02d41d35330c07ddf03a62165fcec10bb561c7806"
 dependencies = [
  "darling_core",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -664,7 +731,7 @@ checksum = "97369cbbc041bc366949bc74d34658d6cda5621039731c6310521892a3a20ae0"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -746,7 +813,7 @@ dependencies = [
  "once_cell",
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -913,7 +980,7 @@ checksum = "162ee34ebcb7c64a8abebc059ce0fee27c2262618d7b60ed8faf72fef13c3650"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -1289,7 +1356,7 @@ dependencies = [
  "quote",
  "serde",
  "serde_tokenstream",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -1579,8 +1646,8 @@ dependencies = [
 name = "icrc_ledger_canister"
 version = "0.1.0"
 dependencies = [
+ "bity-ic-candid-gen",
  "candid",
- "candid_gen",
  "icrc-ledger-types 0.1.8",
  "serde",
 ]
@@ -1589,11 +1656,11 @@ dependencies = [
 name = "icrc_ledger_canister_c2c_client"
 version = "0.1.0"
 dependencies = [
+ "bity-ic-canister-client",
+ "bity-ic-types",
  "candid",
- "canister_client",
  "ic-cdk",
  "icrc_ledger_canister",
- "types",
 ]
 
 [[package]]
@@ -1711,7 +1778,7 @@ checksum = "1ec89e9337638ecdc08744df490b221a7399bf8d164eb52a665454e60e075ad6"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -1764,9 +1831,11 @@ dependencies = [
 name = "integration_tests"
 version = "0.1.0"
 dependencies = [
+ "bity-ic-canister-time",
+ "bity-ic-types",
+ "bity-ic-utils",
  "bytes",
  "candid",
- "canister_time",
  "core_nft",
  "hex",
  "http",
@@ -1787,9 +1856,7 @@ dependencies = [
  "sha2 0.10.8",
  "storage_api_canister",
  "tokio",
- "types",
  "url",
- "utils",
 ]
 
 [[package]]
@@ -2089,7 +2156,7 @@ checksum = "a948666b637a0f465e8564c73e89d4dde00d72d4d473cc972f390fc3dcee7d9c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -2714,7 +2781,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde_derive_internals",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -2815,7 +2882,7 @@ checksum = "f09503e191f4e797cb8aac08e9a4a4695c5edf6a2e70e376d961ddd5c969f82b"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -2826,7 +2893,7 @@ checksum = "18d26a20a969b9e3fdf2fc2d9f21eda6c40e2de84c9408bb5d3b05d499aae711"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -2849,7 +2916,7 @@ checksum = "6c64451ba24fc7a6a2d60fc75dd9c83c90903b19028d4eff35e88fc1e86564e9"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -2861,7 +2928,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -2873,14 +2940,6 @@ dependencies = [
  "form_urlencoded",
  "itoa",
  "ryu",
- "serde",
-]
-
-[[package]]
-name = "serializer"
-version = "0.1.0"
-dependencies = [
- "rmp-serde",
  "serde",
 ]
 
@@ -3020,14 +3079,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
-name = "stable_memory"
-version = "0.1.0"
-dependencies = [
- "ic-cdk",
- "ic-stable-structures",
-]
-
-[[package]]
 name = "stacker"
 version = "0.1.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3057,11 +3108,15 @@ name = "storage_api_canister"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bity-ic-canister-logger",
+ "bity-ic-canister-state-macros",
+ "bity-ic-canister-time",
+ "bity-ic-canister-tracing-macros",
+ "bity-ic-serializer",
+ "bity-ic-stable-memory",
+ "bity-ic-types",
+ "bity-ic-utils",
  "candid",
- "canister_logger",
- "canister_state_macros",
- "canister_time",
- "canister_tracing_macros",
  "enum_dispatch",
  "futures",
  "hex",
@@ -3076,12 +3131,8 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
- "serializer",
  "sha2 0.10.8",
- "stable_memory",
  "tracing",
- "types",
- "utils",
 ]
 
 [[package]]
@@ -3089,12 +3140,16 @@ name = "storage_canister"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bity-ic-canister-client",
+ "bity-ic-canister-logger",
+ "bity-ic-canister-state-macros",
+ "bity-ic-canister-time",
+ "bity-ic-canister-tracing-macros",
+ "bity-ic-serializer",
+ "bity-ic-stable-memory",
+ "bity-ic-types",
+ "bity-ic-utils",
  "candid",
- "canister_client",
- "canister_logger",
- "canister_state_macros",
- "canister_time",
- "canister_tracing_macros",
  "enum_dispatch",
  "futures",
  "hex",
@@ -3111,20 +3166,19 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
- "serializer",
  "sha2 0.10.8",
- "stable_memory",
  "storage_api_canister",
  "tracing",
- "types",
- "utils",
 ]
 
 [[package]]
 name = "storage_canister_c2c_client"
 version = "0.1.0"
 dependencies = [
- "canister_client",
+ "bity-ic-canister-client",
+ "bity-ic-types",
+ "candid",
+ "ic-cdk",
  "storage_api_canister",
  "storage_canister",
 ]
@@ -3154,17 +3208,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rustversion",
- "syn 2.0.99",
-]
-
-[[package]]
-name = "subcanister_manager"
-version = "0.1.0"
-dependencies = [
- "candid",
- "ic-cdk",
- "serde",
- "utils",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -3192,9 +3236,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.99"
+version = "2.0.100"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e02e925281e18ffd9d640e234264753c43edc62d64b2d4cf898f1bc5e75f3fc2"
+checksum = "b09a44accad81e1ba1cd74a32461ba89dee89095ba17b32f5d03683b1b1fc2a0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3218,7 +3262,7 @@ checksum = "c8af7666ab7b6390ab78131fb5b0fce11d6b7a6951602017c35fa82800708971"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -3282,7 +3326,7 @@ checksum = "4fee6c4efc90059e10f81e6d42c60a18f76588c3d74cb83a0b242a2b6c7504c1"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -3293,7 +3337,7 @@ checksum = "26afc1baea8a989337eeb52b6e72a039780ce45c3edfcc9c5b9d112feeb173c2"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -3388,7 +3432,7 @@ checksum = "6e06d43f1345a3bcd39f6a56dbb7dcab2ba47e68e8ac134855e7e2bdbaf8cab8"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -3494,7 +3538,7 @@ checksum = "395ae124c09f9e6918a2310af6038fba074bcf474ac352496d5910dd59a2226d"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -3569,17 +3613,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42ff0bf0c66b8238c6f3b578df37d0b7848e55df8577b3f74f92a69acceeb825"
 
 [[package]]
-name = "types"
-version = "0.1.0"
-dependencies = [
- "candid",
- "ic-stable-structures",
- "icrc-ledger-types 0.1.8",
- "serde",
- "serde_bytes",
-]
-
-[[package]]
 name = "unicase"
 version = "2.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3631,23 +3664,6 @@ name = "utf8_iter"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6c140620e7ffbb22c2dee59cafe6084a59b5ffc27a8859a5f0d494b5d52b6be"
-
-[[package]]
-name = "utils"
-version = "0.1.0"
-dependencies = [
- "candid",
- "canister_time",
- "hex",
- "ic-cdk",
- "ic-cdk-timers",
- "icrc-ledger-types 0.1.8",
- "serde",
- "stable_memory",
- "tokio",
- "tracing",
- "types",
-]
 
 [[package]]
 name = "valuable"
@@ -3713,7 +3729,7 @@ dependencies = [
  "log",
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
  "wasm-bindgen-shared",
 ]
 
@@ -3748,7 +3764,7 @@ checksum = "8ae87ea40c9f689fc23f209965b6fb8a99ad69aeeb0231408be24920604395de"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
@@ -3985,7 +4001,7 @@ checksum = "2380878cad4ac9aac1e2435f3eb4020e8374b5f13c296cb75b4620ff8e229154"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
  "synstructure",
 ]
 
@@ -4016,7 +4032,7 @@ checksum = "fa4f8080344d4671fb4e831a13ad1e68092748387dfc4f55e356242fae12ce3e"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -4027,7 +4043,7 @@ checksum = "5226bc9a9a9836e7428936cde76bb6b22feea1a8bfdbc0d241136e4d13417e25"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -4047,7 +4063,7 @@ checksum = "595eed982f7d355beb85837f651fa22e90b3c044842dc7f2c2842c086f295808"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
  "synstructure",
 ]
 
@@ -4076,5 +4092,5 @@ checksum = "6eafa6dfb17584ea3e2bd6e76e0cc15ad7af12b09abdd1ca55961bed9b1063c6"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.99",
+ "syn 2.0.100",
 ]

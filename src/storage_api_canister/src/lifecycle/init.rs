@@ -1,6 +1,6 @@
-use candid::{CandidType, Nat, Principal};
+use bity_ic_types::BuildVersion;
+use candid::{CandidType, Principal};
 use serde::{Deserialize, Serialize};
-use types::BuildVersion;
 
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct InitArgs {

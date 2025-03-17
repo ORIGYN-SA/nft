@@ -3,10 +3,10 @@ use crate::client::storage::{
     init_upload, insert_data, remove_data, store_chunk, update_data,
 };
 use crate::storage_suite::setup::setup_storage::upgrade_storage_canister;
+use bity_ic_types::BuildVersion;
 use candid::Nat;
 use storage_api_canister::lifecycle::Args;
 use storage_api_canister::post_upgrade::UpgradeArgs;
-use types::BuildVersion;
 
 use http::StatusCode;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;

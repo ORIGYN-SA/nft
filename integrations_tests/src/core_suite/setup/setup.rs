@@ -1,17 +1,14 @@
 use crate::core_suite::setup::setup_core::setup_core_canister;
 use crate::utils::random_principal;
+use bity_ic_types::{BuildVersion, CanisterId, Milliseconds};
 use candid::CandidType;
 use candid::Deserialize;
 use candid::Principal;
 use core_nft::init::InitArgs;
 use core_nft::lifecycle::Args;
 use pocket_ic::{PocketIc, PocketIcBuilder};
-use types::BuildVersion;
-use types::CanisterId;
 
 use std::time::Duration;
-
-use types::Milliseconds;
 
 pub const SECOND_IN_MS: Milliseconds = 1000;
 pub const MINUTE_IN_MS: Milliseconds = SECOND_IN_MS * 60;

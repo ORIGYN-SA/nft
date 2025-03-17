@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use canister_time::{run_interval, DAY_IN_MS};
+use bity_ic_canister_time::{run_interval, DAY_IN_MS};
 use storage_api_canister::cancel_upload;
 use storage_canister_c2c_client::cancel_upload;
 use tracing::{debug, info};

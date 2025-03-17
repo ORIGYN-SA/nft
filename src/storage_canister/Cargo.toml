@@ -15,10 +15,6 @@ inttest = []
 
 [dependencies]
 candid = { workspace = true }
-canister_logger = { path = "../libraries/canister_logger" }
-canister_state_macros = { path = "../libraries/canister_state_macros" }
-canister_tracing_macros = { path = "../libraries/canister_tracing_macros" }
-canister_time = { path = "../libraries/canister_time" }
 ic-cdk = { workspace = true }
 ic-cdk-macros = { workspace = true }
 ic-cdk-timers = { workspace = true }
@@ -28,11 +24,7 @@ icrc_ledger_canister_c2c_client = { path = "../external_canisters/icrc_ledger/c2
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_bytes = { workspace = true }
-serializer = { path = "../libraries/serializer" }
-stable_memory = { path = "../libraries/stable_memory" }
 tracing = { workspace = true }
-types = { path = "../libraries/types" }
-utils = { path = "../libraries/utils" }
 futures = { workspace = true }
 icrc-ledger-types = { workspace = true }
 async-trait = { workspace = true }
@@ -40,7 +32,17 @@ enum_dispatch = { workspace = true }
 sha2 = { workspace = true }
 hex = { workspace = true }
 ic0 = { workspace = true }
-storage_api_canister = { path = "../storage_api_canister", features = []}
 ic-asset-certification = { workspace = true}
 ic-http-certification = { workspace = true}
-canister_client = { path = "../libraries/canister_client" }
+
+storage_api_canister = { path = "../storage_api_canister", features = []}
+
+bity-ic-canister-client = "0.1.0"
+bity-ic-canister-logger = "0.1.0"
+bity-ic-canister-state-macros = "0.1.0"
+bity-ic-canister-tracing-macros = "0.1.0"
+bity-ic-canister-time = "0.1.0"
+bity-ic-serializer = "0.1.0"
+bity-ic-stable-memory = "0.1.0"
+bity-ic-types = "0.1.0"
+bity-ic-utils = "0.1.0"
