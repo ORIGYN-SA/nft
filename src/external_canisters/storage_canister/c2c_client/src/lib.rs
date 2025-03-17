@@ -1,4 +1,4 @@
-use canister_client::generate_candid_c2c_call;
+use bity_ic_canister_client::generate_candid_c2c_call;
 use storage_api_canister::cancel_upload;
 use storage_api_canister::delete_file;
 use storage_api_canister::finalize_upload;

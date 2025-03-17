@@ -1,11 +1,10 @@
 use crate::lifecycle::init_canister;
 use crate::state::{Data, RuntimeState};
-use crate::types::http::certify_all_assets;
-use canister_tracing_macros::trace;
+use bity_ic_canister_tracing_macros::trace;
+use bity_ic_utils::env::{CanisterEnv, Environment};
 use ic_cdk_macros::init;
 use storage_api_canister::lifecycle::Args;
 use tracing::info;
-use utils::env::{CanisterEnv, Environment};
 
 #[init]
 #[trace]
@@ -33,7 +32,6 @@ fn init(args: Args) {
             let runtime_state = RuntimeState::new(env, data);
 
             init_canister(runtime_state);
-            // certify_all_assets();
 
             info!("Init complete.")
         }

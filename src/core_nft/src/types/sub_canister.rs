@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
 use crate::state::mutate_state;
-use crate::state::read_state;
 use crate::types::fund_manager::add_canisters_to_fund_manager;
 use crate::utils::trace;
+use bity_ic_subcanister_manager;
+use bity_ic_subcanister_manager::Canister;
+use bity_ic_utils::retry_async::retry_async;
 use candid::{CandidType, Nat, Principal};
 use ic_cdk::api::management_canister::main::{canister_status, CanisterIdRecord};
 use serde::{Deserialize, Serialize};
@@ -18,20 +20,15 @@ use storage_canister_c2c_client::{
     cancel_upload, delete_file, finalize_upload, get_data, get_storage_size, init_upload,
     insert_data, store_chunk,
 };
-use subcanister_manager;
-use subcanister_manager::Canister;
-use utils::retry_async::retry_async;
 
 const MAX_STORAGE_SIZE: u128 = 500 * 1024 * 1024 * 1024; // 500 GiB TODO maybe we should put a be less here ?
 const MAX_FILE_SIZE: u128 = 2 * 1024 * 1024 * 1024; // 2 GiB
 
 pub use storage_api_canister::lifecycle::Args as ArgsStorage;
 
-use super::fund_manager;
-
 #[derive(Serialize, Deserialize, Clone)]
 pub struct StorageSubCanisterManager {
-    sub_canister_manager: subcanister_manager::SubCanisterManager<StorageCanister>,
+    sub_canister_manager: bity_ic_subcanister_manager::SubCanisterManager<StorageCanister>,
     init_args: ArgsStorage,
     upgrade_args: ArgsStorage,
 }
@@ -51,7 +48,7 @@ impl StorageSubCanisterManager {
         wasm: Vec<u8>,
     ) -> Self {
         Self {
-            sub_canister_manager: subcanister_manager::SubCanisterManager::new(
+            sub_canister_manager: bity_ic_subcanister_manager::SubCanisterManager::new(
                 master_canister_id,
                 sub_canisters,
                 controllers,
@@ -225,7 +222,7 @@ impl StorageSubCanisterManager {
             .list_canisters()
             .into_iter()
             .filter_map(|canister| {
-                if canister.state() == subcanister_manager::CanisterState::Installed {
+                if canister.state() == bity_ic_subcanister_manager::CanisterState::Installed {
                     canister.as_any().downcast_ref::<StorageCanister>().cloned()
                 } else {
                     None
@@ -241,30 +238,12 @@ impl StorageSubCanisterManager {
     ) -> Result<Value, String> {
         canister.get_data(hash_id).await
     }
-}
 
-impl subcanister_manager::SubCanister for StorageSubCanisterManager {
-    type Canister = StorageCanister;
-
-    async fn create_canister(
-        &mut self,
-    ) -> Result<Box<impl Canister>, subcanister_manager::NewCanisterError> {
-        self.sub_canister_manager
-            .create_canister(self.init_args.clone())
-            .await
-    }
-
-    async fn update_canisters(&mut self) -> Result<(), Vec<String>> {
-        self.sub_canister_manager
-            .update_canisters(self.upgrade_args.clone())
-            .await
-    }
-
-    fn list_canisters(&self) -> Vec<Box<impl Canister>> {
+    pub fn list_canisters(&self) -> Vec<Box<impl Canister>> {
         self.sub_canister_manager.list_canisters()
     }
 
-    fn list_canisters_ids(&self) -> Vec<Principal> {
+    pub fn list_canisters_ids(&self) -> Vec<Principal> {
         self.sub_canister_manager.list_canisters_ids()
     }
 }
@@ -272,7 +251,8 @@ impl subcanister_manager::SubCanister for StorageSubCanisterManager {
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct StorageCanister {
     canister_id: Principal,
-    state: subcanister_manager::CanisterState,
+    state: bity_ic_subcanister_manager::CanisterState,
+    canister_param: ArgsStorage,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -280,17 +260,31 @@ pub enum CanisterError {
     CantFindControllers(String),
 }
 
-impl subcanister_manager::Canister for StorageCanister {
-    fn new(canister_id: Principal, state: subcanister_manager::CanisterState) -> Self {
-        Self { canister_id, state }
+impl bity_ic_subcanister_manager::Canister for StorageCanister {
+    type ParamType = ArgsStorage;
+
+    fn new(
+        canister_id: Principal,
+        state: bity_ic_subcanister_manager::CanisterState,
+        canister_param: Self::ParamType,
+    ) -> Self {
+        Self {
+            canister_id,
+            state,
+            canister_param,
+        }
     }
 
     fn canister_id(&self) -> Principal {
         self.canister_id.clone()
     }
 
-    fn state(&self) -> subcanister_manager::CanisterState {
+    fn state(&self) -> bity_ic_subcanister_manager::CanisterState {
         self.state.clone()
+    }
+
+    fn canister_param(&self) -> Self::ParamType {
+        self.canister_param.clone()
     }
 
     fn as_any(&self) -> &dyn std::any::Any {
@@ -335,7 +329,7 @@ impl StorageCanister {
         data_id: String,
         nft_id: Option<Nat>,
     ) -> Result<String, String> {
-        if self.state != subcanister_manager::CanisterState::Installed {
+        if self.state != bity_ic_subcanister_manager::CanisterState::Installed {
             return Err("Canister is not installed".to_string());
         }
 
@@ -390,7 +384,7 @@ impl StorageCanister {
         &self,
         data: init_upload::Args,
     ) -> Result<init_upload::InitUploadResp, String> {
-        if self.state != subcanister_manager::CanisterState::Installed {
+        if self.state != bity_ic_subcanister_manager::CanisterState::Installed {
             return Err("Canister is not installed".to_string());
         }
 
@@ -409,7 +403,7 @@ impl StorageCanister {
         &self,
         data: store_chunk::Args,
     ) -> Result<store_chunk::StoreChunkResp, String> {
-        if self.state != subcanister_manager::CanisterState::Installed {
+        if self.state != bity_ic_subcanister_manager::CanisterState::Installed {
             return Err("Canister is not installed".to_string());
         }
 
@@ -428,7 +422,7 @@ impl StorageCanister {
         &self,
         data: finalize_upload::Args,
     ) -> Result<finalize_upload::FinalizeUploadResp, String> {
-        if self.state != subcanister_manager::CanisterState::Installed {
+        if self.state != bity_ic_subcanister_manager::CanisterState::Installed {
             return Err("Canister is not installed".to_string());
         }
 
@@ -447,7 +441,7 @@ impl StorageCanister {
         &self,
         data: cancel_upload::Args,
     ) -> Result<cancel_upload::CancelUploadResp, String> {
-        if self.state != subcanister_manager::CanisterState::Installed {
+        if self.state != bity_ic_subcanister_manager::CanisterState::Installed {
             return Err("Canister is not installed".to_string());
         }
 
@@ -466,7 +460,7 @@ impl StorageCanister {
         &self,
         data: delete_file::Args,
     ) -> Result<delete_file::DeleteFileResp, String> {
-        if self.state != subcanister_manager::CanisterState::Installed {
+        if self.state != bity_ic_subcanister_manager::CanisterState::Installed {
             return Err("Canister is not installed".to_string());
         }
 

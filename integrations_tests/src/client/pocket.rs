@@ -1,9 +1,9 @@
 use std::time::Duration;
 
+use bity_ic_types::CanisterId;
 use candid::{CandidType, Encode, Principal};
 use pocket_ic::{PocketIc, RejectResponse};
 use serde::de::DeserializeOwned;
-use types::CanisterId;
 
 use crate::utils::T;
 

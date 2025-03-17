@@ -1,6 +1,7 @@
 use crate::client::core_nft::mint;
 use crate::client::storage::{finalize_upload, init_upload, store_chunk};
 use crate::core_suite::setup::setup::{TestEnv, MINUTE_IN_MS};
+use bity_ic_types::Cycles;
 use candid::{Nat, Principal};
 use core_nft::types::management::mint::{Args as MintArgs, Response as MintResponse};
 use icrc_ledger_types::icrc1::account::Account;
@@ -14,7 +15,6 @@ use std::time::Duration;
 use storage_api_canister::finalize_upload;
 use storage_api_canister::init_upload;
 use storage_api_canister::store_chunk;
-use types::Cycles;
 
 pub fn random_principal() -> Principal {
     let mut bytes = [0u8; 29];

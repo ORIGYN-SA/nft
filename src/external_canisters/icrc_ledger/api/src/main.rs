@@ -1,4 +1,4 @@
-use candid_gen::{generate_candid_method, generate_candid_method_no_args};
+use bity_ic_candid_gen::{generate_candid_method, generate_candid_method_no_args};
 
 #[allow(deprecated)]
 fn main() {

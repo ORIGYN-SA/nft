@@ -1,16 +1,15 @@
 use crate::memory::get_upgrades_memory;
 use crate::state::RuntimeState;
-use crate::types::http::certify_all_assets;
 use crate::{lifecycle::init_canister, utils::trace};
+use bity_ic_canister_logger::LogEntry;
+use bity_ic_canister_tracing_macros::trace;
+use bity_ic_stable_memory::get_reader;
+use bity_ic_types::BuildVersion;
 use candid::CandidType;
-use canister_logger::LogEntry;
-use canister_tracing_macros::trace;
 use ic_cdk_macros::post_upgrade;
 use serde::{Deserialize, Serialize};
-use stable_memory::get_reader;
 use storage_api_canister::Args;
 use tracing::info;
-use types::BuildVersion;
 
 #[derive(CandidType, Serialize, Deserialize, Debug)]
 pub struct UpgradeArgs {
@@ -32,7 +31,7 @@ fn post_upgrade(args: Args) {
             let reader = get_reader(&memory);
 
             // uncomment these lines if you want to do a normal upgrade
-            let (mut state, logs, traces): (RuntimeState, Vec<LogEntry>, Vec<LogEntry>) = serializer
+            let (mut state, logs, traces): (RuntimeState, Vec<LogEntry>, Vec<LogEntry>) = bity_ic_serializer
                 ::deserialize(reader)
                 .unwrap();
 
@@ -47,7 +46,7 @@ fn post_upgrade(args: Args) {
             state.env.set_version(upgrade_args.version);
             state.env.set_commit_hash(upgrade_args.commit_hash);
 
-            canister_logger::init_with_logs(state.env.is_test_mode(), logs, traces);
+            bity_ic_canister_logger::init_with_logs(state.env.is_test_mode(), logs, traces);
             init_canister(state);
             // certify_all_assets();
 

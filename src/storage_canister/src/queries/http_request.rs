@@ -3,7 +3,7 @@ use crate::{
     types::http::{self, get_asset_headers, ASSET_ROUTER, HTTP_TREE, NO_CACHE_ASSET_CACHE_CONTROL},
     utils::trace,
 };
-use canister_logger::LogEntry;
+use bity_ic_canister_logger::LogEntry;
 use ic_cdk::api::data_certificate;
 use ic_cdk::{trap, update};
 use ic_cdk_macros::query;
@@ -20,8 +20,8 @@ async fn http_request(req: HttpRequest<'static>) -> HttpResponse<'static> {
     let path = req.get_path().expect("Failed to parse request path");
 
     match path.as_str() {
-        "/logs" => serve_logs(canister_logger::export_logs()),
-        "/traces" => serve_logs(canister_logger::export_traces()),
+        "/logs" => serve_logs(bity_ic_canister_logger::export_logs()),
+        "/traces" => serve_logs(bity_ic_canister_logger::export_traces()),
         "/metrics" => serve_metrics(),
         _ => {
             let asset_resp = serve_asset(&req);

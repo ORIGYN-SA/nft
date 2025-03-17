@@ -1,8 +1,8 @@
+use bity_ic_types::CanisterWasm;
 use lazy_static::lazy_static;
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
-use types::CanisterWasm;
 
 lazy_static! {
     // Wasms in wasms folder
