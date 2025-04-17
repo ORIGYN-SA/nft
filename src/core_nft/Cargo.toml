@@ -20,6 +20,7 @@ storage_canister_c2c_client = { path = "../external_canisters/storage_canister/c
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_bytes = { workspace = true }
+serde_cbor = { workspace = true }
 tracing = { workspace = true }
 futures = { workspace = true }
 icrc-ledger-types = { workspace = true }
@@ -30,6 +31,8 @@ ic0 = { workspace = true }
 canfund = {workspace = true }
 ic-asset-certification = { workspace = true}
 ic-http-certification = { workspace = true}
+lazy_static = { workspace = true }
+sha2 = { workspace = true }
 
 bity-ic-canister-logger = { workspace = true }
 bity-ic-canister-state-macros = { workspace = true }
@@ -40,3 +43,5 @@ bity-ic-stable-memory = { workspace = true }
 bity-ic-types = { workspace = true }
 bity-ic-utils = { workspace = true }
 bity-ic-subcanister-manager = { workspace = true }
+bity-ic-icrc3 = { workspace = true }
+bity-ic-icrc3-macros = { workspace = true }

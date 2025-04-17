@@ -1,6 +1,7 @@
 pub mod collection_metadata;
 pub mod fund_manager;
 pub mod http;
+pub mod icrc3;
 pub mod icrc37;
 pub mod icrc7;
 pub mod management;
@@ -8,9 +9,11 @@ pub mod metadata;
 pub mod nft;
 pub mod nft_metadata;
 pub mod sub_canister;
+pub mod transaction;
 
 pub use collection_metadata::*;
 pub use fund_manager::*;
+pub use icrc3::*;
 pub use icrc37::*;
 pub use icrc7::*;
 pub use management::*;
@@ -18,3 +21,4 @@ pub use metadata::*;
 pub use nft::*;
 pub use nft_metadata::*;
 pub use sub_canister::*;
+pub use transaction::*;

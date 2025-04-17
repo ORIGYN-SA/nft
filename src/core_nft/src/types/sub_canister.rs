@@ -1,12 +1,11 @@
 use std::collections::HashMap;
 
-use crate::state::mutate_state;
-use crate::types::fund_manager::add_canisters_to_fund_manager;
 use crate::utils::trace;
 use bity_ic_subcanister_manager;
 use bity_ic_subcanister_manager::Canister;
 use bity_ic_utils::retry_async::retry_async;
 use candid::{CandidType, Nat, Principal};
+use canfund::manager::options::{CyclesThreshold, FundManagerOptions, FundStrategy};
 use ic_cdk::api::management_canister::main::{canister_status, CanisterIdRecord};
 use serde::{Deserialize, Serialize};
 use storage_api_canister::cancel_upload;
@@ -47,6 +46,14 @@ impl StorageSubCanisterManager {
         commit_hash: String,
         wasm: Vec<u8>,
     ) -> Self {
+        let funding_config = FundManagerOptions::new()
+            .with_interval_secs(60)
+            .with_strategy(FundStrategy::BelowThreshold(
+                CyclesThreshold::new()
+                    .with_min_cycles(1_000_000_000_000)
+                    .with_fund_cycles(2_000_000_000_000),
+            ));
+
         Self {
             sub_canister_manager: bity_ic_subcanister_manager::SubCanisterManager::new(
                 master_canister_id,
@@ -58,6 +65,7 @@ impl StorageSubCanisterManager {
                 test_mode,
                 commit_hash,
                 wasm,
+                funding_config,
             ),
             init_args,
             upgrade_args,
@@ -125,12 +133,6 @@ impl StorageSubCanisterManager {
                                 "SubCanisterManager inserted data with hash_id : {:?}",
                                 hash_id
                             ));
-                            mutate_state(|state| {
-                                add_canisters_to_fund_manager(
-                                    &mut state.data.fund_manager,
-                                    vec![storage_canister.canister_id()],
-                                );
-                            });
                             Ok((hash_id, storage_canister.clone()))
                         }
                         Err(e) => Err(format!("{e:?}")),
@@ -188,12 +190,6 @@ impl StorageSubCanisterManager {
                     match storage_canister.init_upload(data.clone()).await {
                         Ok(_) => {
                             trace(&format!("Initialized upload"));
-                            mutate_state(|state| {
-                                add_canisters_to_fund_manager(
-                                    &mut state.data.fund_manager,
-                                    vec![storage_canister.canister_id()],
-                                );
-                            });
 
                             Ok((
                                 init_upload::InitUploadResp {},

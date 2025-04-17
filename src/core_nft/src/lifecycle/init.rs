@@ -1,18 +1,21 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use crate::lifecycle::init_canister;
 use crate::lifecycle::Args;
 use crate::state::InitApprovalsArg;
-use crate::state::{Data, RuntimeState};
-use crate::types::collection_metadata;
+use crate::state::{init_icrc3, Data, RuntimeState};
 use crate::types::collection_metadata::CollectionMetadata;
 use crate::types::http::certify_all_assets;
+
 use bity_ic_canister_tracing_macros::trace;
+use bity_ic_icrc3::config::{ICRC3Config, ICRC3Properties};
 use bity_ic_types::BuildVersion;
 use bity_ic_utils::env::{CanisterEnv, Environment};
 use candid::Principal;
 use candid::{CandidType, Nat};
 use ic_cdk_macros::init;
+use icrc_ledger_types::icrc3::blocks::SupportedBlockType;
 use serde::{Deserialize, Serialize};
 use storage_api_canister::value_custom::CustomValue as Value;
 use tracing::info;
@@ -74,7 +77,7 @@ fn init(args: Args) {
                 init_args.default_take_value,
                 init_args.max_memo_size,
                 init_args.atomic_batch_transfers,
-                init_args.tx_window,
+                init_args.tx_window.clone(),
                 init_args.permitted_drift,
                 init_args.max_canister_storage_threshold,
                 collection_metadata,
@@ -85,9 +88,45 @@ fn init(args: Args) {
                 data.authorized_principals.push(env.caller());
             }
 
+            let _tx_window = match init_args.tx_window {
+                Some(tx_window) => Duration::from_millis(u64::try_from(tx_window.0).unwrap()),
+                None => Duration::from_secs(0),
+            };
+
+            let icrc3_config = ICRC3Config {
+                supported_blocks: vec![SupportedBlockType {
+                    block_type: "7mint".to_string(),
+                    url: "https://github.com/dfinity/ICRC/blob/main/ICRCs/ICRC-7/ICRC-7.md#mint-block-schema".to_string(),
+                },
+                SupportedBlockType {
+                    block_type: "7burn".to_string(),
+                    url: "https://github.com/dfinity/ICRC/blob/main/ICRCs/ICRC-7/ICRC-7.md#burn-block-schema".to_string(),
+                },
+                SupportedBlockType {
+                    block_type: "7xfer".to_string(),
+                    url: "https://github.com/dfinity/ICRC/blob/main/ICRCs/ICRC-7/ICRC-7.md#icrc7_transfer-block-schema".to_string(),
+                },
+                SupportedBlockType {
+                    block_type: "7update_token".to_string(),
+                    url: "https://github.com/dfinity/ICRC/blob/main/ICRCs/ICRC-7/ICRC-7.md#update-token-block-schema".to_string(),
+                }
+                // TODO add icrc37 blocks types here
+                ],
+                constants: ICRC3Properties::new(
+                    _tx_window,
+                    10,
+                    6 * 1024 * 1024,
+                    2 * 1024 * 1024,
+                    2_000_000_000_000_000_000,
+                    2_000_000_000_000_000_000,
+                    25
+                ),
+            };
+
             let runtime_state = RuntimeState::new(env, data);
 
             init_canister(runtime_state);
+            init_icrc3(icrc3_config);
             certify_all_assets();
 
             info!("Init complete.")

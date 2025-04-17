@@ -2,8 +2,9 @@ use crate::types::nft;
 use crate::utils::check_memo;
 use crate::utils::trace;
 use crate::{
-    state::{mutate_state, read_state},
+    state::{icrc3_add_transaction, mutate_state, read_state},
     types::icrc7,
+    types::transaction::Icrc3Transaction,
 };
 use candid::{Nat, Principal};
 use ic_cdk::api::call::RejectionCode;
@@ -11,7 +12,7 @@ use ic_cdk_macros::update;
 use icrc_ledger_types::icrc1::account::Account;
 
 #[update]
-pub fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_transfer::Response {
+pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_transfer::Response {
     if args.is_empty() {
         return vec![Some(Err((
             RejectionCode::CanisterError,
@@ -19,7 +20,6 @@ pub fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_transfe
         )))];
     }
 
-    // Lecture des paramètres de configuration
     let (max_update_batch_size, atomic_batch_transfers, tx_window, permitted_drift) =
         read_state(|state| {
             (
@@ -134,14 +134,32 @@ pub fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_transfe
 
         nft.transfer(arg.to.clone());
 
+        let transaction = Icrc3Transaction {
+            btype: "7xfer".to_string(),
+            timestamp: current_time,
+            tx: crate::types::transaction::TransactionData {
+                tid: arg.token_id.clone(),
+                from: Some(nft.token_owner.clone()),
+                to: Some(arg.to.clone()),
+                meta: None,
+                memo: arg.memo.clone(),
+                created_at_time: Some(Nat::from(time)),
+            },
+        };
+
+        match icrc3_add_transaction(transaction).await {
+            Ok(_) => {
+                txn_results[index] = Some(Ok(()));
+            }
+            Err(e) => {
+                txn_results[index] = Some(Err((
+                    RejectionCode::CanisterError,
+                    format!("Failed to log transaction: {}", e),
+                )));
+            }
+        }
+
         mutate_state(|state| state.data.update_token_by_id(&nft.token_id, &nft));
-
-        txn_results[index] = Some(Ok(()));
-
-        // TODO: Impl transactions logging ICRC3
-
-        // let txn_id = log_transaction();
-        // txn_results[index] = Some(Ok(txn_id));
     }
 
     txn_results
