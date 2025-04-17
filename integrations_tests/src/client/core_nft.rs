@@ -1,5 +1,9 @@
 use crate::{generate_pocket_query_call, generate_pocket_update_call};
 
+use core_nft::types::icrc3::{
+    icrc3_get_archives, icrc3_get_blocks, icrc3_get_properties, icrc3_get_tip_certificate,
+    icrc3_supported_block_types,
+};
 use core_nft::types::icrc7::{
     icrc7_atomic_batch_transfers, icrc7_balance_of, icrc7_collection_metadata,
     icrc7_default_take_value, icrc7_description, icrc7_logo, icrc7_max_memo_size,
@@ -31,6 +35,11 @@ generate_pocket_query_call!(icrc7_owner_of);
 generate_pocket_query_call!(icrc7_balance_of);
 generate_pocket_query_call!(icrc7_tokens);
 generate_pocket_query_call!(icrc7_tokens_of);
+generate_pocket_query_call!(icrc3_get_archives);
+generate_pocket_query_call!(icrc3_get_blocks);
+generate_pocket_query_call!(icrc3_get_properties);
+generate_pocket_query_call!(icrc3_get_tip_certificate);
+generate_pocket_query_call!(icrc3_supported_block_types);
 
 generate_pocket_update_call!(icrc7_token_metadata);
 

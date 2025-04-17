@@ -1,24 +1,27 @@
-use std::collections::HashMap;
-
 use crate::types::collection_metadata::CollectionMetadata;
 use crate::types::nft::Icrc7Token;
 use crate::types::sub_canister;
 use crate::types::sub_canister::StorageSubCanisterManager;
+
 use bity_ic_canister_state_macros::canister_state;
+use bity_ic_icrc3::transaction::TransactionType;
+use bity_ic_icrc3_macros::icrc3_state;
 use bity_ic_types::{BuildVersion, TimestampNanos};
 use bity_ic_types::{Cycles, TimestampMillis};
 use bity_ic_utils::env::{CanisterEnv, Environment};
 use bity_ic_utils::memory::MemorySize;
+
 use candid::{CandidType, Nat, Principal};
-use canfund::FundManager;
 use icrc_ledger_types::icrc1::account::Account;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
+
 pub use storage_api_canister::lifecycle::{init::InitArgs, post_upgrade::UpgradeArgs};
 
 const STORAGE_WASM: &[u8] =
     include_bytes!("../../storage_canister/wasm/storage_canister_canister.wasm.gz");
 
+icrc3_state!();
 canister_state!(RuntimeState);
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -80,8 +83,6 @@ pub struct Data {
     pub tokens_list: HashMap<Nat, Icrc7Token>,
     pub approval_init: Option<InitApprovalsArg>,
     pub sub_canister_manager: StorageSubCanisterManager,
-    #[serde(skip)]
-    pub fund_manager: FundManager,
     // pub archive_init: Option<InitArchiveArg>,
 }
 
@@ -125,14 +126,12 @@ impl Data {
             HashMap::new(),
             vec![],
             authorized_principals.clone(),
-            2_000_000_000_000,
-            2_000_000_000_000,
+            2_000_000_000_000, // todo gwojda create constant here
+            2_000_000_000_000, // todo gwojda create constant here
             test_mode.clone(),
             commit_hash.clone(),
             STORAGE_WASM.to_vec(),
         );
-
-        let mut fund_manager = FundManager::new();
 
         Self {
             authorized_principals: authorized_principals.into_iter().collect(),
@@ -155,7 +154,6 @@ impl Data {
             tokens_list: HashMap::new(),
             approval_init,
             sub_canister_manager,
-            fund_manager,
         }
     }
 
@@ -232,7 +230,6 @@ impl Clone for Data {
             tokens_list: self.tokens_list.clone(),
             approval_init: self.approval_init.clone(),
             sub_canister_manager: self.sub_canister_manager.clone(),
-            fund_manager: FundManager::new(),
         }
     }
 }

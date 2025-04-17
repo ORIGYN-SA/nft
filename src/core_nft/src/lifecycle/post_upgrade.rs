@@ -1,12 +1,14 @@
 use crate::lifecycle::init_canister;
 use crate::memory::get_upgrades_memory;
-use crate::state::RuntimeState;
-use crate::types::fund_manager::add_canisters_to_fund_manager;
+use crate::state::{replace_icrc3, RuntimeState};
 use crate::Args;
+
 use bity_ic_canister_logger::LogEntry;
 use bity_ic_canister_tracing_macros::trace;
+use bity_ic_icrc3::icrc3::ICRC3;
 use bity_ic_stable_memory::get_reader;
 use bity_ic_types::BuildVersion;
+
 use candid::CandidType;
 use ic_cdk_macros::post_upgrade;
 use serde::{Deserialize, Serialize};
@@ -31,7 +33,7 @@ fn post_upgrade(args: Args) {
             let reader = get_reader(&memory);
 
             // uncomment these lines if you want to do a normal upgrade
-            let (mut state, logs, traces): (RuntimeState, Vec<LogEntry>, Vec<LogEntry>) = bity_ic_serializer
+            let (mut state, logs, traces, icrc3): (RuntimeState, Vec<LogEntry>, Vec<LogEntry>, ICRC3) = bity_ic_serializer
                 ::deserialize(reader)
                 .unwrap();
 
@@ -48,8 +50,7 @@ fn post_upgrade(args: Args) {
 
             bity_ic_canister_logger::init_with_logs(state.env.is_test_mode(), logs, traces);
             init_canister(state.clone());
-
-            add_canisters_to_fund_manager(&mut state.data.fund_manager, state.data.sub_canister_manager.list_canisters_ids());
+            replace_icrc3(icrc3);
 
             info!(version = %upgrade_args.version, "Post-upgrade complete");
         }

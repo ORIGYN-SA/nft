@@ -1,13 +1,16 @@
 use crate::guards::{caller_is_governance_principal, GuardManagement};
-use crate::state::{mutate_state, read_state, InternalFilestorageData};
+use crate::state::{icrc3_add_transaction, mutate_state, read_state, InternalFilestorageData};
 use crate::types::http::{add_redirection, remove_redirection};
 use crate::types::sub_canister::StorageCanister;
+use crate::types::transaction::{Icrc3Transaction, TransactionData};
 use crate::types::{icrc7, management, nft};
 use crate::utils::{check_memo, hash_string_to_u64, trace};
-use candid::types::principal;
-use candid::Nat;
-use ic_cdk::api::call::RejectionCode;
+pub use candid::Nat;
+pub use ic_cdk::api::call::RejectionCode;
 use ic_cdk_macros::update;
+use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
+use icrc_ledger_types::icrc1::account::Account;
+use std::collections::BTreeMap;
 pub use storage_api_canister::cancel_upload;
 pub use storage_api_canister::delete_file;
 pub use storage_api_canister::finalize_upload;
@@ -16,7 +19,7 @@ pub use storage_api_canister::store_chunk;
 
 //TODO Use minting autority to mint tokens
 #[update(guard = "caller_is_governance_principal")]
-pub fn mint(req: management::mint::Args) -> management::mint::Response {
+pub async fn mint(req: management::mint::Args) -> management::mint::Response {
     let caller = ic_cdk::caller();
     let _guard_principal =
         GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
@@ -39,7 +42,7 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
         ));
     }
 
-    match check_memo(req.memo) {
+    match check_memo(req.memo.clone()) {
         Ok(_) => {}
         Err(e) => {
             return Err((RejectionCode::CanisterError, e));
@@ -61,14 +64,36 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
                 req.token_logo,
                 req.token_owner,
             );
+
+            let transaction = Icrc3Transaction {
+                btype: "7mint".to_string(),
+                timestamp: ic_cdk::api::time(),
+                tx: TransactionData {
+                    tid: token_name_hash.clone(),
+                    from: None,
+                    to: Some(req.token_owner.clone()),
+                    meta: None,
+                    memo: req.memo.clone(),
+                    created_at_time: Some(Nat::from(ic_cdk::api::time())),
+                },
+            };
+
+            match icrc3_add_transaction(transaction).await {
+                Ok(_) => {}
+                Err(e) => {
+                    return Err((
+                        RejectionCode::CanisterError,
+                        format!("Failed to log transaction: {}", e),
+                    ));
+                }
+            }
+
             mutate_state(|state| {
                 state
                     .data
                     .tokens_list
                     .insert(token_name_hash.clone(), new_token);
             });
-
-            // TODO add transactions logs
         }
     }
 
@@ -91,19 +116,67 @@ pub async fn update_nft_metadata(
     match token_list.contains_key(&token_name_hash.clone()) {
         true => {
             let mut token = token_list.get(&token_name_hash.clone()).unwrap().clone();
+            let mut metadata_map = BTreeMap::new();
             if let Some(name) = req.token_name {
-                token.token_name = name;
+                token.token_name = name.clone();
+                metadata_map.insert(
+                    "icrc7:token_name".to_string(),
+                    Icrc3Value::Text(name.clone()),
+                );
             }
             if let Some(description) = req.token_description {
-                token.token_description = Some(description);
+                token.token_description = Some(description.clone());
+                metadata_map.insert(
+                    "icrc7:token_description".to_string(),
+                    Icrc3Value::Text(description.clone()),
+                );
             }
             if let Some(logo) = req.token_logo {
-                token.token_logo = Some(logo);
+                token.token_logo = Some(logo.clone());
+                metadata_map.insert(
+                    "icrc7:token_logo".to_string(),
+                    Icrc3Value::Text(logo.clone()),
+                );
             }
             if let Some(metadata) = req.token_metadata {
                 trace(&format!("Adding metadata to token: {:?}", metadata));
-                token.add_metadata(metadata).await;
+                token.add_metadata(metadata.clone()).await;
+                let mut btree_metadata = BTreeMap::new();
+                for (key, value) in metadata {
+                    btree_metadata.insert(key.clone(), value.clone());
+                }
+                metadata_map.insert(
+                    "icrc7:token_metadata".to_string(),
+                    Icrc3Value::Map(btree_metadata),
+                );
             }
+
+            let transaction = Icrc3Transaction {
+                btype: "7update_token".to_string(),
+                timestamp: ic_cdk::api::time(),
+                tx: TransactionData {
+                    tid: token_name_hash.clone(),
+                    from: Some(Account {
+                        owner: ic_cdk::caller(),
+                        subaccount: None,
+                    }),
+                    to: None,
+                    meta: Some(Icrc3Value::Map(metadata_map)),
+                    memo: None,
+                    created_at_time: Some(Nat::from(ic_cdk::api::time())),
+                },
+            };
+
+            match icrc3_add_transaction(transaction).await {
+                Ok(_) => {}
+                Err(e) => {
+                    return Err((
+                        RejectionCode::CanisterError,
+                        format!("Failed to log transaction: {}", e),
+                    ));
+                }
+            };
+
             mutate_state(|state| {
                 state
                     .data
@@ -128,10 +201,51 @@ pub async fn update_nft_metadata(
     Ok(token_name_hash.clone())
 }
 
-// #[update(guard = "caller_is_governance_principal")]
-// pub fn burn_nft() -> () {
-//     token.burn()
-// }
+#[update(guard = "caller_is_governance_principal")]
+pub async fn burn_nft(token_id: Nat) -> Result<(), (RejectionCode, String)> {
+    let caller = ic_cdk::caller();
+    let _guard_principal =
+        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
+
+    let token = match read_state(|state| state.data.tokens_list.get(&token_id).cloned()) {
+        Some(token) => token,
+        None => {
+            return Err((
+                RejectionCode::CanisterError,
+                "Token does not exist".to_string(),
+            ));
+        }
+    };
+
+    let transaction = Icrc3Transaction {
+        btype: "7burn".to_string(),
+        timestamp: ic_cdk::api::time(),
+        tx: TransactionData {
+            tid: token_id.clone(),
+            from: Some(token.token_owner.clone()),
+            to: None,
+            meta: None,
+            memo: None,
+            created_at_time: Some(Nat::from(ic_cdk::api::time())),
+        },
+    };
+
+    match icrc3_add_transaction(transaction).await {
+        Ok(_) => {}
+        Err(e) => {
+            return Err((
+                RejectionCode::CanisterError,
+                format!("Failed to log transaction: {}", e),
+            ));
+        }
+    }
+
+    mutate_state(|state| {
+        state.data.tokens_list.remove(&token_id);
+    });
+
+    Ok(())
+}
 
 #[update(guard = "caller_is_governance_principal")]
 pub fn update_minting_authorities(

@@ -86,9 +86,9 @@ dependencies = [
 
 [[package]]
 name = "async-trait"
-version = "0.1.87"
+version = "0.1.88"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d556ec1359574147ec0c4fc5eb525f3f23263a592b1a9c07e0a75b427de55c97"
+checksum = "e539d3fca749fcee5236ab05e93a52867dd549cc157c8cb7f99595f3cedffdb5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -266,6 +266,79 @@ dependencies = [
 ]
 
 [[package]]
+name = "bity-ic-icrc3"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d889503568ebff8141b4dd254f0ea9c7ae28304fb241983987e5a62769643d69"
+dependencies = [
+ "bity-ic-icrc3-archive-api",
+ "bity-ic-icrc3-archive-c2c-client",
+ "bity-ic-subcanister-manager",
+ "bity-ic-types",
+ "bity-ic-utils",
+ "candid",
+ "canfund",
+ "futures",
+ "hex",
+ "ic-cdk",
+ "ic-certification",
+ "ic-ledger-types",
+ "ic-stable-structures",
+ "ic0",
+ "icrc-ledger-types 0.1.8",
+ "leb128",
+ "minicbor 0.25.1",
+ "serde",
+ "serde_bytes",
+ "serde_cbor",
+ "sha2 0.10.8",
+ "syn 2.0.100",
+ "tracing",
+]
+
+[[package]]
+name = "bity-ic-icrc3-archive-api"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4370f66923a8c180170f479a9a06a56ce14b2e85e95a28d8b2fe3a17431cad6a"
+dependencies = [
+ "bity-ic-types",
+ "candid",
+ "hex",
+ "ic-stable-structures",
+ "icrc-ledger-types 0.1.8",
+ "serde",
+ "serde_bytes",
+ "serde_cbor",
+ "sha2 0.10.8",
+]
+
+[[package]]
+name = "bity-ic-icrc3-archive-c2c-client"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b7d4e33f98dc75f98b15db84146eabe723da6a0c7d9a4da09e641e8bc1fd57e"
+dependencies = [
+ "bity-ic-canister-client",
+ "bity-ic-icrc3-archive-api",
+ "bity-ic-types",
+ "candid",
+ "ic-cdk",
+]
+
+[[package]]
+name = "bity-ic-icrc3-macros"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ddf0fe5a0375fe3f4e25022b6ba178b4c03302a5080a8f3a6673ff032742ad1"
+dependencies = [
+ "lazy_static",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
+]
+
+[[package]]
 name = "bity-ic-serializer"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -287,12 +360,13 @@ dependencies = [
 
 [[package]]
 name = "bity-ic-subcanister-manager"
-version = "0.1.0"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6884c8b23f6fd1186a3e7e30b38545b00aa973fb4a27e8b8bd8b46faca56cb3"
+checksum = "fc3f5a83104aa0a29f79e6e06c4500f8eca26d997a84077dab02951ae410f9eb"
 dependencies = [
  "bity-ic-utils",
  "candid",
+ "canfund",
  "ic-cdk",
  "serde",
 ]
@@ -546,6 +620,8 @@ dependencies = [
  "bity-ic-canister-state-macros",
  "bity-ic-canister-time",
  "bity-ic-canister-tracing-macros",
+ "bity-ic-icrc3",
+ "bity-ic-icrc3-macros",
  "bity-ic-serializer",
  "bity-ic-stable-memory",
  "bity-ic-subcanister-manager",
@@ -565,9 +641,12 @@ dependencies = [
  "ic0",
  "icrc-ledger-types 0.1.8",
  "icrc_ledger_canister_c2c_client",
+ "lazy_static",
  "serde",
  "serde_bytes",
+ "serde_cbor",
  "serde_json",
+ "sha2 0.10.8",
  "storage_api_canister",
  "storage_canister_c2c_client",
  "tracing",
@@ -1491,9 +1570,9 @@ dependencies = [
 
 [[package]]
 name = "ic-stable-structures"
-version = "0.6.7"
+version = "0.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b492c5a16455ae78623eaa12ead96dda6c69a83c535b1b00789f19b381c8a24c"
+checksum = "f0f5684f577e0146738cd11afed789109c4f51ba963c75823c48c1501dc53278"
 dependencies = [
  "ic_principal",
 ]
@@ -1592,7 +1671,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90569d2894d9536c5416943556ac6339df249f06611b3c41029196b39e0dd119"
 dependencies = [
  "candid",
- "minicbor",
+ "minicbor 0.19.1",
  "num-bigint",
  "num-traits",
 ]
@@ -1631,7 +1710,7 @@ dependencies = [
  "ic-stable-structures",
  "icrc-cbor",
  "itertools",
- "minicbor",
+ "minicbor 0.19.1",
  "num-bigint",
  "num-traits",
  "serde",
@@ -1993,7 +2072,16 @@ version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7005aaf257a59ff4de471a9d5538ec868a21586534fff7f85dd97d4043a6139"
 dependencies = [
- "minicbor-derive",
+ "minicbor-derive 0.13.0",
+]
+
+[[package]]
+name = "minicbor"
+version = "0.25.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0452a60c1863c1f50b5f77cd295e8d2786849f35883f0b9e18e7e6e1b5691b0"
+dependencies = [
+ "minicbor-derive 0.15.3",
 ]
 
 [[package]]
@@ -2005,6 +2093,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "minicbor-derive"
+version = "0.15.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bd2209fff77f705b00c737016a48e73733d7fbccb8b007194db148f03561fb70"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -2848,18 +2947,18 @@ checksum = "56e6fa9c48d24d85fb3de5ad847117517440f6beceb7798af16b4a87d616b8d0"
 
 [[package]]
 name = "serde"
-version = "1.0.218"
+version = "1.0.219"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8dfc9d19bdbf6d17e22319da49161d5d0108e4188e8b680aef6299eed22df60"
+checksum = "5f0e2c6ed6606019b4e29e69dbaba95b11854410e5347d525002456dbbb786b6"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_bytes"
-version = "0.11.16"
+version = "0.11.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "364fec0df39c49a083c9a8a18a23a6bcfd9af130fe9fe321d18520a0d113e09e"
+checksum = "8437fd221bde2d4ca316d61b90e337e9e702b3820b87d63caa9ba6c02bd06d96"
 dependencies = [
  "serde",
 ]
@@ -2876,9 +2975,9 @@ dependencies = [
 
 [[package]]
 name = "serde_derive"
-version = "1.0.218"
+version = "1.0.219"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f09503e191f4e797cb8aac08e9a4a4695c5edf6a2e70e376d961ddd5c969f82b"
+checksum = "5b0276cf7f2c73365f7157c8123c21cd9a50fbbd844757af28ca1f5925fc2a00"
 dependencies = [
  "proc-macro2",
  "quote",
