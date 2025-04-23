@@ -11,7 +11,7 @@ pub fn setup_core_canister(
     controller: Principal,
 ) -> Principal {
     let core_nft_wasm = CORE_WASM.clone();
-    pic.add_cycles(core_canister_id, 100_000_000_000_000_000);
+    pic.add_cycles(core_canister_id, 100_000_000_000_000_000_000);
 
     pic.set_controllers(
         core_canister_id,
