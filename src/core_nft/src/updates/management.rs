@@ -69,12 +69,14 @@ pub async fn mint(req: management::mint::Args) -> management::mint::Response {
                 btype: "7mint".to_string(),
                 timestamp: ic_cdk::api::time(),
                 tx: TransactionData {
-                    tid: token_name_hash.clone(),
+                    tid: Some(token_name_hash.clone()),
                     from: None,
                     to: Some(req.token_owner.clone()),
                     meta: None,
                     memo: req.memo.clone(),
                     created_at_time: Some(Nat::from(ic_cdk::api::time())),
+                    spender: None,
+                    exp: None,
                 },
             };
 
@@ -155,7 +157,7 @@ pub async fn update_nft_metadata(
                 btype: "7update_token".to_string(),
                 timestamp: ic_cdk::api::time(),
                 tx: TransactionData {
-                    tid: token_name_hash.clone(),
+                    tid: Some(token_name_hash.clone()),
                     from: Some(Account {
                         owner: ic_cdk::caller(),
                         subaccount: None,
@@ -164,6 +166,8 @@ pub async fn update_nft_metadata(
                     meta: Some(Icrc3Value::Map(metadata_map)),
                     memo: None,
                     created_at_time: Some(Nat::from(ic_cdk::api::time())),
+                    spender: None,
+                    exp: None,
                 },
             };
 
@@ -221,12 +225,14 @@ pub async fn burn_nft(token_id: Nat) -> Result<(), (RejectionCode, String)> {
         btype: "7burn".to_string(),
         timestamp: ic_cdk::api::time(),
         tx: TransactionData {
-            tid: token_id.clone(),
+            tid: Some(token_id.clone()),
             from: Some(token.token_owner.clone()),
             to: None,
             meta: None,
             memo: None,
             created_at_time: Some(Nat::from(ic_cdk::api::time())),
+            spender: None,
+            exp: None,
         },
     };
 

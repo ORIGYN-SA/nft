@@ -1,1 +1,250 @@
+pub use crate::types::icrc37::{
+    icrc37_collection_approvals, icrc37_is_approved, icrc37_max_approvals,
+    icrc37_max_approvals_per_token_or_collection, icrc37_max_revoke_approvals,
+    icrc37_token_approvals,
+};
+use candid::Nat;
+use ic_cdk_macros::query;
+pub use icrc_ledger_types::icrc1::account::Account;
 
+use crate::state::read_state;
+
+#[query]
+fn icrc37_get_token_approvals(
+    token_id: Nat,
+    prev: Option<icrc37_token_approvals::TokenApproval>,
+    take: Option<Nat>,
+) -> icrc37_token_approvals::Response {
+    read_state(|state| {
+        let mut response = Vec::new();
+        let take_usize = take
+            .map(|n| usize::try_from(n.0).unwrap_or(10))
+            .unwrap_or(10);
+
+        if let Some(approvals_map) = state.data.token_approvals.get(&token_id) {
+            let mut all_approvals: Vec<icrc37_token_approvals::TokenApproval> = approvals_map
+                .iter()
+                .map(
+                    |(account, approval)| icrc37_token_approvals::TokenApproval {
+                        token_id: token_id.clone(),
+                        approval_info: crate::types::icrc37::ApprovalInfo {
+                            spender: approval.spender.clone(),
+                            from_subaccount: account.subaccount,
+                            expires_at: approval.expires_at,
+                            memo: approval
+                                .memo
+                                .as_ref()
+                                .map(|m| serde_bytes::ByteBuf::from(m.clone())),
+                            created_at_time: approval.created_at,
+                        },
+                    },
+                )
+                .collect();
+
+            all_approvals.sort_by(|a, b| {
+                b.approval_info
+                    .created_at_time
+                    .cmp(&a.approval_info.created_at_time)
+            });
+
+            let start_index = if let Some(prev_approval) = prev {
+                all_approvals
+                    .iter()
+                    .position(|approval| {
+                        approval.approval_info.spender == prev_approval.approval_info.spender
+                    })
+                    .map(|pos| pos + 1)
+                    .unwrap_or(0)
+            } else {
+                0
+            };
+
+            let paginated_approvals = all_approvals
+                .iter()
+                .skip(start_index)
+                .take(take_usize)
+                .cloned()
+                .collect::<Vec<_>>();
+
+            response.extend(paginated_approvals);
+        }
+
+        response
+    })
+}
+
+#[query]
+fn icrc37_get_collection_approvals(
+    account: Account,
+    prev: Option<icrc37_collection_approvals::CollectionApproval>,
+    take: Option<Nat>,
+) -> icrc37_collection_approvals::Response {
+    read_state(|state| {
+        let mut response = Vec::new();
+        let take_usize = take
+            .map(|n| usize::try_from(n.0).unwrap_or(10))
+            .unwrap_or(10);
+
+        let mut all_approvals: Vec<icrc37_collection_approvals::CollectionApproval> = state
+            .data
+            .collection_approvals
+            .iter()
+            .filter(|(from_account, _)| {
+                from_account.owner == account.owner
+                    && (account.subaccount.is_none()
+                        || account.subaccount == from_account.subaccount)
+            })
+            .map(
+                |(from_account, approval)| icrc37_collection_approvals::CollectionApproval {
+                    approval_info: crate::types::icrc37::ApprovalInfo {
+                        spender: approval.spender.clone(),
+                        from_subaccount: from_account.subaccount,
+                        expires_at: approval.expires_at,
+                        memo: approval
+                            .memo
+                            .as_ref()
+                            .map(|m| serde_bytes::ByteBuf::from(m.clone())),
+                        created_at_time: approval.created_at,
+                    },
+                },
+            )
+            .collect();
+
+        all_approvals.sort_by(|a, b| {
+            b.approval_info
+                .created_at_time
+                .cmp(&a.approval_info.created_at_time)
+        });
+
+        let start_index = if let Some(prev_approval) = prev {
+            all_approvals
+                .iter()
+                .position(|approval| {
+                    approval.approval_info.spender == prev_approval.approval_info.spender
+                })
+                .map(|pos| pos + 1)
+                .unwrap_or(0)
+        } else {
+            0
+        };
+
+        let paginated_approvals = all_approvals
+            .iter()
+            .skip(start_index)
+            .take(take_usize)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        response.extend(paginated_approvals);
+
+        response
+    })
+}
+
+#[query]
+fn icrc37_is_approved(args: icrc37_is_approved::Args) -> icrc37_is_approved::Response {
+    read_state(|state| {
+        let mut response = Vec::with_capacity(args.len());
+
+        for arg in args {
+            let spender_account = arg.spender.clone();
+            let from_account = Account {
+                owner: arg.spender.owner,
+                subaccount: arg.from_subaccount,
+            };
+
+            let current_time = ic_cdk::api::time();
+
+            let has_token_approval =
+                if let Some(token_approvals) = state.data.token_approvals.get(&arg.token_id) {
+                    if let Some(approval) = token_approvals.get(&spender_account) {
+                        if let Some(expires_at) = approval.expires_at {
+                            expires_at > current_time
+                        } else {
+                            true
+                        }
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+
+            let has_collection_approval =
+                if let Some(approval) = state.data.collection_approvals.get(&spender_account) {
+                    if let Some(expires_at) = approval.expires_at {
+                        expires_at > current_time
+                    } else {
+                        true
+                    }
+                } else {
+                    false
+                };
+
+            let owner = state.data.owner_of(&arg.token_id);
+            let is_owner = owner == Some(from_account);
+
+            response.push(is_owner || has_token_approval || has_collection_approval);
+        }
+
+        response
+    })
+}
+
+#[query]
+fn icrc37_max_approvals_per_token_or_collection() -> Nat {
+    read_state(|state| {
+        let approvals_state = state
+            .data
+            .approval_init
+            .as_ref()
+            .expect("Approval functionality not initialized");
+
+        Nat::from(
+            approvals_state
+                .max_approvals_per_token_or_collection
+                .unwrap_or(10),
+        )
+    })
+}
+
+#[query]
+fn icrc37_max_revoke_approvals() -> Nat {
+    read_state(|state| {
+        let approvals_state = state
+            .data
+            .approval_init
+            .as_ref()
+            .expect("Approval functionality not initialized");
+
+        Nat::from(approvals_state.max_revoke_approvals.unwrap_or(25))
+    })
+}
+
+#[query]
+fn icrc37_max_approvals() -> Nat {
+    read_state(|state| {
+        let approvals_state = state
+            .data
+            .approval_init
+            .as_ref()
+            .expect("Approval functionality not initialized");
+
+        Nat::from(approvals_state.max_approvals.unwrap_or(100))
+    })
+}
+
+#[query]
+fn icrc37_collection_approval_requires_token() -> bool {
+    read_state(|state| {
+        let approvals_state = state
+            .data
+            .approval_init
+            .as_ref()
+            .expect("Approval functionality not initialized");
+
+        approvals_state
+            .collection_approval_requires_token
+            .unwrap_or(false)
+    })
+}

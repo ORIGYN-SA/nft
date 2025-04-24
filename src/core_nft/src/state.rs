@@ -1,4 +1,5 @@
 use crate::types::collection_metadata::CollectionMetadata;
+use crate::types::icrc37::{CollectionApprovals, TokenApprovals};
 use crate::types::nft::Icrc7Token;
 use crate::types::sub_canister;
 use crate::types::sub_canister::StorageSubCanisterManager;
@@ -83,6 +84,8 @@ pub struct Data {
     pub tokens_list: HashMap<Nat, Icrc7Token>,
     pub approval_init: Option<InitApprovalsArg>,
     pub sub_canister_manager: StorageSubCanisterManager,
+    pub token_approvals: TokenApprovals,
+    pub collection_approvals: CollectionApprovals,
     // pub archive_init: Option<InitArchiveArg>,
 }
 
@@ -154,6 +157,8 @@ impl Data {
             tokens_list: HashMap::new(),
             approval_init,
             sub_canister_manager,
+            token_approvals: HashMap::new(),
+            collection_approvals: HashMap::new(),
         }
     }
 
@@ -230,6 +235,8 @@ impl Clone for Data {
             tokens_list: self.tokens_list.clone(),
             approval_init: self.approval_init.clone(),
             sub_canister_manager: self.sub_canister_manager.clone(),
+            token_approvals: self.token_approvals.clone(),
+            collection_approvals: self.collection_approvals.clone(),
         }
     }
 }

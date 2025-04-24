@@ -34,7 +34,6 @@ pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_t
             )
         });
 
-    // Vérification de la taille du batch
     let max_batch_size = usize::try_from(max_update_batch_size.0).unwrap();
     if args.len() > max_batch_size {
         return vec![Some(Err((
@@ -138,12 +137,14 @@ pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_t
             btype: "7xfer".to_string(),
             timestamp: current_time,
             tx: crate::types::transaction::TransactionData {
-                tid: arg.token_id.clone(),
+                tid: Some(arg.token_id.clone()),
                 from: Some(nft.token_owner.clone()),
                 to: Some(arg.to.clone()),
                 meta: None,
                 memo: arg.memo.clone(),
                 created_at_time: Some(Nat::from(time)),
+                spender: None,
+                exp: None,
             },
         };
 
