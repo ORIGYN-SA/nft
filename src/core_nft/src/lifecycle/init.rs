@@ -109,8 +109,27 @@ fn init(args: Args) {
                 SupportedBlockType {
                     block_type: "7update_token".to_string(),
                     url: "https://github.com/dfinity/ICRC/blob/main/ICRCs/ICRC-7/ICRC-7.md#update-token-block-schema".to_string(),
+                },
+                SupportedBlockType {
+                    block_type: "37approve".to_string(),
+                    url: "https://github.com/dfinity/ICRC/blob/main/ICRCs/ICRC-37/ICRC-37.md#icrc37_approve_tokens-block-schema".to_string(),
+                },
+                SupportedBlockType {
+                    block_type: "37approve_coll".to_string(),
+                    url: "https://github.com/dfinity/ICRC/blob/main/ICRCs/ICRC-37/ICRC-37.md#icrc37_approve_collection-block-schema".to_string(),
+                },
+                SupportedBlockType {
+                    block_type: "37revoke".to_string(),
+                    url: "https://github.com/dfinity/ICRC/blob/main/ICRCs/ICRC-37/ICRC-37.md#icrc37_revoke_token_approvals-block-schema".to_string(),
+                },
+                SupportedBlockType {
+                    block_type: "37revoke_coll".to_string(),
+                    url: "https://github.com/dfinity/ICRC/blob/main/ICRCs/ICRC-37/ICRC-37.md#icrc37_revoke_collection_approvals-block-schema".to_string(),
+                },
+                SupportedBlockType {
+                    block_type: "37xfer".to_string(),
+                    url: "https://github.com/dfinity/ICRC/blob/main/ICRCs/ICRC-37/ICRC-37.md#icrc37_transfer_from-block-schema".to_string(),
                 }
-                // TODO add icrc37 blocks types here
                 ],
                 constants: ICRC3Properties::new(
                     _tx_window,
