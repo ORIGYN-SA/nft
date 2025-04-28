@@ -1,0 +1,59 @@
+image: rust:latest
+
+stages:
+  - build
+  - test
+
+variables:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+before_script:
+  - rustup default stable
+  - rustup target add wasm32-unknown-unknown
+  - apt-get update && apt-get install -y build-essential
+  - wget https://github.com/dfinity/pocketic/releases/download/8.0.0/pocket-ic-x86_64-linux.gz
+  - gunzip pocket-ic-x86_64-linux.gz
+  - chmod +x pocket-ic-x86_64-linux
+  - mv pocket-ic-x86_64-linux /usr/local/bin/pocket-ic
+
+build:
+  stage: build
+  script:
+    - bash ./scripts/build_all.sh
+  artifacts:
+    paths:
+      - target/
+    expire_in: 1 week
+
+test_icrc3:
+  stage: test
+  variables:
+    POCKET_IC_BIN: /usr/local/bin/pocket-ic
+  script:
+    - cargo test --package integrations_tests --test test_icrc3 -- --test-threads=1
+  needs: ["build"]
+
+test_icrc7:
+  stage: test
+  variables:
+    POCKET_IC_BIN: /usr/local/bin/pocket-ic
+  script:
+    - cargo test --package integrations_tests --test test_icrc7 -- --test-threads=1
+  needs: ["build"]
+
+test_icrc37:
+  stage: test
+  variables:
+    POCKET_IC_BIN: /usr/local/bin/pocket-ic
+  script:
+    - cargo test --package integrations_tests --test test_icrc37 -- --test-threads=1
+  needs: ["build"]
+
+test_management:
+  stage: test
+  variables:
+    POCKET_IC_BIN: /usr/local/bin/pocket-ic
+  script:
+    - cargo test --package integrations_tests --test test_management -- --test-threads=1
+  needs: ["build"] 
