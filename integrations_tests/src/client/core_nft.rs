@@ -4,6 +4,13 @@ use core_nft::types::icrc3::{
     icrc3_get_archives, icrc3_get_blocks, icrc3_get_properties, icrc3_get_tip_certificate,
     icrc3_supported_block_types,
 };
+use core_nft::types::icrc37::{
+    icrc37_approve_collection, icrc37_approve_tokens, icrc37_collection_approval_requires_token,
+    icrc37_get_collection_approvals, icrc37_get_token_approvals, icrc37_is_approved,
+    icrc37_max_approvals, icrc37_max_approvals_per_token_or_collection,
+    icrc37_max_revoke_approvals, icrc37_revoke_collection_approvals, icrc37_revoke_token_approvals,
+    icrc37_transfer_from,
+};
 use core_nft::types::icrc7::{
     icrc7_atomic_batch_transfers, icrc7_balance_of, icrc7_collection_metadata,
     icrc7_default_take_value, icrc7_description, icrc7_logo, icrc7_max_memo_size,
@@ -41,6 +48,14 @@ generate_pocket_query_call!(icrc3_get_properties);
 generate_pocket_query_call!(icrc3_get_tip_certificate);
 generate_pocket_query_call!(icrc3_supported_block_types);
 
+generate_pocket_query_call!(icrc37_is_approved);
+generate_pocket_query_call!(icrc37_max_approvals);
+generate_pocket_query_call!(icrc37_max_approvals_per_token_or_collection);
+generate_pocket_query_call!(icrc37_max_revoke_approvals);
+generate_pocket_query_call!(icrc37_collection_approval_requires_token);
+generate_pocket_query_call!(icrc37_get_token_approvals);
+generate_pocket_query_call!(icrc37_get_collection_approvals);
+
 generate_pocket_update_call!(icrc7_token_metadata);
 
 generate_pocket_update_call!(icrc7_transfer);
@@ -53,3 +68,9 @@ generate_pocket_update_call!(store_chunk);
 generate_pocket_update_call!(finalize_upload);
 generate_pocket_update_call!(cancel_upload);
 generate_pocket_update_call!(delete_file);
+
+generate_pocket_update_call!(icrc37_approve_collection);
+generate_pocket_update_call!(icrc37_approve_tokens);
+generate_pocket_update_call!(icrc37_revoke_collection_approvals);
+generate_pocket_update_call!(icrc37_revoke_token_approvals);
+generate_pocket_update_call!(icrc37_transfer_from);
