@@ -182,7 +182,7 @@ async fn approve_token(
             .entry(arg.token_id.clone())
             .or_insert_with(HashMap::new);
 
-        token_approvals.insert(from_account, approval);
+        token_approvals.insert(arg.approval_info.spender.clone(), approval);
     });
 
     ApproveTokenResult::Ok(Nat::from(index))
@@ -297,7 +297,7 @@ async fn approve_collection(
         state
             .data
             .collection_approvals
-            .insert(from_account, approval);
+            .insert(arg.approval_info.spender.clone(), approval);
     });
 
     ApproveCollectionResult::Ok(Nat::from(index))

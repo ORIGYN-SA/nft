@@ -102,22 +102,20 @@ impl TransactionType for Icrc3Transaction {
                 }
             }
             "37approve_coll" => {
+                if self.tx.tid.is_some() {
+                    return Err("Token ID is not allowed for collection approval".to_string());
+                }
                 if self.tx.from.is_none() {
                     return Err("From is required for collection approval".to_string());
                 }
                 if self.tx.to.is_some() {
                     return Err("To is not allowed for collection approval".to_string());
                 }
-                if let Some(meta) = &self.tx.meta {
-                    if let ICRC3Value::Map(map) = meta {
-                        if !map.contains_key("spender") {
-                            return Err("Spender is required for collection approval".to_string());
-                        }
-                    } else {
-                        return Err("Meta must be a map for collection approval".to_string());
-                    }
-                } else {
-                    return Err("Meta with spender is required for collection approval".to_string());
+                if self.tx.spender.is_none() {
+                    return Err("Spender is required for collection approval".to_string());
+                }
+                if self.tx.meta.is_some() {
+                    return Err("Meta is not allowed for collection approval".to_string());
                 }
             }
             "37revoke" => {

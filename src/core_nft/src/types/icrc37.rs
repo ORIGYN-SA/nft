@@ -186,7 +186,7 @@ pub mod icrc37_transfer_from {
     pub type Response = Result<Vec<Option<TransferFromResult>>, TransferFromError>;
 }
 
-pub mod icrc37_token_approvals {
+pub mod icrc37_get_token_approvals {
     use super::*;
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct TokenApproval {
@@ -198,7 +198,7 @@ pub mod icrc37_token_approvals {
     pub type Response = Vec<TokenApproval>;
 }
 
-pub mod icrc37_collection_approvals {
+pub mod icrc37_get_collection_approvals {
     use super::*;
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
