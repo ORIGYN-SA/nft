@@ -31,13 +31,9 @@ default:
       - runner_system_failure
 
 before_script:
-  - apt-get update && apt-get install -y \
-      curl \
-      build-essential \
-      ca-certificates \
-      git 
-  - rm -rf /var/lib/apt/lists/*
-  - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  - apt-get update
+  - apt-get install -y curl build-essential ca-certificates git
+  - curl https://sh.rustup.rs -sSf | sh -s -- -y
   - export PATH="$HOME/.cargo/bin:$PATH"
   - rustup default stable
   - rustup target add wasm32-unknown-unknown
