@@ -1,7 +1,6 @@
 pub use crate::types::icrc37::{
     icrc37_get_collection_approvals, icrc37_get_token_approvals, icrc37_is_approved,
-    icrc37_max_approvals, icrc37_max_approvals_per_token_or_collection,
-    icrc37_max_revoke_approvals,
+    icrc37_max_approvals_per_token_or_collection, icrc37_max_revoke_approvals,
 };
 use bity_ic_icrc3::utils::trace;
 use candid::Nat;
@@ -12,12 +11,12 @@ use crate::state::read_state;
 
 #[query]
 fn icrc37_get_token_approvals(
-    token_id: Nat,
-    prev: Option<icrc37_get_token_approvals::TokenApproval>,
-    take: Option<Nat>,
+    args: icrc37_get_token_approvals::Args,
 ) -> icrc37_get_token_approvals::Response {
     read_state(|state| {
         let mut response = Vec::new();
+        let (token_id, prev, take) = args;
+
         let take_usize = take
             .map(|n| usize::try_from(n.0).unwrap_or(10))
             .unwrap_or(10);
@@ -85,13 +84,23 @@ fn icrc37_get_collection_approvals(
             .map(|n| usize::try_from(n.0).unwrap_or(10))
             .unwrap_or(10);
 
+        trace(&format!(
+            "state
+            .data
+            .collection_approvals: {:?}",
+            state.data.collection_approvals
+        ));
+
         let mut all_approvals: Vec<icrc37_get_collection_approvals::CollectionApproval> = state
             .data
             .collection_approvals
             .iter()
             .filter(|(from_account, _)| {
-                from_account.owner == args.0.owner
-                    && (args.0.subaccount.is_none() || args.0.subaccount == from_account.subaccount)
+                trace(&format!(
+                    "from_account: {:?}, args.0: {:?}",
+                    from_account, args.0
+                ));
+                from_account.owner == args.0.owner && args.0.subaccount == from_account.subaccount
             })
             .map(
                 |(from_account, approval)| icrc37_get_collection_approvals::CollectionApproval {
@@ -114,6 +123,8 @@ fn icrc37_get_collection_approvals(
                 .created_at_time
                 .cmp(&a.approval_info.created_at_time)
         });
+
+        trace(&format!("all_approvals: {:?}", all_approvals));
 
         let start_index = if let Some(prev_approval) = args.1 {
             all_approvals
@@ -206,59 +217,18 @@ fn icrc37_is_approved(args: icrc37_is_approved::Args) -> icrc37_is_approved::Res
 }
 
 #[query]
-fn icrc37_max_approvals_per_token_or_collection() -> Nat {
+fn icrc37_max_approvals_per_token_or_collection(
+) -> icrc37_max_approvals_per_token_or_collection::Response {
     read_state(|state| {
-        let approvals_state = state
+        state
             .data
             .approval_init
-            .as_ref()
-            .expect("Approval functionality not initialized");
-
-        Nat::from(
-            approvals_state
-                .max_approvals_per_token_or_collection
-                .unwrap_or(10),
-        )
+            .max_approvals_per_token_or_collection
+            .clone()
     })
 }
 
 #[query]
-fn icrc37_max_revoke_approvals() -> Nat {
-    read_state(|state| {
-        let approvals_state = state
-            .data
-            .approval_init
-            .as_ref()
-            .expect("Approval functionality not initialized");
-
-        Nat::from(approvals_state.max_revoke_approvals.unwrap_or(25))
-    })
-}
-
-#[query]
-fn icrc37_max_approvals() -> Nat {
-    read_state(|state| {
-        let approvals_state = state
-            .data
-            .approval_init
-            .as_ref()
-            .expect("Approval functionality not initialized");
-
-        Nat::from(approvals_state.max_approvals.unwrap_or(100))
-    })
-}
-
-#[query]
-fn icrc37_collection_approval_requires_token() -> bool {
-    read_state(|state| {
-        let approvals_state = state
-            .data
-            .approval_init
-            .as_ref()
-            .expect("Approval functionality not initialized");
-
-        approvals_state
-            .collection_approval_requires_token
-            .unwrap_or(false)
-    })
+fn icrc37_max_revoke_approvals() -> icrc37_max_revoke_approvals::Response {
+    read_state(|state| state.data.approval_init.max_revoke_approvals.clone())
 }

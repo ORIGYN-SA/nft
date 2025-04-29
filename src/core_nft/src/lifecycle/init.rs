@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use crate::lifecycle::init_canister;
 use crate::lifecycle::Args;
-use crate::state::InitApprovalsArg;
+pub use crate::state::InitApprovalsArg;
 use crate::state::{init_icrc3, Data, RuntimeState};
 use crate::types::collection_metadata::CollectionMetadata;
 use crate::types::http::certify_all_assets;
@@ -42,7 +42,7 @@ pub struct InitArgs {
     pub permitted_drift: Option<Nat>,
     pub max_canister_storage_threshold: Option<Nat>,
     pub collection_metadata: HashMap<String, Value>,
-    pub approval_init: Option<InitApprovalsArg>,
+    pub approval_init: InitApprovalsArg,
 }
 
 #[init]

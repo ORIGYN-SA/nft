@@ -82,7 +82,7 @@ pub struct Data {
     pub max_canister_storage_threshold: Option<Nat>,
     pub collection_metadata: CollectionMetadata,
     pub tokens_list: HashMap<Nat, Icrc7Token>,
-    pub approval_init: Option<InitApprovalsArg>,
+    pub approval_init: InitApprovalsArg,
     pub sub_canister_manager: StorageSubCanisterManager,
     pub token_approvals: TokenApprovals,
     pub collection_approvals: CollectionApprovals,
@@ -112,7 +112,7 @@ impl Data {
         max_canister_storage_threshold: Option<Nat>,
         permitted_drift: Option<Nat>,
         collection_metadata: CollectionMetadata,
-        approval_init: Option<InitApprovalsArg>,
+        approval_init: InitApprovalsArg,
     ) -> Self {
         let sub_canister_manager = StorageSubCanisterManager::new(
             sub_canister::ArgsStorage::Init(InitArgs {
@@ -243,11 +243,8 @@ impl Clone for Data {
 
 #[derive(CandidType, Deserialize, Serialize, Debug, Clone)]
 pub struct InitApprovalsArg {
-    pub max_approvals: Option<u16>,
-    pub max_approvals_per_token_or_collection: Option<u16>,
-    pub max_revoke_approvals: Option<u16>,
-    pub settle_to_approvals: Option<u16>,
-    pub collection_approval_requires_token: Option<bool>,
+    pub max_approvals_per_token_or_collection: Option<Nat>,
+    pub max_revoke_approvals: Option<Nat>,
 }
 
 #[derive(CandidType, Serialize)]

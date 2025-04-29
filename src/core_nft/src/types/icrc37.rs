@@ -4,7 +4,7 @@ use icrc_ledger_types::icrc1::account::{Account, Subaccount};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub const DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION: u16 = 10;
+pub const DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION: usize = 10;
 
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct Approval {
@@ -227,22 +227,11 @@ pub mod icrc37_is_approved {
 pub mod icrc37_max_approvals_per_token_or_collection {
     use super::*;
     pub type Args = ();
-    pub type Response = Nat;
+    pub type Response = Option<Nat>;
 }
 
 pub mod icrc37_max_revoke_approvals {
     use super::*;
     pub type Args = ();
-    pub type Response = Nat;
-}
-
-pub mod icrc37_max_approvals {
-    use super::*;
-    pub type Args = ();
-    pub type Response = Nat;
-}
-
-pub mod icrc37_collection_approval_requires_token {
-    pub type Args = ();
-    pub type Response = bool;
+    pub type Response = Option<Nat>;
 }

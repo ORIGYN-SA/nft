@@ -7,6 +7,7 @@ use crate::types::nft;
 use crate::types::Icrc3Transaction;
 
 use bity_ic_icrc3::types::Icrc3Error;
+use bity_ic_icrc3::utils::trace;
 use candid::{Nat, Principal};
 use ic_cdk_macros::update;
 use icrc_ledger_types::icrc1::account::Account;
@@ -42,18 +43,6 @@ async fn verify_approval_timing(
     }
 
     Ok(())
-}
-
-fn get_max_approvals() -> usize {
-    read_state(|state| {
-        state
-            .data
-            .approval_init
-            .as_ref()
-            .and_then(|init| init.max_approvals_per_token_or_collection)
-            .unwrap_or(crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION)
-            as usize
-    })
 }
 
 #[update]
@@ -120,7 +109,26 @@ async fn approve_token(
         return ApproveTokenResult::Err(ApproveTokenError::InvalidSpender);
     }
 
-    let max_approvals_per_token = get_max_approvals();
+    let max_approvals_per_token = usize::try_from(
+        read_state(|state| {
+            state
+                .data
+                .approval_init
+                .max_approvals_per_token_or_collection
+                .clone()
+        })
+        .unwrap_or(Nat::from(
+            crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION,
+        ))
+        .0,
+    )
+    .unwrap_or(crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION);
+
+    trace(&format!(
+        "max_approvals_per_token: {:?}",
+        max_approvals_per_token
+    ));
+
     let memo_clone = arg.approval_info.memo.clone();
 
     let approval = Approval {
@@ -257,7 +265,21 @@ async fn approve_collection(
         memo: memo_clone.clone().map(|m| m.into_vec()),
     };
 
-    let max_approvals_per_collection = get_max_approvals();
+    let max_approvals_per_collection = usize::try_from(
+        read_state(|state| {
+            state
+                .data
+                .approval_init
+                .max_approvals_per_token_or_collection
+                .clone()
+        })
+        .unwrap_or(Nat::from(
+            crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION,
+        ))
+        .0,
+    )
+    .unwrap_or(crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION);
+
     let would_exceed_max_approvals =
         read_state(|state| state.data.collection_approvals.len() >= max_approvals_per_collection);
 
@@ -308,6 +330,30 @@ async fn icrc37_revoke_token_approvals(
     args: icrc37_revoke_token_approvals::Args,
 ) -> icrc37_revoke_token_approvals::Response {
     let caller = ic_cdk::caller();
+
+    // here we check the max revoke approvals,
+    // not that if spender is not provided, we will revoke all approvals for the token
+    // even if the max revoke approvals is 0.
+    // this is implementation choice, and is not a bug.
+    // look more logical that way.
+
+    let max_revoke_approvals = usize::try_from(
+        read_state(|state| state.data.approval_init.max_revoke_approvals.clone())
+            .unwrap_or(Nat::from(
+                crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION,
+            ))
+            .0,
+    )
+    .unwrap_or(crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION);
+
+    if args.len() > max_revoke_approvals {
+        return Err(
+            icrc37_revoke_token_approvals::RevokeTokenApprovalError::GenericError {
+                error_code: Nat::from(1u64),
+                message: "Maximum revoke approvals exceeded".to_string(),
+            },
+        );
+    }
 
     let mut results = Vec::with_capacity(args.len());
 
@@ -376,7 +422,7 @@ async fn revoke_token_approvals(
         token_approvals.remove(spender);
     } else {
         token_approvals.clear();
-    }
+    };
 
     let created_at_time = arg.created_at_time.map(|t| Nat::from(t));
 
@@ -420,6 +466,30 @@ async fn icrc37_revoke_collection_approvals(
     args: icrc37_revoke_collection_approvals::Args,
 ) -> icrc37_revoke_collection_approvals::Response {
     let caller = ic_cdk::caller();
+
+    // here we check the max revoke approvals,
+    // not that if spender is not provided, we will revoke all approvals for the collection
+    // even if the max revoke approvals is 0.
+    // this is implementation choice, and is not a bug.
+    // look more logical that way.
+
+    let max_revoke_approvals = usize::try_from(
+        read_state(|state| state.data.approval_init.max_revoke_approvals.clone())
+            .unwrap_or(Nat::from(
+                crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION,
+            ))
+            .0,
+    )
+    .unwrap_or(crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION);
+
+    if args.len() > max_revoke_approvals {
+        return Err(
+            icrc37_revoke_collection_approvals::RevokeCollectionApprovalError::GenericError {
+                error_code: Nat::from(1u64),
+                message: "Maximum revoke approvals exceeded".to_string(),
+            },
+        );
+    }
 
     let mut results = Vec::with_capacity(args.len());
 
@@ -466,7 +536,7 @@ async fn revoke_collection_approvals(
         collection_approvals.remove(spender);
     } else {
         collection_approvals.clear();
-    }
+    };
 
     let created_at_time = arg.created_at_time.map(|t| Nat::from(t));
 

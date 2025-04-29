@@ -5,9 +5,8 @@ use core_nft::types::icrc3::{
     icrc3_supported_block_types,
 };
 use core_nft::types::icrc37::{
-    icrc37_approve_collection, icrc37_approve_tokens, icrc37_collection_approval_requires_token,
-    icrc37_get_collection_approvals, icrc37_get_token_approvals, icrc37_is_approved,
-    icrc37_max_approvals, icrc37_max_approvals_per_token_or_collection,
+    icrc37_approve_collection, icrc37_approve_tokens, icrc37_get_collection_approvals,
+    icrc37_get_token_approvals, icrc37_is_approved, icrc37_max_approvals_per_token_or_collection,
     icrc37_max_revoke_approvals, icrc37_revoke_collection_approvals, icrc37_revoke_token_approvals,
     icrc37_transfer_from,
 };
@@ -49,10 +48,8 @@ generate_pocket_query_call!(icrc3_get_tip_certificate);
 generate_pocket_query_call!(icrc3_supported_block_types);
 
 generate_pocket_query_call!(icrc37_is_approved);
-generate_pocket_query_call!(icrc37_max_approvals);
 generate_pocket_query_call!(icrc37_max_approvals_per_token_or_collection);
 generate_pocket_query_call!(icrc37_max_revoke_approvals);
-generate_pocket_query_call!(icrc37_collection_approval_requires_token);
 generate_pocket_query_call!(icrc37_get_token_approvals);
 generate_pocket_query_call!(icrc37_get_collection_approvals);
 

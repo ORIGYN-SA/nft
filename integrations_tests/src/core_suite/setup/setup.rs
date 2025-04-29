@@ -1,10 +1,8 @@
 use crate::core_suite::setup::setup_core::setup_core_canister;
 use crate::utils::random_principal;
 use bity_ic_types::{BuildVersion, CanisterId, Milliseconds};
-use candid::CandidType;
-use candid::Deserialize;
-use candid::Principal;
-use core_nft::init::InitArgs;
+use candid::{CandidType, Deserialize, Nat, Principal};
+use core_nft::init::{InitApprovalsArg, InitArgs};
 use core_nft::lifecycle::Args;
 use pocket_ic::{PocketIc, PocketIcBuilder};
 
@@ -107,7 +105,10 @@ impl TestEnvBuilder {
             permitted_drift: None,
             max_canister_storage_threshold: None,
             collection_metadata: HashMap::new(),
-            approval_init: None,
+            approval_init: InitApprovalsArg {
+                max_approvals_per_token_or_collection: Some(Nat::from(10u64)),
+                max_revoke_approvals: Some(Nat::from(10u64)),
+            },
         });
 
         let collection_canister_id =
