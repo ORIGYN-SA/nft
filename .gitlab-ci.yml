@@ -32,7 +32,7 @@ default:
 
 before_script:
   - apt-get update
-  - apt-get install -y curl build-essential ca-certificates git
+  - apt-get install -y curl build-essential ca-certificates git wget
   - curl https://sh.rustup.rs -sSf | sh -s -- -y
   - export PATH="$HOME/.cargo/bin:$PATH"
   - rustup default stable
