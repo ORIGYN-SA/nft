@@ -1238,6 +1238,25 @@ fn test_icrc37_revoke_collection_approvals_max_limit() {
         .unwrap()
         .as_nanos() as u64;
 
+    let mint_return = mint_nft(
+        pic,
+        "test1".to_string(),
+        Account {
+            owner: controller,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+    );
+
+    match mint_return {
+        Ok(_) => {}
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
+    }
+
     // Get max approvals limit
     let max_approvals =
         icrc37_max_approvals_per_token_or_collection(pic, controller, collection_canister_id, &())
@@ -1273,6 +1292,8 @@ fn test_icrc37_revoke_collection_approvals_max_limit() {
 
         let approve_response =
             icrc37_approve_collection(pic, controller, collection_canister_id, &approve_args);
+
+        println!("approve_response: {:?}", approve_response);
 
         assert!(approve_response.is_ok());
 
@@ -1337,7 +1358,7 @@ fn test_icrc37_revoke_collection_approvals_max_limit() {
         collection_canister_id,
         &(
             Account {
-                owner: spender,
+                owner: controller,
                 subaccount: None,
             },
             None,
@@ -1409,6 +1430,8 @@ fn test_icrc37_revoke_collection_approvals_max_limit() {
         ),
     );
 
+    println!("remaining_approvals: {:?}", remaining_approvals);
+
     if let Some(approval) = remaining_approvals.first() {
         let revoke_args = vec![
             icrc37::icrc37_revoke_collection_approvals::RevokeCollectionApprovalArg {
@@ -1426,6 +1449,8 @@ fn test_icrc37_revoke_collection_approvals_max_limit() {
             &revoke_args,
         );
 
+        println!("revoke_response: {:?}", revoke_response);
+
         assert!(revoke_response.is_err());
     }
 }
@@ -1441,13 +1466,26 @@ fn test_icrc37_revoke_collection_approvals_within_limit() {
         nft_owner2,
     } = test_env;
 
-    let current_time = pic
-        .get_time()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos() as u64;
+    let mint_return = mint_nft(
+        pic,
+        "test1".to_string(),
+        Account {
+            owner: controller,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+    );
 
-    // Create approvals up to max_revoke_approvals
+    match mint_return {
+        Ok(_) => {}
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
+    }
+
+    // Get max revoke approvals limit
     let max_revoke_approvals =
         icrc37_max_revoke_approvals(pic, controller, collection_canister_id, &())
             .unwrap_or(Nat::from(10u64))
@@ -1455,7 +1493,7 @@ fn test_icrc37_revoke_collection_approvals_within_limit() {
             .try_into()
             .unwrap_or(10);
 
-    let mut approvals = Vec::new();
+    // Create approvals up to max_revoke_approvals
     for i in 0..max_revoke_approvals {
         let current_time = pic
             .get_time()
@@ -1479,13 +1517,38 @@ fn test_icrc37_revoke_collection_approvals_within_limit() {
             approval_info: approval_info.clone(),
         }];
 
-        let _ = icrc37_approve_collection(pic, controller, collection_canister_id, &approve_args);
+        let approve_response =
+            icrc37_approve_collection(pic, controller, collection_canister_id, &approve_args);
 
-        approvals.push(approval_info);
+        println!("approve_response: {:?}", approve_response);
+        assert!(approve_response.is_ok());
+        let results = approve_response.unwrap();
+        assert!(results[0].is_some());
+        match results[0].as_ref().unwrap() {
+            icrc37::icrc37_approve_collection::ApproveCollectionResult::Ok(_) => assert!(true),
+            icrc37::icrc37_approve_collection::ApproveCollectionResult::Err(_) => assert!(false),
+        }
 
         pic.advance_time(Duration::from_millis(MINUTE_IN_MS));
         tick_n_blocks(pic, 10);
     }
+
+    // Get all current approvals
+    let approvals = icrc37_get_collection_approvals(
+        pic,
+        controller,
+        collection_canister_id,
+        &(
+            Account {
+                owner: controller,
+                subaccount: None,
+            },
+            None,
+            None,
+        ),
+    );
+
+    assert_eq!(approvals.len(), max_revoke_approvals);
 
     // Try to revoke approvals one by one
     for approval in approvals {
@@ -1497,7 +1560,7 @@ fn test_icrc37_revoke_collection_approvals_within_limit() {
 
         let revoke_args = vec![
             icrc37::icrc37_revoke_collection_approvals::RevokeCollectionApprovalArg {
-                spender: Some(approval.spender.clone()),
+                spender: Some(approval.approval_info.spender.clone()),
                 from_subaccount: None,
                 memo: None,
                 created_at_time: Some(current_time),
@@ -1526,5 +1589,513 @@ fn test_icrc37_revoke_collection_approvals_within_limit() {
 
         pic.advance_time(Duration::from_millis(MINUTE_IN_MS));
         tick_n_blocks(pic, 10);
+    }
+
+    // Verify all approvals have been revoked
+    let remaining_approvals = icrc37_get_collection_approvals(
+        pic,
+        controller,
+        collection_canister_id,
+        &(
+            Account {
+                owner: controller,
+                subaccount: None,
+            },
+            None,
+            None,
+        ),
+    );
+
+    assert!(remaining_approvals.is_empty());
+}
+
+#[test]
+fn test_icrc37_approve_collection_with_nft() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    // Mint a token for nft_owner1
+    let mint_return = mint_nft(
+        pic,
+        "test1".to_string(),
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+    );
+
+    match mint_return {
+        Ok(token_id) => {
+            let current_time = pic
+                .get_time()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64;
+
+            // Approve collection for nft_owner2
+            let approval_info = icrc37::ApprovalInfo {
+                spender: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                from_subaccount: None,
+                expires_at: None,
+                memo: None,
+                created_at_time: current_time,
+            };
+
+            let approve_args = vec![icrc37::icrc37_approve_collection::ApproveCollectionArg {
+                approval_info: approval_info.clone(),
+            }];
+
+            let approve_response =
+                icrc37_approve_collection(pic, nft_owner1, collection_canister_id, &approve_args);
+
+            assert!(approve_response.is_ok());
+            let results = approve_response.unwrap();
+            assert!(results[0].is_some());
+            match results[0].as_ref().unwrap() {
+                icrc37::icrc37_approve_collection::ApproveCollectionResult::Ok(_) => assert!(true),
+                icrc37::icrc37_approve_collection::ApproveCollectionResult::Err(_) => {
+                    assert!(false)
+                }
+            }
+
+            // Verify the collection approval exists
+            let approvals = icrc37_get_collection_approvals(
+                pic,
+                controller,
+                collection_canister_id,
+                &(
+                    Account {
+                        owner: nft_owner1,
+                        subaccount: None,
+                    },
+                    None,
+                    None,
+                ),
+            );
+
+            assert!(!approvals.is_empty());
+            assert_eq!(approvals[0].approval_info.spender.owner, nft_owner2);
+
+            // Try to transfer the NFT using the collection approval
+            let transfer_args = vec![icrc37::icrc37_transfer_from::TransferFromArg {
+                spender_subaccount: None,
+                from: Account {
+                    owner: nft_owner1,
+                    subaccount: None,
+                },
+                to: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                token_id: token_id.clone(),
+                memo: None,
+                created_at_time: Some(current_time),
+            }];
+
+            let transfer_response =
+                icrc37_transfer_from(pic, nft_owner2, collection_canister_id, &transfer_args);
+
+            assert!(transfer_response.is_ok());
+            let results = transfer_response.unwrap();
+            assert!(results[0].is_some());
+            match results[0].as_ref().unwrap() {
+                icrc37::icrc37_transfer_from::TransferFromResult::Ok(_) => assert!(true),
+                icrc37::icrc37_transfer_from::TransferFromResult::Err(_) => assert!(false),
+            }
+
+            // Verify the token is now owned by nft_owner2
+            let owner_of = icrc7_owner_of(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![token_id.clone()],
+            );
+
+            assert_eq!(
+                owner_of[0],
+                Some(Account {
+                    owner: nft_owner2,
+                    subaccount: None
+                })
+            );
+        }
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
+    }
+}
+
+#[test]
+fn test_icrc37_approvals_reset_after_transfer_as_owner() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let nft_owner3 = random_principal();
+
+    // Mint a token for nft_owner1
+    let mint_return = mint_nft(
+        pic,
+        "test1".to_string(),
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+    );
+
+    match mint_return {
+        Ok(token_id) => {
+            let current_time = pic
+                .get_time()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64;
+
+            // Approve token for nft_owner2
+            let token_approval_info = icrc37::ApprovalInfo {
+                spender: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                from_subaccount: None,
+                expires_at: None,
+                memo: None,
+                created_at_time: current_time,
+            };
+
+            let token_approve_args = vec![icrc37::icrc37_approve_tokens::ApproveTokenArg {
+                token_id: token_id.clone(),
+                approval_info: token_approval_info.clone(),
+            }];
+
+            let token_approve_response =
+                icrc37_approve_tokens(pic, nft_owner1, collection_canister_id, &token_approve_args);
+            assert!(token_approve_response.is_ok());
+
+            // Approve collection for nft_owner2
+            let collection_approval_info = icrc37::ApprovalInfo {
+                spender: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                from_subaccount: None,
+                expires_at: None,
+                memo: None,
+                created_at_time: current_time,
+            };
+
+            let collection_approve_args =
+                vec![icrc37::icrc37_approve_collection::ApproveCollectionArg {
+                    approval_info: collection_approval_info.clone(),
+                }];
+
+            let collection_approve_response = icrc37_approve_collection(
+                pic,
+                nft_owner1,
+                collection_canister_id,
+                &collection_approve_args,
+            );
+            assert!(collection_approve_response.is_ok());
+
+            // First transfer using nft_owner2 (authorized)
+            let transfer_args_1 = vec![icrc37::icrc37_transfer_from::TransferFromArg {
+                spender_subaccount: None,
+                from: Account {
+                    owner: nft_owner1,
+                    subaccount: None,
+                },
+                to: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                token_id: token_id.clone(),
+                memo: None,
+                created_at_time: Some(current_time),
+            }];
+
+            let transfer_response_1 =
+                icrc37_transfer_from(pic, nft_owner2, collection_canister_id, &transfer_args_1);
+            assert!(transfer_response_1.is_ok());
+
+            // Verify the token is now owned by nft_owner2
+            let owner_of_1 = icrc7_owner_of(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![token_id.clone()],
+            );
+
+            assert_eq!(
+                owner_of_1[0],
+                Some(Account {
+                    owner: nft_owner2,
+                    subaccount: None
+                })
+            );
+
+            // Try second transfer using nft_owner2 (should succeed as nft_owner2 is now the owner)
+            let transfer_args_2 = vec![icrc37::icrc37_transfer_from::TransferFromArg {
+                spender_subaccount: None,
+                from: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                to: Account {
+                    owner: nft_owner3,
+                    subaccount: None,
+                },
+                token_id: token_id.clone(),
+                memo: None,
+                created_at_time: Some(current_time),
+            }];
+
+            let transfer_response_2 =
+                icrc37_transfer_from(pic, nft_owner2, collection_canister_id, &transfer_args_2);
+            assert!(transfer_response_2.is_ok());
+            let results = transfer_response_2.unwrap();
+            assert!(results[0].is_some());
+            match results[0].as_ref().unwrap() {
+                icrc37::icrc37_transfer_from::TransferFromResult::Ok(_) => assert!(true),
+                icrc37::icrc37_transfer_from::TransferFromResult::Err(_) => assert!(false),
+            }
+
+            // Verify the token is now owned by nft_owner3
+            let owner_of_2 = icrc7_owner_of(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![token_id.clone()],
+            );
+
+            assert_eq!(
+                owner_of_2[0],
+                Some(Account {
+                    owner: nft_owner3,
+                    subaccount: None
+                })
+            );
+
+            // Verify token approvals are reset
+            let token_approvals = icrc37_get_token_approvals(
+                pic,
+                controller,
+                collection_canister_id,
+                &(token_id.clone(), None, None),
+            );
+            assert!(token_approvals.is_empty());
+        }
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
+    }
+}
+
+#[test]
+fn test_icrc37_approvals_reset_after_transfer_with_approvals() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let nft_owner3 = random_principal();
+    let nft_owner4 = random_principal();
+
+    // Mint a token for nft_owner1
+    let mint_return = mint_nft(
+        pic,
+        "test1".to_string(),
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+    );
+
+    match mint_return {
+        Ok(token_id) => {
+            let current_time = pic
+                .get_time()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64;
+
+            // Approve token for nft_owner2
+            let token_approval_info = icrc37::ApprovalInfo {
+                spender: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                from_subaccount: None,
+                expires_at: None,
+                memo: None,
+                created_at_time: current_time,
+            };
+
+            let token_approve_args = vec![icrc37::icrc37_approve_tokens::ApproveTokenArg {
+                token_id: token_id.clone(),
+                approval_info: token_approval_info.clone(),
+            }];
+
+            let token_approve_response =
+                icrc37_approve_tokens(pic, nft_owner1, collection_canister_id, &token_approve_args);
+            assert!(token_approve_response.is_ok());
+
+            // Approve collection for nft_owner2
+            let collection_approval_info = icrc37::ApprovalInfo {
+                spender: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                from_subaccount: None,
+                expires_at: None,
+                memo: None,
+                created_at_time: current_time,
+            };
+
+            let collection_approve_args =
+                vec![icrc37::icrc37_approve_collection::ApproveCollectionArg {
+                    approval_info: collection_approval_info.clone(),
+                }];
+
+            let collection_approve_response = icrc37_approve_collection(
+                pic,
+                nft_owner1,
+                collection_canister_id,
+                &collection_approve_args,
+            );
+            assert!(collection_approve_response.is_ok());
+
+            // First transfer using nft_owner2 (authorized)
+            let transfer_args_1 = vec![icrc37::icrc37_transfer_from::TransferFromArg {
+                spender_subaccount: None,
+                from: Account {
+                    owner: nft_owner1,
+                    subaccount: None,
+                },
+                to: Account {
+                    owner: nft_owner3,
+                    subaccount: None,
+                },
+                token_id: token_id.clone(),
+                memo: None,
+                created_at_time: Some(current_time),
+            }];
+
+            let transfer_response_1 =
+                icrc37_transfer_from(pic, nft_owner2, collection_canister_id, &transfer_args_1);
+            assert!(transfer_response_1.is_ok());
+
+            // Verify the token is now owned by nft_owner3
+            let owner_of_1 = icrc7_owner_of(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![token_id.clone()],
+            );
+
+            assert_eq!(
+                owner_of_1[0],
+                Some(Account {
+                    owner: nft_owner3,
+                    subaccount: None
+                })
+            );
+
+            // Try second transfer using nft_owner2 (should fail as approvals should be reset)
+            let transfer_args_2 = vec![icrc37::icrc37_transfer_from::TransferFromArg {
+                spender_subaccount: None,
+                from: Account {
+                    owner: nft_owner3,
+                    subaccount: None,
+                },
+                to: Account {
+                    owner: nft_owner4,
+                    subaccount: None,
+                },
+                token_id: token_id.clone(),
+                memo: None,
+                created_at_time: Some(current_time),
+            }];
+
+            let transfer_response_2 =
+                icrc37_transfer_from(pic, nft_owner2, collection_canister_id, &transfer_args_2);
+            assert!(transfer_response_2.is_ok());
+            let results = transfer_response_2.unwrap();
+            assert!(results[0].is_some());
+            match results[0].as_ref().unwrap() {
+                icrc37::icrc37_transfer_from::TransferFromResult::Ok(_) => assert!(false),
+                icrc37::icrc37_transfer_from::TransferFromResult::Err(_) => assert!(true),
+            }
+
+            // Verify the token is still owned by nft_owner3
+            let owner_of_2 = icrc7_owner_of(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![token_id.clone()],
+            );
+
+            assert_eq!(
+                owner_of_2[0],
+                Some(Account {
+                    owner: nft_owner3,
+                    subaccount: None
+                })
+            );
+
+            // Verify token approvals are reset
+            let token_approvals = icrc37_get_token_approvals(
+                pic,
+                controller,
+                collection_canister_id,
+                &(token_id.clone(), None, None),
+            );
+            assert!(token_approvals.is_empty());
+
+            // Verify collection approvals are reset
+            let collection_approvals = icrc37_get_collection_approvals(
+                pic,
+                controller,
+                collection_canister_id,
+                &(
+                    Account {
+                        owner: nft_owner1,
+                        subaccount: None,
+                    },
+                    None,
+                    None,
+                ),
+            );
+            assert!(collection_approvals.is_empty());
+        }
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
     }
 }

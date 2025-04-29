@@ -28,7 +28,7 @@ pub struct ApprovalInfo {
 pub type TokenApprovals = HashMap<Nat, HashMap<Account, Approval>>;
 
 // Map to store collection approvals: spender -> approval
-pub type CollectionApprovals = HashMap<Account, Approval>;
+pub type CollectionApprovals = HashMap<Account, HashMap<Account, Approval>>;
 
 pub mod icrc37_approve_tokens {
     use super::*;
