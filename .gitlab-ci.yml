@@ -7,6 +7,18 @@ stages:
 variables:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  FF_USE_FASTZIP: "true"
+  ARTIFACT_COMPRESSION_LEVEL: "fast"
+  GIT_DEPTH: 1
+
+default:
+  interruptible: true
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+  tags:
+    - linux
 
 before_script:
   - rustup default stable
@@ -17,6 +29,14 @@ before_script:
   - chmod +x pocket-ic-x86_64-linux
   - mv pocket-ic-x86_64-linux /usr/local/bin/pocket-ic
 
+.test_template: &test_template
+  stage: test
+  variables:
+    POCKET_IC_BIN: /usr/local/bin/pocket-ic
+  needs: ["build"]
+  resource_group: test
+  parallel: 2
+
 build:
   stage: build
   script:
@@ -25,35 +45,24 @@ build:
     paths:
       - target/
     expire_in: 1 week
+  resource_group: build
 
 test_icrc3:
-  stage: test
-  variables:
-    POCKET_IC_BIN: /usr/local/bin/pocket-ic
+  <<: *test_template
   script:
     - cargo test --package integrations_tests --test test_icrc3 -- --test-threads=1
-  needs: ["build"]
 
 test_icrc7:
-  stage: test
-  variables:
-    POCKET_IC_BIN: /usr/local/bin/pocket-ic
+  <<: *test_template
   script:
     - cargo test --package integrations_tests --test test_icrc7 -- --test-threads=1
-  needs: ["build"]
 
 test_icrc37:
-  stage: test
-  variables:
-    POCKET_IC_BIN: /usr/local/bin/pocket-ic
+  <<: *test_template
   script:
     - cargo test --package integrations_tests --test test_icrc37 -- --test-threads=1
-  needs: ["build"]
 
 test_management:
-  stage: test
-  variables:
-    POCKET_IC_BIN: /usr/local/bin/pocket-ic
+  <<: *test_template
   script:
-    - cargo test --package integrations_tests --test test_management -- --test-threads=1
-  needs: ["build"] 
+    - cargo test --package integrations_tests --test test_management -- --test-threads=1 
