@@ -234,10 +234,8 @@ async fn approve_collection(
 
     let from_account = Account {
         owner: caller,
-        subaccount: None,
+        subaccount: arg.approval_info.from_subaccount,
     };
-
-    let owner = read_state(|state| state.data.authorized_principals.clone());
 
     let anonymous_account = Account {
         owner: Principal::anonymous(),
@@ -248,10 +246,18 @@ async fn approve_collection(
         return ApproveCollectionResult::Err(ApproveCollectionError::InvalidSpender);
     }
 
-    if !owner.contains(&from_account.owner) {
+    let has_nfts = read_state(|state| {
+        state
+            .data
+            .tokens_list
+            .iter()
+            .any(|(_, token)| token.token_owner.owner == caller)
+    });
+
+    if !has_nfts {
         return ApproveCollectionResult::Err(ApproveCollectionError::GenericError {
             error_code: Nat::from(1u64),
-            message: "Unauthorized".to_string(),
+            message: "Caller must own at least one NFT to approve collection".to_string(),
         });
     }
 
@@ -280,8 +286,15 @@ async fn approve_collection(
     )
     .unwrap_or(crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION);
 
-    let would_exceed_max_approvals =
-        read_state(|state| state.data.collection_approvals.len() >= max_approvals_per_collection);
+    let would_exceed_max_approvals = read_state(|state| {
+        state
+            .data
+            .collection_approvals
+            .get(&from_account)
+            .unwrap_or(&HashMap::new())
+            .len()
+            >= max_approvals_per_collection
+    });
 
     if would_exceed_max_approvals {
         return ApproveCollectionResult::Err(ApproveCollectionError::GenericError {
@@ -319,6 +332,8 @@ async fn approve_collection(
         state
             .data
             .collection_approvals
+            .entry(from_account.clone())
+            .or_insert_with(HashMap::new)
             .insert(arg.approval_info.spender.clone(), approval);
     });
 
@@ -532,11 +547,18 @@ async fn revoke_collection_approvals(
 
     let mut collection_approvals = read_state(|state| state.data.collection_approvals.clone());
 
-    if let Some(spender) = &arg.spender {
-        collection_approvals.remove(spender);
+    if let Some(approvals) = collection_approvals.get_mut(&from_account) {
+        if let Some(spender) = &arg.spender {
+            approvals.remove(spender);
+        } else {
+            collection_approvals.remove(&from_account);
+        }
     } else {
-        collection_approvals.clear();
-    };
+        return RevokeCollectionApprovalResult::Err(RevokeCollectionApprovalError::GenericError {
+            error_code: Nat::from(1u64),
+            message: "No approvals found for the collection".to_string(),
+        });
+    }
 
     let created_at_time = arg.created_at_time.map(|t| Nat::from(t));
 
@@ -650,12 +672,24 @@ async fn transfer_from(
     });
 
     let has_collection_approval = mutate_state(|state| {
-        if let Some(approval) = state.data.collection_approvals.get(&spender_account) {
-            if let Some(expires_at) = approval.expires_at {
-                state.data.collection_approvals.remove(&spender_account);
-                return expires_at > current_time;
+        if let Some(token_owner_approvals) =
+            state.data.collection_approvals.get_mut(&nft.token_owner)
+        {
+            if let Some(approval) = token_owner_approvals.get_mut(&spender_account) {
+                if let Some(expires_at) = approval.expires_at {
+                    // remove the approval if it has expired
+                    if expires_at <= current_time {
+                        token_owner_approvals.remove(&spender_account);
+                        // remove the collection approval if it is empty
+                        if token_owner_approvals.is_empty() {
+                            state.data.collection_approvals.remove(&nft.token_owner);
+                        }
+                        return false;
+                    }
+                    return true;
+                }
+                return true;
             }
-            return true;
         }
         false
     });
@@ -710,6 +744,20 @@ async fn transfer_from(
         state.data.update_token_by_id(&nft.token_id, &nft);
         state.data.token_approvals.remove(&arg.token_id);
     });
+
+    let has_nfts = read_state(|state| {
+        state
+            .data
+            .tokens_list
+            .iter()
+            .any(|(_, token)| token.token_owner.owner == caller)
+    });
+
+    if !has_nfts {
+        mutate_state(|state| {
+            state.data.collection_approvals.remove(&arg.from);
+        });
+    }
 
     TransferFromResult::Ok(Nat::from(index))
 }

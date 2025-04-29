@@ -1,13 +1,13 @@
+use crate::state::read_state;
+
 pub use crate::types::icrc37::{
     icrc37_get_collection_approvals, icrc37_get_token_approvals, icrc37_is_approved,
     icrc37_max_approvals_per_token_or_collection, icrc37_max_revoke_approvals,
 };
 use bity_ic_icrc3::utils::trace;
-use candid::Nat;
 use ic_cdk_macros::query;
 pub use icrc_ledger_types::icrc1::account::Account;
-
-use crate::state::read_state;
+use std::collections::HashMap;
 
 #[query]
 fn icrc37_get_token_approvals(
@@ -94,19 +94,14 @@ fn icrc37_get_collection_approvals(
         let mut all_approvals: Vec<icrc37_get_collection_approvals::CollectionApproval> = state
             .data
             .collection_approvals
+            .get(&args.0)
+            .unwrap_or(&HashMap::new())
             .iter()
-            .filter(|(from_account, _)| {
-                trace(&format!(
-                    "from_account: {:?}, args.0: {:?}",
-                    from_account, args.0
-                ));
-                from_account.owner == args.0.owner && args.0.subaccount == from_account.subaccount
-            })
             .map(
-                |(from_account, approval)| icrc37_get_collection_approvals::CollectionApproval {
+                |(account, approval)| icrc37_get_collection_approvals::CollectionApproval {
                     approval_info: crate::types::icrc37::ApprovalInfo {
                         spender: approval.spender.clone(),
-                        from_subaccount: from_account.subaccount,
+                        from_subaccount: account.subaccount,
                         expires_at: approval.expires_at,
                         memo: approval
                             .memo
@@ -188,16 +183,21 @@ fn icrc37_is_approved(args: icrc37_is_approved::Args) -> icrc37_is_approved::Res
 
             trace(&format!("has_token_approval: {:?}", has_token_approval));
 
-            let has_collection_approval =
-                if let Some(approval) = state.data.collection_approvals.get(&spender_account) {
-                    if let Some(expires_at) = approval.expires_at {
-                        expires_at > current_time
-                    } else {
-                        true
-                    }
-                } else {
-                    false
-                };
+            let has_collection_approval = if let Some(_) = state
+                .data
+                .collection_approvals
+                .iter()
+                .find(|(_, approvals)| {
+                    approvals.iter().any(|(account, _)| {
+                        account.owner == spender_account.owner
+                            && account.subaccount == spender_account.subaccount
+                    })
+                }) {
+                true
+            } else {
+                trace(&format!("no collection_approval"));
+                false
+            };
 
             trace(&format!(
                 "has_collection_approval: {:?}",
