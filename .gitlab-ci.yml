@@ -10,6 +10,17 @@ variables:
   FF_USE_FASTZIP: "true"
   ARTIFACT_COMPRESSION_LEVEL: "fast"
   GIT_DEPTH: 1
+  CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .cargo/
+    - target/
+    - ~/.cargo/bin/
+    - ~/.cargo/registry/index/
+    - ~/.cargo/registry/cache/
+    - ~/.cargo/git/db/
 
 default:
   interruptible: true
@@ -22,11 +33,23 @@ before_script:
   - rustup default stable
   - rustup target add wasm32-unknown-unknown
   - apt-get update && apt-get install -y build-essential
-  - cargo install ic-wasm
-  - wget https://github.com/dfinity/pocketic/releases/download/8.0.0/pocket-ic-x86_64-linux.gz
-  - gunzip pocket-ic-x86_64-linux.gz
-  - chmod +x pocket-ic-x86_64-linux
-  - mv pocket-ic-x86_64-linux /usr/local/bin/pocket-ic
+
+build:
+  stage: build
+  script:
+    - cargo install ic-wasm
+    - wget https://github.com/dfinity/pocketic/releases/download/8.0.0/pocket-ic-x86_64-linux.gz
+    - gunzip pocket-ic-x86_64-linux.gz
+    - chmod +x pocket-ic-x86_64-linux
+    - mv pocket-ic-x86_64-linux /usr/local/bin/pocket-ic
+    - bash ./scripts/build_all.sh
+  artifacts:
+    paths:
+      - target/
+      - .cargo/
+      - /usr/local/bin/pocket-ic
+    expire_in: 1 week
+  resource_group: build
 
 .test_template: &test_template
   stage: test
@@ -35,16 +58,6 @@ before_script:
   needs: ["build"]
   resource_group: test
   parallel: 2
-
-build:
-  stage: build
-  script:
-    - bash ./scripts/build_all.sh
-  artifacts:
-    paths:
-      - target/
-    expire_in: 1 week
-  resource_group: build
 
 test_icrc3:
   <<: *test_template
