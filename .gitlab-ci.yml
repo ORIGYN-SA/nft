@@ -1,4 +1,4 @@
-image: rust:latest
+image: debian:bullseye
 
 stages:
   - build
@@ -31,9 +31,16 @@ default:
       - runner_system_failure
 
 before_script:
+  - apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    ca-certificates \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+  - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  - source "$HOME/.cargo/env"
   - rustup default stable
   - rustup target add wasm32-unknown-unknown
-  - apt-get update && apt-get install -y build-essential
 
 build:
   stage: build
