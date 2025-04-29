@@ -22,6 +22,7 @@ before_script:
   - rustup default stable
   - rustup target add wasm32-unknown-unknown
   - apt-get update && apt-get install -y build-essential
+  - cargo install ic-wasm
   - wget https://github.com/dfinity/pocketic/releases/download/8.0.0/pocket-ic-x86_64-linux.gz
   - gunzip pocket-ic-x86_64-linux.gz
   - chmod +x pocket-ic-x86_64-linux
