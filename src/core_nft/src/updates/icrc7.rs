@@ -72,11 +72,9 @@ pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_t
             }
         }
 
-        let caller_as_account = Account {
-            owner: ic_cdk::caller(),
-            subaccount: None,
-        };
-        if nft.token_owner != caller_as_account {
+        let caller_as_principal = ic_cdk::caller();
+
+        if nft.token_owner.owner != caller_as_principal {
             txn_results[index] = Some(Err((
                 RejectionCode::CanisterError,
                 "Token owner does not match the sender".to_string(),

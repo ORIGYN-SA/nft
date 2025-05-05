@@ -35,7 +35,7 @@ pub async fn mint(req: management::mint::Args) -> management::mint::Response {
             .unwrap_or(Nat::from(icrc7::DEFAULT_MAX_SUPPLY_CAP))
     });
 
-    if token_list.len() > supply_cap {
+    if token_list.len() >= supply_cap {
         return Err((
             RejectionCode::CanisterError,
             "Exceed Max allowed Supply Cap".to_string(),

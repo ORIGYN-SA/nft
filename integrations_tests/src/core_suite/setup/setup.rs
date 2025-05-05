@@ -94,7 +94,7 @@ impl TestEnvBuilder {
             symbol: "MC".to_string(),
             name: "MyCollection".to_string(),
             logo: None,
-            supply_cap: None,
+            supply_cap: Some(Nat::from(10u64)),
             max_query_batch_size: None,
             max_update_batch_size: None,
             max_take_value: None,
