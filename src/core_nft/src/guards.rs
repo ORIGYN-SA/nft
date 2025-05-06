@@ -46,3 +46,11 @@ pub fn caller_is_governance_principal() -> Result<(), String> {
         Err("Caller is not a governance principal".to_string())
     }
 }
+
+pub fn caller_is_minting_authority() -> Result<(), String> {
+    if read_state(|state| state.is_caller_minting_authority()) {
+        Ok(())
+    } else {
+        Err("Caller is not a minting authority".to_string())
+    }
+}

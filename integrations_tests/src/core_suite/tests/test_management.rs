@@ -1,8 +1,15 @@
 use crate::client::core_nft::{
-    cancel_upload, delete_file, finalize_upload, init_upload, store_chunk,
+    cancel_upload, delete_file, finalize_upload, init_upload, mint, remove_authorized_principals,
+    remove_minting_authorities, store_chunk, update_authorized_principals,
+    update_minting_authorities, update_nft_metadata,
 };
 use candid::{Nat, Principal};
+use icrc_ledger_types::icrc1::account::Account;
 
+use core_nft::types::management::{
+    mint, remove_authorized_principals, remove_minting_authorities, update_authorized_principals,
+    update_minting_authorities, update_nft_metadata,
+};
 use http::StatusCode;
 use ic_cdk::println;
 use sha2::{Digest, Sha256};
@@ -1017,4 +1024,436 @@ fn test_management_cycles() {
     for (canister_id, cycles) in &canister_cycles {
         println!("Canister {}: {} cycles", canister_id, cycles);
     }
+}
+
+#[test]
+fn test_management_authorized_principals() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let new_authorized_principal = nft_owner1; // Principal non autorisé
+
+    let authorized_principals = vec![controller, new_authorized_principal];
+    let result = update_authorized_principals(
+        pic,
+        controller,
+        collection_canister_id,
+        &(update_authorized_principals::Args {
+            authorized_principals,
+        }),
+    );
+    assert!(result.is_ok(), "Should succeed with authorized principal");
+
+    let result = update_authorized_principals(
+        pic,
+        new_authorized_principal,
+        collection_canister_id,
+        &(update_authorized_principals::Args {
+            authorized_principals: vec![nft_owner2],
+        }),
+    );
+    assert!(
+        result.is_ok(),
+        "Should succeed with newly authorized principal"
+    );
+}
+
+#[test]
+#[should_panic]
+fn test_update_authorized_principals_unauthorized() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let unauthorized_principal = nft_owner1;
+    let _ = update_authorized_principals(
+        pic,
+        unauthorized_principal,
+        collection_canister_id,
+        &(update_authorized_principals::Args {
+            authorized_principals: vec![nft_owner1],
+        }),
+    );
+}
+
+#[test]
+#[should_panic]
+fn test_remove_authorized_principals_unauthorized() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let unauthorized_principal = nft_owner1;
+    let _ = remove_authorized_principals(
+        pic,
+        unauthorized_principal,
+        collection_canister_id,
+        &(remove_authorized_principals::Args {
+            authorized_principals: vec![nft_owner1],
+        }),
+    );
+}
+
+#[test]
+#[should_panic]
+fn test_update_minting_authorities_unauthorized() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let unauthorized_principal = nft_owner1;
+    let _ = update_minting_authorities(
+        pic,
+        unauthorized_principal,
+        collection_canister_id,
+        &(update_minting_authorities::Args {
+            minting_authorities: vec![nft_owner1],
+        }),
+    );
+}
+
+#[test]
+#[should_panic]
+fn test_remove_minting_authorities_unauthorized() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let unauthorized_principal = nft_owner1;
+    let _ = remove_minting_authorities(
+        pic,
+        unauthorized_principal,
+        collection_canister_id,
+        &(remove_minting_authorities::Args {
+            minting_authorities: vec![nft_owner1],
+        }),
+    );
+}
+
+#[test]
+#[should_panic]
+fn test_update_nft_metadata_unauthorized() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let unauthorized_principal = nft_owner1;
+    let _ = update_nft_metadata(
+        pic,
+        unauthorized_principal,
+        collection_canister_id,
+        &(update_nft_metadata::Args {
+            token_id: Nat::from(0u64),
+            token_name: None,
+            token_description: None,
+            token_logo: None,
+            token_metadata: None,
+        }),
+    );
+}
+
+#[test]
+#[should_panic]
+fn test_init_upload_unauthorized() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let unauthorized_principal = nft_owner1;
+    let _ = init_upload(
+        pic,
+        unauthorized_principal,
+        collection_canister_id,
+        &(init_upload::Args {
+            file_path: "/test.png".to_string(),
+            file_hash: "dummy_hash".to_string(),
+            file_size: 1024,
+            chunk_size: None,
+        }),
+    );
+}
+
+#[test]
+#[should_panic]
+fn test_store_chunk_unauthorized() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let unauthorized_principal = nft_owner1;
+    let _ = store_chunk(
+        pic,
+        unauthorized_principal,
+        collection_canister_id,
+        &(store_chunk::Args {
+            file_path: "/test.png".to_string(),
+            chunk_id: Nat::from(0u64),
+            chunk_data: vec![0; 1024],
+        }),
+    );
+}
+
+#[test]
+#[should_panic]
+fn test_finalize_upload_unauthorized() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let unauthorized_principal = nft_owner1;
+    let _ = finalize_upload(
+        pic,
+        unauthorized_principal,
+        collection_canister_id,
+        &(finalize_upload::Args {
+            file_path: "/test.png".to_string(),
+        }),
+    );
+}
+
+#[test]
+#[should_panic]
+fn test_cancel_upload_unauthorized() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let unauthorized_principal = nft_owner1;
+    let _ = cancel_upload(
+        pic,
+        unauthorized_principal,
+        collection_canister_id,
+        &(cancel_upload::Args {
+            file_path: "/test.png".to_string(),
+        }),
+    );
+}
+
+#[test]
+#[should_panic]
+fn test_delete_file_unauthorized() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let unauthorized_principal = nft_owner1;
+    let _ = delete_file(
+        pic,
+        unauthorized_principal,
+        collection_canister_id,
+        &(delete_file::Args {
+            file_path: "/test.png".to_string(),
+        }),
+    );
+}
+
+#[test]
+fn test_authorized_principals_workflow() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let authorized_principals = vec![controller, nft_owner1];
+    let result = update_authorized_principals(
+        pic,
+        controller,
+        collection_canister_id,
+        &(update_authorized_principals::Args {
+            authorized_principals,
+        }),
+    );
+    assert!(result.is_ok(), "Should succeed with authorized principal");
+
+    let result = update_authorized_principals(
+        pic,
+        nft_owner1,
+        collection_canister_id,
+        &(update_authorized_principals::Args {
+            authorized_principals: vec![nft_owner2],
+        }),
+    );
+    assert!(
+        result.is_ok(),
+        "Should succeed with newly authorized principal"
+    );
+}
+
+#[test]
+#[should_panic]
+fn test_mint_unauthorized() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let unauthorized_principal = nft_owner1;
+    let result = mint(
+        pic,
+        unauthorized_principal,
+        collection_canister_id,
+        &(mint::Args {
+            token_name: "test".to_string(),
+            token_description: None,
+            token_logo: None,
+            token_owner: Account {
+                owner: nft_owner1,
+                subaccount: None,
+            },
+            memo: None,
+        }),
+    );
+    assert!(matches!(result, Err((_, _))), "mint should panic");
+}
+
+#[test]
+fn test_mint_authorized() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let result = update_minting_authorities(
+        pic,
+        controller,
+        collection_canister_id,
+        &(update_minting_authorities::Args {
+            minting_authorities: vec![nft_owner1],
+        }),
+    );
+    assert!(result.is_ok(), "Should succeed with authorized principal");
+
+    let result = mint(
+        pic,
+        nft_owner1,
+        collection_canister_id,
+        &(mint::Args {
+            token_name: "test".to_string(),
+            token_description: None,
+            token_logo: None,
+            token_owner: Account {
+                owner: nft_owner1,
+                subaccount: None,
+            },
+            memo: None,
+        }),
+    );
+    assert!(result.is_ok(), "Should succeed with authorized principal");
+}
+
+#[test]
+#[should_panic]
+fn test_add_then_remove_minting_authorities_unauthorized() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let result = update_minting_authorities(
+        pic,
+        controller,
+        collection_canister_id,
+        &(update_minting_authorities::Args {
+            minting_authorities: vec![nft_owner1],
+        }),
+    );
+    assert!(result.is_ok(), "Should succeed with authorized principal");
+
+    let result = remove_minting_authorities(
+        pic,
+        controller,
+        collection_canister_id,
+        &(remove_minting_authorities::Args {
+            minting_authorities: vec![nft_owner1],
+        }),
+    );
+    assert!(result.is_ok(), "Should succeed with authorized principal");
+    let result = mint(
+        pic,
+        nft_owner1,
+        collection_canister_id,
+        &(mint::Args {
+            token_name: "test".to_string(),
+            token_description: None,
+            token_logo: None,
+            token_owner: Account {
+                owner: nft_owner1,
+                subaccount: None,
+            },
+            memo: None,
+        }),
+    );
+    assert!(matches!(result, Err((_, _))), "mint should panic");
 }

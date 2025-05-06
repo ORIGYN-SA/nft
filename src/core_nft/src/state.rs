@@ -47,6 +47,10 @@ impl RuntimeState {
         self.data.authorized_principals.contains(&self.env.caller())
     }
 
+    pub fn is_caller_minting_authority(&self) -> bool {
+        self.data.minting_authorities.contains(&self.env.caller())
+    }
+
     pub fn metrics(&self) -> Metrics {
         Metrics {
             canister_info: CanisterInfo {
