@@ -53,3 +53,23 @@ pub mod remove_minting_authorities {
     }
     pub type Response = Result<()>;
 }
+
+pub mod update_authorized_principals {
+    use super::*;
+
+    #[derive(CandidType, Serialize, Deserialize, Clone)]
+    pub struct Args {
+        pub authorized_principals: Vec<Principal>,
+    }
+    pub type Response = Result<()>;
+}
+
+pub mod remove_authorized_principals {
+    use super::*;
+
+    #[derive(CandidType, Serialize, Deserialize, Clone)]
+    pub struct Args {
+        pub authorized_principals: Vec<Principal>,
+    }
+    pub type Response = Result<()>;
+}

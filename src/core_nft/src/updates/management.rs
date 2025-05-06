@@ -1,4 +1,4 @@
-use crate::guards::{caller_is_governance_principal, GuardManagement};
+use crate::guards::{caller_is_governance_principal, caller_is_minting_authority, GuardManagement};
 use crate::state::{icrc3_add_transaction, mutate_state, read_state, InternalFilestorageData};
 use crate::types::http::{add_redirection, remove_redirection};
 use crate::types::sub_canister::StorageCanister;
@@ -17,8 +17,7 @@ pub use storage_api_canister::finalize_upload;
 pub use storage_api_canister::init_upload;
 pub use storage_api_canister::store_chunk;
 
-//TODO Use minting autority to mint tokens
-#[update(guard = "caller_is_governance_principal")]
+#[update(guard = "caller_is_minting_authority")]
 pub async fn mint(req: management::mint::Args) -> management::mint::Response {
     let caller = ic_cdk::caller();
     let _guard_principal =
@@ -248,48 +247,6 @@ pub async fn burn_nft(token_id: Nat) -> Result<(), (RejectionCode, String)> {
 
     mutate_state(|state| {
         state.data.tokens_list.remove(&token_id);
-    });
-
-    Ok(())
-}
-
-#[update(guard = "caller_is_governance_principal")]
-pub fn update_minting_authorities(
-    req: management::update_minting_authorities::Args,
-) -> management::update_minting_authorities::Response {
-    let caller = ic_cdk::caller();
-    let _guard_principal =
-        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
-
-    let mut minting_authorities = req.minting_authorities.clone();
-    let previous_minting_authorities = mutate_state(|state| state.data.minting_authorities.clone());
-
-    minting_authorities.append(&mut previous_minting_authorities.clone());
-    minting_authorities.sort();
-    minting_authorities.dedup();
-
-    mutate_state(|state| {
-        state.data.minting_authorities = minting_authorities.into_iter().collect();
-    });
-
-    Ok(())
-}
-
-#[update(guard = "caller_is_governance_principal")]
-pub fn remove_minting_authorities(
-    req: management::remove_minting_authorities::Args,
-) -> management::remove_minting_authorities::Response {
-    let caller = ic_cdk::caller();
-    let _guard_principal =
-        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
-
-    let mut minting_authorities = req.minting_authorities.clone();
-    let previous_minting_authorities = mutate_state(|state| state.data.minting_authorities.clone());
-
-    minting_authorities.retain(|auth| !previous_minting_authorities.contains(auth));
-
-    mutate_state(|state| {
-        state.data.minting_authorities = minting_authorities.into_iter().collect();
     });
 
     Ok(())
@@ -605,4 +562,90 @@ pub async fn delete_file(data: delete_file::Args) -> delete_file::Response {
     );
 
     Ok(delete_file::DeleteFileResp {})
+}
+
+#[update(guard = "caller_is_governance_principal")]
+pub fn update_minting_authorities(
+    req: management::update_minting_authorities::Args,
+) -> management::update_minting_authorities::Response {
+    let caller = ic_cdk::caller();
+    let _guard_principal =
+        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
+
+    let mut minting_authorities = req.minting_authorities.clone();
+    let previous_minting_authorities = mutate_state(|state| state.data.minting_authorities.clone());
+
+    minting_authorities.append(&mut previous_minting_authorities.clone());
+    minting_authorities.sort();
+    minting_authorities.dedup();
+
+    mutate_state(|state| {
+        state.data.minting_authorities = minting_authorities.into_iter().collect();
+    });
+
+    Ok(())
+}
+
+#[update(guard = "caller_is_governance_principal")]
+pub fn remove_minting_authorities(
+    req: management::remove_minting_authorities::Args,
+) -> management::remove_minting_authorities::Response {
+    let caller = ic_cdk::caller();
+    let _guard_principal =
+        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
+
+    let mut minting_authorities = req.minting_authorities.clone();
+    let previous_minting_authorities = mutate_state(|state| state.data.minting_authorities.clone());
+
+    minting_authorities.retain(|auth| !previous_minting_authorities.contains(auth));
+
+    mutate_state(|state| {
+        state.data.minting_authorities = minting_authorities.into_iter().collect();
+    });
+
+    Ok(())
+}
+
+#[update(guard = "caller_is_governance_principal")]
+pub async fn update_authorized_principals(
+    req: management::update_authorized_principals::Args,
+) -> management::update_authorized_principals::Response {
+    let caller = ic_cdk::caller();
+    let _guard_principal =
+        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
+
+    let mut authorized_principals = req.authorized_principals.clone();
+    let previous_authorized_principals =
+        mutate_state(|state| state.data.authorized_principals.clone());
+
+    authorized_principals.append(&mut previous_authorized_principals.clone());
+    authorized_principals.sort();
+    authorized_principals.dedup();
+
+    mutate_state(|state| {
+        state.data.authorized_principals = authorized_principals.into_iter().collect();
+    });
+
+    Ok(())
+}
+
+#[update(guard = "caller_is_governance_principal")]
+pub async fn remove_authorized_principals(
+    req: management::remove_authorized_principals::Args,
+) -> management::remove_authorized_principals::Response {
+    let caller = ic_cdk::caller();
+    let _guard_principal =
+        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
+
+    let mut authorized_principals = req.authorized_principals.clone();
+    let previous_authorized_principals =
+        mutate_state(|state| state.data.authorized_principals.clone());
+
+    authorized_principals.retain(|auth| !previous_authorized_principals.contains(auth));
+
+    mutate_state(|state| {
+        state.data.authorized_principals = authorized_principals.into_iter().collect();
+    });
+
+    Ok(())
 }

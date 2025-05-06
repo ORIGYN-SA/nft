@@ -17,7 +17,10 @@ use core_nft::types::icrc7::{
     icrc7_owner_of, icrc7_permitted_drift, icrc7_supply_cap, icrc7_symbol, icrc7_token_metadata,
     icrc7_tokens, icrc7_tokens_of, icrc7_total_supply, icrc7_transfer, icrc7_tx_window,
 };
-use core_nft::types::management::{mint, update_minting_authorities, update_nft_metadata};
+use core_nft::types::management::{
+    mint, remove_authorized_principals, remove_minting_authorities, update_authorized_principals,
+    update_minting_authorities, update_nft_metadata,
+};
 use storage_api_canister::updates::{
     cancel_upload, delete_file, finalize_upload, init_upload, store_chunk,
 };
@@ -60,6 +63,9 @@ generate_pocket_update_call!(icrc7_transfer);
 generate_pocket_update_call!(mint);
 generate_pocket_update_call!(update_nft_metadata);
 generate_pocket_update_call!(update_minting_authorities);
+generate_pocket_update_call!(remove_minting_authorities);
+generate_pocket_update_call!(update_authorized_principals);
+generate_pocket_update_call!(remove_authorized_principals);
 generate_pocket_update_call!(init_upload);
 generate_pocket_update_call!(store_chunk);
 generate_pocket_update_call!(finalize_upload);
