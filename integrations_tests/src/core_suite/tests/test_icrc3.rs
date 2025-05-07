@@ -9,8 +9,8 @@ use icrc_ledger_types::icrc1::account::Account;
 use icrc_ledger_types::icrc3::blocks::GetBlocksRequest;
 use std::time::Duration;
 
-use crate::core_suite::setup::default_test_setup;
 use crate::core_suite::setup::setup::{TestEnv, MINUTE_IN_MS};
+use crate::core_suite::setup::{default_test_setup, test_setup_no_limit};
 
 #[test]
 fn test_icrc7_transfer() {
@@ -420,7 +420,7 @@ fn test_icrc3_block_range_validation() {
 
 #[test]
 fn test_multiple_operations_archive_behavior() {
-    let mut test_env: TestEnv = default_test_setup();
+    let mut test_env: TestEnv = test_setup_no_limit();
 
     let TestEnv {
         ref mut pic,
