@@ -1,10 +1,10 @@
 use crate::client::core_nft::{
-    icrc7_atomic_batch_transfers, icrc7_balance_of, icrc7_default_take_value, icrc7_description,
-    icrc7_logo, icrc7_max_memo_size, icrc7_max_query_batch_size, icrc7_max_take_value,
-    icrc7_max_update_batch_size, icrc7_name, icrc7_owner_of, icrc7_permitted_drift,
-    icrc7_supply_cap, icrc7_symbol, icrc7_token_metadata, icrc7_tokens, icrc7_tokens_of,
-    icrc7_total_supply, icrc7_transfer, icrc7_tx_window, mint, update_minting_authorities,
-    update_nft_metadata,
+    icrc7_atomic_batch_transfers, icrc7_balance_of, icrc7_collection_metadata,
+    icrc7_default_take_value, icrc7_description, icrc7_logo, icrc7_max_memo_size,
+    icrc7_max_query_batch_size, icrc7_max_take_value, icrc7_max_update_batch_size, icrc7_name,
+    icrc7_owner_of, icrc7_permitted_drift, icrc7_supply_cap, icrc7_symbol, icrc7_token_metadata,
+    icrc7_tokens, icrc7_tokens_of, icrc7_total_supply, icrc7_transfer, icrc7_tx_window, mint,
+    update_minting_authorities, update_nft_metadata,
 };
 use crate::core_suite::setup::setup::{TestEnv, MINUTE_IN_MS};
 use crate::utils::mint_nft;
@@ -2470,4 +2470,67 @@ fn test_icrc7_transfer_after_fail() {
             assert!(false);
         }
     }
+}
+
+#[test]
+fn test_icrc7_collection_metadata() {
+    let mut test_env: TestEnv = default_test_setup();
+    println!("test_env: {:?}", test_env);
+
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let metadata = icrc7_collection_metadata(pic, controller, collection_canister_id, &());
+    println!("metadata: {:?}", metadata);
+
+    assert!(metadata
+        .iter()
+        .any(|(key, value)| { key == "icrc7:symbol" && matches!(value, Value::Text(_)) }));
+    assert!(metadata
+        .iter()
+        .any(|(key, value)| { key == "icrc7:name" && matches!(value, Value::Text(_)) }));
+    assert!(metadata
+        .iter()
+        .any(|(key, value)| { key == "icrc7:total_supply" && matches!(value, Value::Nat(_)) }));
+
+    let total_supply = metadata
+        .iter()
+        .find(|(key, _)| key == "icrc7:total_supply")
+        .map(|(_, value)| match value {
+            Value::Nat(n) => n.clone(),
+            _ => Nat::from(0u64),
+        })
+        .unwrap_or(Nat::from(0u64));
+    assert_eq!(total_supply, Nat::from(0u64));
+
+    let _ = mint_nft(
+        pic,
+        "test1".to_string(),
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+    );
+
+    let updated_metadata = icrc7_collection_metadata(pic, controller, collection_canister_id, &());
+    let updated_total_supply = updated_metadata
+        .iter()
+        .find(|(key, _)| key == "icrc7:total_supply")
+        .map(|(_, value)| match value {
+            Value::Nat(n) => n.clone(),
+            _ => Nat::from(0u64),
+        })
+        .unwrap_or(Nat::from(0u64));
+    assert_eq!(updated_total_supply, Nat::from(1u64));
+
+    let mut sorted_metadata = metadata.clone();
+    sorted_metadata.sort_by(|a, b| a.0.cmp(&b.0));
+    assert_eq!(metadata, sorted_metadata);
 }

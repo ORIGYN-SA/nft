@@ -8,8 +8,106 @@ use crate::state::read_state;
 
 #[query]
 pub fn icrc7_collection_metadata() -> icrc7::icrc7_collection_metadata::Response {
-    // TODO
-    Vec::new()
+    read_state(|state| {
+        let mut metadata = Vec::new();
+
+        metadata.push((
+            "icrc7:symbol".to_string(),
+            ICRC3Value::Text(state.data.symbol.clone()),
+        ));
+        metadata.push((
+            "icrc7:name".to_string(),
+            ICRC3Value::Text(state.data.name.clone()),
+        ));
+
+        metadata.push((
+            "icrc7:total_supply".to_string(),
+            ICRC3Value::Nat(state.data.total_supply()),
+        ));
+
+        if let Some(description) = &state.data.description {
+            metadata.push((
+                "icrc7:description".to_string(),
+                ICRC3Value::Text(description.clone()),
+            ));
+        }
+
+        if state.data.logo.is_some() {
+            metadata.push((
+                "icrc7:logo".to_string(),
+                ICRC3Value::Text(format!(
+                    "https://{}.raw.icp0.io/logo",
+                    ic_cdk::id().to_text()
+                )),
+            ));
+        }
+
+        if let Some(supply_cap) = &state.data.supply_cap {
+            metadata.push((
+                "icrc7:supply_cap".to_string(),
+                ICRC3Value::Nat(supply_cap.clone()),
+            ));
+        }
+
+        if let Some(max_query_batch_size) = &state.data.max_query_batch_size {
+            metadata.push((
+                "icrc7:max_query_batch_size".to_string(),
+                ICRC3Value::Nat(max_query_batch_size.clone()),
+            ));
+        }
+
+        if let Some(max_update_batch_size) = &state.data.max_update_batch_size {
+            metadata.push((
+                "icrc7:max_update_batch_size".to_string(),
+                ICRC3Value::Nat(max_update_batch_size.clone()),
+            ));
+        }
+
+        if let Some(default_take_value) = &state.data.default_take_value {
+            metadata.push((
+                "icrc7:default_take_value".to_string(),
+                ICRC3Value::Nat(default_take_value.clone()),
+            ));
+        }
+
+        if let Some(max_take_value) = &state.data.max_take_value {
+            metadata.push((
+                "icrc7:max_take_value".to_string(),
+                ICRC3Value::Nat(max_take_value.clone()),
+            ));
+        }
+
+        if let Some(max_memo_size) = &state.data.max_memo_size {
+            metadata.push((
+                "icrc7:max_memo_size".to_string(),
+                ICRC3Value::Nat(max_memo_size.clone()),
+            ));
+        }
+
+        if let Some(atomic_batch_transfers) = &state.data.atomic_batch_transfers {
+            metadata.push((
+                "icrc7:atomic_batch_transfers".to_string(),
+                ICRC3Value::Text(atomic_batch_transfers.to_string()),
+            ));
+        }
+
+        if let Some(tx_window) = &state.data.tx_window {
+            metadata.push((
+                "icrc7:tx_window".to_string(),
+                ICRC3Value::Nat(tx_window.clone()),
+            ));
+        }
+
+        if let Some(permitted_drift) = &state.data.permitted_drift {
+            metadata.push((
+                "icrc7:permitted_drift".to_string(),
+                ICRC3Value::Nat(permitted_drift.clone()),
+            ));
+        }
+
+        metadata.sort_by(|a, b| a.0.cmp(&b.0));
+        metadata
+    })
 }
 
 #[query]
