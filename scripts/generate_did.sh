@@ -23,7 +23,7 @@ if [[ $# -gt 0 ]]; then
         exit
         ;;
       -o | --output )
-        shift; outpath=$1
+        outpath=$2
         ;;
       -d | --dry-run )
         dryrun=1
@@ -38,11 +38,11 @@ else
   exit 1
 fi
 
-defaultpath="src/$1/api"
-did_path="${outpath:-$defaultpath}"
+output_path=$outpath
+echo "output_path: ${output_path}"
 if [[ $dryrun -eq 1 ]]; then
-  echo -e "This would be written to ${did_path}/${1}.did :\n"
-  candid-extractor "src/$1/target/wasm32-unknown-unknown/release/${1}.wasm"
+  echo -e "This would be written to ${output_path}/${1}.did :\n"
+  candid-extractor "$1"
 else
-  candid-extractor "src/$1/target/wasm32-unknown-unknown/release/${1}.wasm" > $did_path/can.did
+  candid-extractor "$1" > $output_path
 fi

@@ -1,8 +1,8 @@
 use crate::core_suite::setup::setup_core::setup_core_canister;
 use crate::utils::random_principal;
-use bity_ic_types::{BuildVersion, CanisterId, Milliseconds};
-use candid::{CandidType, Deserialize, Nat, Principal};
-use core_nft::init::{InitApprovalsArg, InitArgs};
+use bity_ic_types::{CanisterId, Milliseconds};
+use candid::{CandidType, Deserialize, Principal};
+use core_nft::init::InitArgs;
 use core_nft::lifecycle::Args;
 use pocket_ic::{PocketIc, PocketIcBuilder};
 
@@ -26,7 +26,6 @@ pub struct TestEnv {
     pub pic: PocketIc,
 }
 
-use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Debug;
 use std::fmt::Formatter;
@@ -38,7 +37,7 @@ impl Debug for TestEnv {
     }
 }
 pub struct TestEnvBuilder {
-    controller: Principal,
+    pub controller: Principal,
     nft_owner1: Principal,
     nft_owner2: Principal,
     collection_id: CanisterId,
@@ -65,7 +64,7 @@ impl TestEnvBuilder {
         self
     }
 
-    pub fn build(&mut self) -> TestEnv {
+    pub fn build(&mut self, init_args: InitArgs) -> TestEnv {
         println!("Start building TestEnv");
 
         let mut pic = PocketIcBuilder::new()
@@ -84,32 +83,7 @@ impl TestEnvBuilder {
 
         println!("collection_id: {}", self.collection_id.to_text());
 
-        let nft_init_args = Args::Init(InitArgs {
-            test_mode: true,
-            version: BuildVersion::min(),
-            commit_hash: "commit_hash".to_string(),
-            authorized_principals: vec![self.controller.clone()],
-            minting_authorities: vec![self.controller.clone()],
-            description: None,
-            symbol: "MC".to_string(),
-            name: "MyCollection".to_string(),
-            logo: None,
-            supply_cap: Some(Nat::from(10u64)),
-            max_query_batch_size: None,
-            max_update_batch_size: None,
-            max_take_value: None,
-            default_take_value: None,
-            max_memo_size: None,
-            atomic_batch_transfers: None,
-            tx_window: None,
-            permitted_drift: None,
-            max_canister_storage_threshold: None,
-            collection_metadata: HashMap::new(),
-            approval_init: InitApprovalsArg {
-                max_approvals_per_token_or_collection: Some(Nat::from(10u64)),
-                max_revoke_approvals: Some(Nat::from(10u64)),
-            },
-        });
+        let nft_init_args = Args::Init(init_args);
 
         let collection_canister_id =
             setup_core_canister(&mut pic, self.collection_id, nft_init_args, self.controller);

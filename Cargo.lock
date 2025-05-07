@@ -202,16 +202,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f68f53c83ab957f72c32642f3868eec03eb974d1fb82e453128456482613d36"
 
 [[package]]
-name = "bity-ic-candid-gen"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23f8b4742ab2c770ff0a315dc17cab6ae766d3b56609a95b88d793cee21252e8"
-dependencies = [
- "quote",
- "syn 2.0.100",
-]
-
-[[package]]
 name = "bity-ic-canister-client"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -640,7 +630,6 @@ dependencies = [
  "ic-stable-structures",
  "ic0",
  "icrc-ledger-types 0.1.8",
- "icrc_ledger_canister_c2c_client",
  "lazy_static",
  "serde",
  "serde_bytes",
@@ -1719,27 +1708,6 @@ dependencies = [
  "strum",
  "strum_macros",
  "time",
-]
-
-[[package]]
-name = "icrc_ledger_canister"
-version = "0.1.0"
-dependencies = [
- "bity-ic-candid-gen",
- "candid",
- "icrc-ledger-types 0.1.8",
- "serde",
-]
-
-[[package]]
-name = "icrc_ledger_canister_c2c_client"
-version = "0.1.0"
-dependencies = [
- "bity-ic-canister-client",
- "bity-ic-types",
- "candid",
- "ic-cdk",
- "icrc_ledger_canister",
 ]
 
 [[package]]
@@ -3226,7 +3194,6 @@ dependencies = [
  "ic-ledger-types",
  "ic-stable-structures",
  "icrc-ledger-types 0.1.8",
- "icrc_ledger_canister_c2c_client",
  "serde",
  "serde_bytes",
  "serde_json",
@@ -3261,7 +3228,6 @@ dependencies = [
  "ic-stable-structures",
  "ic0",
  "icrc-ledger-types 0.1.8",
- "icrc_ledger_canister_c2c_client",
  "serde",
  "serde_bytes",
  "serde_json",
