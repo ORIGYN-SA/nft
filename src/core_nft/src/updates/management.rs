@@ -199,8 +199,6 @@ pub async fn update_nft_metadata(
         }
     }
 
-    // TODO add transactions logs
-
     Ok(token_name_hash.clone())
 }
 
