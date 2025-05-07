@@ -1,6 +1,8 @@
 pub mod collection_metadata;
 pub mod fund_manager;
 pub mod http;
+pub mod icrc10;
+pub mod icrc21;
 pub mod icrc3;
 pub mod icrc37;
 pub mod icrc7;
@@ -13,6 +15,8 @@ pub mod transaction;
 
 pub use collection_metadata::*;
 pub use fund_manager::*;
+pub use icrc10::*;
+pub use icrc21::*;
 pub use icrc3::*;
 pub use icrc37::*;
 pub use icrc7::*;
