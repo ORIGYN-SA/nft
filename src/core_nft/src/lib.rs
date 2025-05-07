@@ -1,5 +1,7 @@
 use ic_cdk::export_candid;
 
+use crate::types::icrc10;
+use crate::types::icrc21;
 use crate::types::icrc7;
 use crate::types::management;
 use storage_api_canister::updates::cancel_upload;
