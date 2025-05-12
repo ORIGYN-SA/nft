@@ -5,6 +5,7 @@ members = [
     "src/storage_canister",
     "src/storage_api_canister",
     "src/external_canisters/storage_canister/c2c_client",
+    "cmdline"
 ]
 resolver = "2"
 

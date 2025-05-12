@@ -5,13 +5,10 @@ use storage_api_canister::delete_file;
 use storage_api_canister::finalize_upload;
 use storage_api_canister::init_upload;
 use storage_api_canister::store_chunk;
-use tracing::info;
 // use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
-use super::http;
 use super::http::{certify_asset, uncertify_asset};
 use crate::memory::get_data_storage_memory;
 use crate::memory::VM;
-use crate::state::read_state;
 use crate::utils::trace;
 use hex;
 use ic_cdk::api::stable::{stable_size, WASM_PAGE_SIZE_IN_BYTES};
@@ -20,17 +17,11 @@ use ic_stable_structures::StableBTreeMap;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use storage_api_canister::types::storage::UploadState;
 use storage_api_canister::types::value_custom::CustomValue as Value;
 use storage_api_canister::utils;
 
 const DEFAULT_CHUNK_SIZE: u64 = 1 * 1024 * 1024;
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub enum UploadState {
-    Init,
-    InProgress,
-    Finalized,
-}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct InternalRawStorageMetadata {
@@ -167,6 +158,7 @@ impl StorageData {
         &mut self,
         data: init_upload::Args,
     ) -> Result<init_upload::InitUploadResp, String> {
+        trace(&format!("init_upload - file_path: {:?}", data.file_path));
         // Check if the file already exists
         if self
             .storage_raw_internal_metadata
@@ -303,8 +295,14 @@ impl StorageData {
 
         self.storage_raw_internal_metadata
             .insert(data.file_path.clone(), metadata.clone());
-        self.storage_raw.insert(data.file_path, file_data.clone());
+        self.storage_raw
+            .insert(data.file_path.clone(), file_data.clone());
         // certify_asset(vec![Asset::new(metadata.file_path, file_data)]);
+
+        trace(&format!(
+            "finalize_upload - file_path: {:?}",
+            data.file_path
+        ));
 
         Ok(finalize_upload::FinalizeUploadResp {})
     }
@@ -361,12 +359,20 @@ impl StorageData {
     pub fn cache_miss(&self, path: String) -> Result<(), String> {
         trace(&format!("cache_miss: {:?}", path));
 
+        let path = if path.starts_with('/') {
+            path[1..].to_string()
+        } else {
+            path
+        };
+
         let free_heap_size = self.get_free_heap_size_bytes();
 
         let metadata = self
             .storage_raw_internal_metadata
             .get(&path.clone())
             .ok_or("Upload not initialized".to_string())?;
+
+        trace(&format!("cache_miss metadata: {:?}", metadata));
 
         if metadata.state != UploadState::Finalized {
             trace(&format!(

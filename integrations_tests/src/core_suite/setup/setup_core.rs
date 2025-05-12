@@ -1,5 +1,6 @@
 use crate::wasms::CORE_WASM;
 use candid::encode_one;
+use candid::types::value::IDLValue;
 use candid::Principal;
 use core_nft::lifecycle::Args;
 use pocket_ic::PocketIc;
@@ -20,6 +21,11 @@ pub fn setup_core_canister(
     )
     .unwrap();
     pic.tick();
+
+    println!(
+        "ret IDLValue {:?}",
+        IDLValue::try_from_candid_type(&&args).unwrap()
+    );
 
     pic.install_canister(
         core_canister_id,

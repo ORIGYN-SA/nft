@@ -2,14 +2,35 @@
   "canisters": {
     "storage": {
       "build": ["./scripts/build.sh ./src storage_canister"],
-      "candid": "src/storage_canister/api/can.did",
+      "candid": "src/storage_canister/wasm/can.did",
       "declarations": {
         "bindings": ["js", "did"],
         "env_override": null,
         "output": "src/storage_canister/api/declarations"
       },
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ],
       "type": "custom",
       "wasm": "src/storage_canister/wasm/storage_canister_canister.wasm.gz"
+    },
+    "core_nft": {
+      "build": ["./scripts/build.sh ./src core_nft"],
+      "candid": "src/core_nft/wasm/can.did",
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ],
+      "declarations": {
+        "bindings": ["js", "did"],
+        "env_override": null,
+        "output": "src/core_nft/api/declarations"
+      },
+      "type": "custom",
+      "wasm": "src/core_nft/wasm/core_nft_canister.wasm.gz"
     }
   },
   "defaults": {

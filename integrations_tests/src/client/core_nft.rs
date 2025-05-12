@@ -42,8 +42,6 @@ generate_pocket_query_call!(icrc7_tx_window);
 generate_pocket_query_call!(icrc7_permitted_drift);
 generate_pocket_query_call!(icrc7_owner_of);
 generate_pocket_query_call!(icrc7_balance_of);
-generate_pocket_query_call!(icrc7_tokens);
-generate_pocket_query_call!(icrc7_tokens_of);
 generate_pocket_query_call!(icrc3_get_archives);
 generate_pocket_query_call!(icrc3_get_blocks);
 generate_pocket_query_call!(icrc3_get_properties);
@@ -53,8 +51,6 @@ generate_pocket_query_call!(icrc3_supported_block_types);
 generate_pocket_query_call!(icrc37_is_approved);
 generate_pocket_query_call!(icrc37_max_approvals_per_token_or_collection);
 generate_pocket_query_call!(icrc37_max_revoke_approvals);
-generate_pocket_query_call!(icrc37_get_token_approvals);
-generate_pocket_query_call!(icrc37_get_collection_approvals);
 
 generate_pocket_update_call!(icrc7_token_metadata);
 

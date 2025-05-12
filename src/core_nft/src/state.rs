@@ -11,6 +11,7 @@ use bity_ic_types::{BuildVersion, TimestampNanos};
 use bity_ic_types::{Cycles, TimestampMillis};
 use bity_ic_utils::env::{CanisterEnv, Environment};
 use bity_ic_utils::memory::MemorySize;
+use storage_api_canister::types::storage::UploadState;
 
 use candid::{CandidType, Nat, Principal};
 use icrc_ledger_types::icrc1::account::Account;
@@ -265,13 +266,6 @@ pub struct CanisterInfo {
     pub commit_hash: String,
     pub memory_used: MemorySize,
     pub cycles_balance: Cycles,
-}
-
-#[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub enum UploadState {
-    Init,
-    InProgress,
-    Finalized,
 }
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
