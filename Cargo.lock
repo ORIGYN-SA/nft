@@ -307,9 +307,9 @@ dependencies = [
 
 [[package]]
 name = "bity-ic-icrc3"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d889503568ebff8141b4dd254f0ea9c7ae28304fb241983987e5a62769643d69"
+checksum = "c24166449096b20ad5c9e9d034e778629ee8d43a0d85fbecbce00313aa210629"
 dependencies = [
  "bity-ic-icrc3-archive-api",
  "bity-ic-icrc3-archive-c2c-client",
@@ -400,9 +400,9 @@ dependencies = [
 
 [[package]]
 name = "bity-ic-subcanister-manager"
-version = "0.2.2"
+version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc3f5a83104aa0a29f79e6e06c4500f8eca26d997a84077dab02951ae410f9eb"
+checksum = "0322c3dbdf6b8e5d18ea87e93c56d013e8d17104ddf606331cf0119e0b00dc3d"
 dependencies = [
  "bity-ic-utils",
  "candid",
@@ -572,9 +572,9 @@ dependencies = [
 
 [[package]]
 name = "canfund"
-version = "0.7.0"
+version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b23c9f11d24d5a101a0ed297ace8b76261737ba9654f3ddfeb35a3d73c33d230"
+checksum = "d7491b967ee1b9167c3beab5a2b762085af3309ddcfd803e728090cdc222a8f0"
 dependencies = [
  "async-trait",
  "candid",

@@ -1,4 +1,4 @@
-use crate::types::icrc7;
+use crate::{types::icrc7, utils::trace};
 use candid::Nat;
 use ic_cdk_macros::query;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value;
@@ -186,7 +186,7 @@ pub fn icrc7_permitted_drift() -> icrc7::icrc7_permitted_drift::Response {
     read_state(|state| state.data.permitted_drift.clone())
 }
 
-#[query]
+#[query(composite = true)]
 pub async fn icrc7_token_metadata(
     token_ids: icrc7::icrc7_token_metadata::Args,
 ) -> icrc7::icrc7_token_metadata::Response {

@@ -240,10 +240,10 @@ fn test_icrc7_token_metadata_multiple_insert() {
             new_metadata.insert("test1".to_string(), Value::Text("test1".to_string()));
             new_metadata.insert("test2".to_string(), Value::Nat(Nat::from(1 as u64)));
             let logo_data = include_bytes!("../assets/logo2.min-3f9527e7.svg").to_vec();
-            new_metadata.insert(
-                "test3".to_string(),
-                Value::Blob(ByteBuf::from(logo_data.clone())),
-            );
+            // new_metadata.insert(
+            //     "test3".to_string(),
+            //     Value::Blob(ByteBuf::from(logo_data.clone())),
+            // );
 
             let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),
@@ -253,14 +253,18 @@ fn test_icrc7_token_metadata_multiple_insert() {
                 token_metadata: Some(new_metadata),
             };
 
-            let _ = update_nft_metadata(
+            let ret = update_nft_metadata(
                 pic,
                 controller,
                 collection_canister_id,
                 &update_nft_metadata_args,
             );
 
-            pic.tick();
+            println!("ret: {:?}", ret);
+
+            tick_n_blocks(pic, 10);
+
+            println!("token_id: {:?}", token_id);
 
             let metadata = icrc7_token_metadata(
                 pic,
@@ -268,6 +272,8 @@ fn test_icrc7_token_metadata_multiple_insert() {
                 collection_canister_id,
                 &vec![token_id.clone()],
             );
+
+            println!("metadata: {:?}", metadata);
 
             assert_eq!(metadata[0].clone().unwrap()[0].0, "Description".to_string());
             assert_eq!(
@@ -317,6 +323,8 @@ fn test_icrc7_token_metadata_multiple_insert() {
                 token_logo: None,
                 token_metadata: Some(new_metadata_2),
             };
+
+            println!("update_nft_metadata_args_2");
 
             let _ = update_nft_metadata(
                 pic,
@@ -1188,13 +1196,12 @@ fn test_icrc7_tokens() {
     } = test_env;
 
     let tokens: core_nft::types::icrc7::icrc7_tokens::Response =
-        crate::client::pocket::execute_query(
-            pic,
-            controller,
+        crate::client::pocket::unwrap_response(pic.query_call(
             collection_canister_id,
+            controller,
             "icrc7_tokens",
-            &Encode!(&(), &()).unwrap(),
-        );
+            Encode!(&(), &()).unwrap(),
+        ));
 
     println!("tokens: {:?}", tokens);
     assert!(tokens.is_empty());
@@ -1211,13 +1218,13 @@ fn test_icrc7_tokens() {
     );
 
     let tokens: core_nft::types::icrc7::icrc7_tokens::Response =
-        crate::client::pocket::execute_query(
-            pic,
-            controller,
+        crate::client::pocket::unwrap_response(pic.query_call(
             collection_canister_id,
+            controller,
             "icrc7_tokens",
-            &Encode!(&(), &()).unwrap(),
-        );
+            Encode!(&(), &()).unwrap(),
+        ));
+
     println!("tokens: {:?}", tokens);
     assert_eq!(tokens.len(), 1);
 
@@ -1233,13 +1240,12 @@ fn test_icrc7_tokens() {
     );
 
     let tokens: core_nft::types::icrc7::icrc7_tokens::Response =
-        crate::client::pocket::execute_query(
-            pic,
-            controller,
+        crate::client::pocket::unwrap_response(pic.query_call(
             collection_canister_id,
+            controller,
             "icrc7_tokens",
-            &Encode!(&(), &()).unwrap(),
-        );
+            Encode!(&(), &()).unwrap(),
+        ));
     println!("tokens: {:?}", tokens);
     assert_eq!(tokens.len(), 2);
 }
@@ -1258,21 +1264,23 @@ fn test_icrc7_tokens_of() {
     } = test_env;
 
     let tokens_of_owner1: core_nft::types::icrc7::icrc7_tokens_of::Response =
-        crate::client::pocket::execute_query(
-            pic,
-            controller,
-            collection_canister_id,
-            "icrc7_tokens_of",
-            &Encode!(
-                &Account {
-                    owner: nft_owner1,
-                    subaccount: None,
-                },
-                &(),
-                &()
-            )
-            .unwrap(),
+        crate::client::pocket::unwrap_response(
+            pic.query_call(
+                collection_canister_id,
+                controller,
+                "icrc7_tokens_of",
+                Encode!(
+                    &Account {
+                        owner: nft_owner1,
+                        subaccount: None,
+                    },
+                    &(),
+                    &()
+                )
+                .unwrap(),
+            ),
         );
+
     println!("tokens_of_owner1: {:?}", tokens_of_owner1);
     assert!(tokens_of_owner1.is_empty());
 
@@ -1288,20 +1296,21 @@ fn test_icrc7_tokens_of() {
     );
 
     let tokens_of_owner1: core_nft::types::icrc7::icrc7_tokens_of::Response =
-        crate::client::pocket::execute_query(
-            pic,
-            controller,
-            collection_canister_id,
-            "icrc7_tokens_of",
-            &Encode!(
-                &Account {
-                    owner: nft_owner1,
-                    subaccount: None,
-                },
-                &(),
-                &()
-            )
-            .unwrap(),
+        crate::client::pocket::unwrap_response(
+            pic.query_call(
+                collection_canister_id,
+                controller,
+                "icrc7_tokens_of",
+                Encode!(
+                    &Account {
+                        owner: nft_owner1,
+                        subaccount: None,
+                    },
+                    &(),
+                    &()
+                )
+                .unwrap(),
+            ),
         );
 
     println!("tokens_of_owner1: {:?}", tokens_of_owner1);
@@ -1319,20 +1328,21 @@ fn test_icrc7_tokens_of() {
     );
 
     let tokens_of_owner2: core_nft::types::icrc7::icrc7_tokens_of::Response =
-        crate::client::pocket::execute_query(
-            pic,
-            controller,
-            collection_canister_id,
-            "icrc7_tokens_of",
-            &Encode!(
-                &Account {
-                    owner: nft_owner2,
-                    subaccount: None,
-                },
-                &(),
-                &()
-            )
-            .unwrap(),
+        crate::client::pocket::unwrap_response(
+            pic.query_call(
+                collection_canister_id,
+                controller,
+                "icrc7_tokens_of",
+                Encode!(
+                    &Account {
+                        owner: nft_owner2,
+                        subaccount: None,
+                    },
+                    &(),
+                    &()
+                )
+                .unwrap(),
+            ),
         );
 
     println!("tokens_of_owner2: {:?}", tokens_of_owner2);

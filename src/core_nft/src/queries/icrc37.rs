@@ -86,13 +86,6 @@ fn icrc37_get_collection_approvals(
             .map(|n| usize::try_from(n.0).unwrap_or(10))
             .unwrap_or(10);
 
-        trace(&format!(
-            "state
-            .data
-            .collection_approvals: {:?}",
-            state.data.collection_approvals
-        ));
-
         let mut all_approvals: Vec<icrc37_get_collection_approvals::CollectionApproval> = state
             .data
             .collection_approvals
@@ -120,8 +113,6 @@ fn icrc37_get_collection_approvals(
                 .created_at_time
                 .cmp(&a.approval_info.created_at_time)
         });
-
-        trace(&format!("all_approvals: {:?}", all_approvals));
 
         let start_index = if let Some(prev_approval) = prev {
             all_approvals

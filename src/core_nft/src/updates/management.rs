@@ -221,9 +221,11 @@ pub async fn update_nft_metadata(
 
     match token_list.contains_key(&token_name_hash.clone()) {
         true => {
+            trace(&format!("token_list: true"));
             let mut token = token_list.get(&token_name_hash.clone()).unwrap().clone();
             let mut metadata_map = BTreeMap::new();
             if let Some(name) = req.token_name {
+                trace(&format!("name: {:?}", name));
                 token.token_name = name.clone();
                 metadata_map.insert(
                     "icrc7:token_name".to_string(),
@@ -231,6 +233,7 @@ pub async fn update_nft_metadata(
                 );
             }
             if let Some(description) = req.token_description {
+                trace(&format!("description: {:?}", description));
                 token.token_description = Some(description.clone());
                 metadata_map.insert(
                     "icrc7:token_description".to_string(),
@@ -238,6 +241,7 @@ pub async fn update_nft_metadata(
                 );
             }
             if let Some(logo) = req.token_logo {
+                trace(&format!("logo: {:?}", logo));
                 token.token_logo = Some(logo.clone());
                 metadata_map.insert(
                     "icrc7:token_logo".to_string(),
@@ -549,14 +553,16 @@ pub fn get_all_uploads(
     prev: Option<Nat>,
     take: Option<Nat>,
 ) -> management::get_all_uploads::Response {
+    trace(&format!("prev: {:?}, take: {:?}", prev, take));
     let all_uploads = read_state(|state| state.internal_filestorage.clone());
-    let start = prev.unwrap_or(Nat::from(0u64));
-    let end = take.unwrap_or(Nat::from(100u64));
+    let start: usize = usize::try_from(prev.unwrap_or(Nat::from(0u64)).0).unwrap_or(0);
+    let end: usize = usize::try_from(take.unwrap_or(Nat::from(100u64)).0).unwrap_or(100);
+    trace(&format!("start: {:?}, end: {:?}", start, end));
     let filtered_uploads: HashMap<String, UploadState> = all_uploads
         .map
         .iter()
-        .skip(start.0.try_into().unwrap_or(0))
-        .take(end.0.try_into().unwrap_or(100))
+        .skip(start)
+        .take(end)
         .map(|(path, status)| (path.clone(), status.state.clone()))
         .collect();
 
