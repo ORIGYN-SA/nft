@@ -1,8 +1,6 @@
-use candid::{CandidType, Nat};
-use serde::{Deserialize, Serialize};
-// use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
-use crate::types::value_custom::CustomValue as Value;
+use candid::CandidType;
 use ic_cdk::api::call::CallResult as Result;
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, CandidType, Clone, Debug)]
 pub struct Args {

@@ -307,9 +307,9 @@ dependencies = [
 
 [[package]]
 name = "bity-ic-icrc3"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c24166449096b20ad5c9e9d034e778629ee8d43a0d85fbecbce00313aa210629"
+checksum = "f557e0d424b1ca859956fd39e665db5565b7a3f1793dffba10cdf4e6c8518f79"
 dependencies = [
  "bity-ic-icrc3-archive-api",
  "bity-ic-icrc3-archive-c2c-client",
@@ -400,14 +400,15 @@ dependencies = [
 
 [[package]]
 name = "bity-ic-subcanister-manager"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0322c3dbdf6b8e5d18ea87e93c56d013e8d17104ddf606331cf0119e0b00dc3d"
+checksum = "cf9416071f0864db356c362f967a07cc4f4048f1230da584285bf47daf1fd32d"
 dependencies = [
  "bity-ic-utils",
  "candid",
  "canfund",
  "ic-cdk",
+ "ic0",
  "serde",
 ]
 

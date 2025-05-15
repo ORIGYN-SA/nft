@@ -1,8 +1,8 @@
-use crate::types::collection_metadata::CollectionMetadata;
 use crate::types::icrc37::{CollectionApprovals, TokenApprovals};
 use crate::types::nft::Icrc7Token;
 use crate::types::sub_canister;
 use crate::types::sub_canister::StorageSubCanisterManager;
+use crate::types::Metadata;
 
 use bity_ic_canister_state_macros::canister_state;
 use bity_ic_icrc3::transaction::TransactionType;
@@ -85,7 +85,7 @@ pub struct Data {
     pub tx_window: Option<Nat>,
     pub permitted_drift: Option<Nat>,
     pub max_canister_storage_threshold: Option<Nat>,
-    pub collection_metadata: CollectionMetadata,
+    pub metadata: Metadata,
     pub tokens_list: HashMap<Nat, Icrc7Token>,
     pub approval_init: InitApprovalsArg,
     pub sub_canister_manager: StorageSubCanisterManager,
@@ -116,7 +116,7 @@ impl Data {
         tx_window: Option<Nat>,
         max_canister_storage_threshold: Option<Nat>,
         permitted_drift: Option<Nat>,
-        collection_metadata: CollectionMetadata,
+        metadata: Metadata,
         approval_init: InitApprovalsArg,
     ) -> Self {
         let sub_canister_manager = StorageSubCanisterManager::new(
@@ -158,7 +158,7 @@ impl Data {
             tx_window,
             permitted_drift,
             max_canister_storage_threshold,
-            collection_metadata,
+            metadata,
             tokens_list: HashMap::new(),
             approval_init,
             sub_canister_manager,
@@ -236,7 +236,7 @@ impl Clone for Data {
             tx_window: self.tx_window.clone(),
             permitted_drift: self.permitted_drift.clone(),
             max_canister_storage_threshold: self.max_canister_storage_threshold.clone(),
-            collection_metadata: self.collection_metadata.clone(),
+            metadata: self.metadata.clone(),
             tokens_list: self.tokens_list.clone(),
             approval_init: self.approval_init.clone(),
             sub_canister_manager: self.sub_canister_manager.clone(),

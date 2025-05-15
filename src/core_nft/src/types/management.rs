@@ -1,12 +1,12 @@
-use std::collections::HashMap;
+use crate::types::value_custom::CustomValue;
 
 use candid::{CandidType, Nat, Principal};
 use ic_cdk::api::call::CallResult as Result;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
 use icrc_ledger_types::icrc1::account::Account;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use storage_api_canister::types::storage::UploadState;
-use storage_api_canister::types::value_custom::CustomValue;
 
 pub mod mint {
     use super::*;

@@ -240,10 +240,10 @@ fn test_icrc7_token_metadata_multiple_insert() {
             new_metadata.insert("test1".to_string(), Value::Text("test1".to_string()));
             new_metadata.insert("test2".to_string(), Value::Nat(Nat::from(1 as u64)));
             let logo_data = include_bytes!("../assets/logo2.min-3f9527e7.svg").to_vec();
-            // new_metadata.insert(
-            //     "test3".to_string(),
-            //     Value::Blob(ByteBuf::from(logo_data.clone())),
-            // );
+            new_metadata.insert(
+                "test3".to_string(),
+                Value::Blob(ByteBuf::from(logo_data.clone())),
+            );
 
             let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),

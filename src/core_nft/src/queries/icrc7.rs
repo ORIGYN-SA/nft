@@ -1,4 +1,4 @@
-use crate::{types::icrc7, utils::trace};
+use crate::types::icrc7;
 use candid::Nat;
 use ic_cdk_macros::query;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value;
@@ -186,8 +186,8 @@ pub fn icrc7_permitted_drift() -> icrc7::icrc7_permitted_drift::Response {
     read_state(|state| state.data.permitted_drift.clone())
 }
 
-#[query(composite = true)]
-pub async fn icrc7_token_metadata(
+#[query]
+pub fn icrc7_token_metadata(
     token_ids: icrc7::icrc7_token_metadata::Args,
 ) -> icrc7::icrc7_token_metadata::Response {
     let mut ret = Vec::new();
@@ -195,7 +195,7 @@ pub async fn icrc7_token_metadata(
         let token = read_state(|state| state.data.get_token_by_id(&token_id).cloned());
         match token {
             Some(token) => {
-                let metadata = token.token_metadata().await;
+                let metadata = read_state(|state| token.token_metadata(&state.data.metadata));
                 let mut metadata_vec: Vec<(String, ICRC3Value)> = metadata.into_iter().collect();
                 metadata_vec.sort_by(|a, b| a.0.cmp(&b.0));
                 ret.push(Some(metadata_vec));

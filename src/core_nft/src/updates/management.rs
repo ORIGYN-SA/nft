@@ -1,6 +1,5 @@
 use crate::guards::{caller_is_governance_principal, caller_is_minting_authority, GuardManagement};
 use crate::state::{icrc3_add_transaction, mutate_state, read_state, InternalFilestorageData};
-use crate::types::collection_metadata::CollectionMetadata;
 use crate::types::http::{add_redirection, remove_redirection};
 use crate::types::sub_canister::StorageCanister;
 use crate::types::transaction::{Icrc3Transaction, TransactionData};
@@ -115,7 +114,10 @@ pub async fn update_collection_metadata(
 
     if let Some(collection_metadata) = req.collection_metadata {
         mutate_state(|state| {
-            state.data.collection_metadata = CollectionMetadata::from(collection_metadata);
+            state
+                .data
+                .metadata
+                .erase_all_data(None, collection_metadata);
         });
     }
 
@@ -248,9 +250,7 @@ pub async fn update_nft_metadata(
                     Icrc3Value::Text(logo.clone()),
                 );
             }
-            if let Some(metadata) = req.token_metadata {
-                trace(&format!("Adding metadata to token: {:?}", metadata));
-                token.add_metadata(metadata.clone()).await;
+            if let Some(metadata) = req.token_metadata.clone() {
                 let mut btree_metadata = BTreeMap::new();
                 for (key, value) in metadata {
                     btree_metadata.insert(key.clone(), value.clone());
@@ -288,6 +288,14 @@ pub async fn update_nft_metadata(
                     ));
                 }
             };
+
+            if let Some(metadata) = req.token_metadata {
+                trace(&format!("Adding metadata to token: {:?}", metadata));
+
+                mutate_state(|state| {
+                    token.add_metadata(&mut state.data.metadata, metadata.clone());
+                });
+            }
 
             mutate_state(|state| {
                 state
