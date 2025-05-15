@@ -14,10 +14,12 @@ use icrc_ledger_types::icrc1::account::Account;
 #[update]
 pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_transfer::Response {
     if args.is_empty() {
-        return vec![Some(Err((
-            RejectionCode::CanisterError,
-            "No argument provided".to_string(),
-        )))];
+        return vec![Some(Err(
+            icrc7::icrc7_transfer::TransferError::GenericError {
+                error_code: Nat::from(0u64),
+                message: "No argument provided".to_string(),
+            },
+        ))];
     }
 
     let (max_update_batch_size, atomic_batch_transfers, tx_window, permitted_drift) =
@@ -36,30 +38,31 @@ pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_t
 
     let max_batch_size = usize::try_from(max_update_batch_size.0).unwrap();
     if args.len() > max_batch_size {
-        return vec![Some(Err((
-            RejectionCode::CanisterError,
-            "Exceed Max allowed Update Batch Size".to_string(),
-        )))];
+        return vec![Some(Err(
+            icrc7::icrc7_transfer::TransferError::GenericError {
+                error_code: Nat::from(0u64),
+                message: "Exceed Max allowed Update Batch Size".to_string(),
+            },
+        ))];
     }
 
     if ic_cdk::caller() == Principal::anonymous() {
-        return vec![Some(Err((
-            RejectionCode::CanisterError,
-            "Anonymous Identity".to_string(),
-        )))];
+        return vec![Some(Err(
+            icrc7::icrc7_transfer::TransferError::InvalidRecipient,
+        ))];
     }
 
     let current_time = ic_cdk::api::time();
-    let mut txn_results = vec![None; args.len()];
+    let mut txn_results: icrc7::icrc7_transfer::Response = vec![None; args.len()];
+
     for (index, arg) in args.iter().enumerate() {
         let mut nft: nft::Icrc7Token =
             match mutate_state(|state| state.data.tokens_list.get(&arg.token_id).cloned()) {
                 Some(token) => token,
                 None => {
-                    txn_results[index] = Some(Err((
-                        RejectionCode::CanisterError,
-                        "Token does not exist".to_string(),
-                    )));
+                    txn_results[index] = Some(Err(
+                        icrc7::icrc7_transfer::TransferError::NonExistingTokenId,
+                    ));
                     continue;
                 }
             };
@@ -67,7 +70,11 @@ pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_t
         match check_memo(arg.memo.clone()) {
             Ok(_) => {}
             Err(e) => {
-                txn_results[index] = Some(Err((RejectionCode::CanisterError, e)));
+                txn_results[index] =
+                    Some(Err(icrc7::icrc7_transfer::TransferError::GenericError {
+                        error_code: Nat::from(0u64),
+                        message: e,
+                    }));
                 continue;
             }
         }
@@ -75,10 +82,7 @@ pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_t
         let caller_as_principal = ic_cdk::caller();
 
         if nft.token_owner.owner != caller_as_principal {
-            txn_results[index] = Some(Err((
-                RejectionCode::CanisterError,
-                "Token owner does not match the sender".to_string(),
-            )));
+            txn_results[index] = Some(Err(icrc7::icrc7_transfer::TransferError::InvalidRecipient));
             continue;
         }
 
@@ -88,18 +92,12 @@ pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_t
         };
 
         if arg.to == anonymous_account {
-            txn_results[index] = Some(Err((
-                RejectionCode::CanisterError,
-                "Invalid recipient".to_string(),
-            )));
+            txn_results[index] = Some(Err(icrc7::icrc7_transfer::TransferError::InvalidRecipient));
             continue;
         }
 
         if nft.token_owner == arg.to {
-            txn_results[index] = Some(Err((
-                RejectionCode::CanisterError,
-                "Cannot transfer to the same owner".to_string(),
-            )));
+            txn_results[index] = Some(Err(icrc7::icrc7_transfer::TransferError::InvalidRecipient));
             continue;
         }
 
@@ -112,10 +110,9 @@ pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_t
             .unwrap_or(icrc7::DEFAULT_PERMITTED_DRIFT);
 
         if time > current_time + drift {
-            txn_results[index] = Some(Err((
-                RejectionCode::CanisterError,
-                format!("CreatedInFuture {{ ledger_time: {} }}", current_time),
-            )));
+            txn_results[index] = Some(Err(icrc7::icrc7_transfer::TransferError::CreatedInFuture {
+                ledger_time: Nat::from(current_time),
+            }));
             continue;
         }
 
@@ -125,7 +122,7 @@ pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_t
             .unwrap_or(icrc7::DEFAULT_TX_WINDOW);
 
         if time < current_time.saturating_sub(tx_window + drift) {
-            txn_results[index] = Some(Err((RejectionCode::CanisterError, "TooOld".to_string())));
+            txn_results[index] = Some(Err(icrc7::icrc7_transfer::TransferError::TooOld));
             continue;
         }
 
@@ -147,14 +144,15 @@ pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_t
         };
 
         match icrc3_add_transaction(transaction).await {
-            Ok(_) => {
-                txn_results[index] = Some(Ok(()));
+            Ok(transaction_id) => {
+                txn_results[index] = Some(Ok(Nat::from(transaction_id)));
             }
             Err(e) => {
-                txn_results[index] = Some(Err((
-                    RejectionCode::CanisterError,
-                    format!("Failed to log transaction: {}", e),
-                )));
+                txn_results[index] =
+                    Some(Err(icrc7::icrc7_transfer::TransferError::GenericError {
+                        error_code: Nat::from(0u64),
+                        message: format!("Failed to log transaction: {}", e),
+                    }));
             }
         }
 

@@ -194,7 +194,9 @@ pub mod icrc37_get_token_approvals {
         pub approval_info: ApprovalInfo,
     }
 
-    pub type Args = (Nat, Option<TokenApproval>, Option<Nat>);
+    pub type Args0 = Nat;
+    pub type Args1 = Option<TokenApproval>;
+    pub type Args2 = Option<Nat>;
     pub type Response = Vec<TokenApproval>;
 }
 
@@ -206,7 +208,9 @@ pub mod icrc37_get_collection_approvals {
         pub approval_info: ApprovalInfo,
     }
 
-    pub type Args = (Account, Option<CollectionApproval>, Option<Nat>);
+    pub type Args0 = Account;
+    pub type Args1 = Option<CollectionApproval>;
+    pub type Args2 = Option<Nat>;
     pub type Response = Vec<CollectionApproval>;
 }
 

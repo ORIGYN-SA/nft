@@ -5,8 +5,9 @@ use crate::lifecycle::init_canister;
 use crate::lifecycle::Args;
 pub use crate::state::InitApprovalsArg;
 use crate::state::{init_icrc3, Data, RuntimeState};
-use crate::types::collection_metadata::CollectionMetadata;
 use crate::types::http::certify_all_assets;
+use crate::types::value_custom::CustomValue as Value;
+use crate::types::Metadata;
 
 use bity_ic_canister_tracing_macros::trace;
 use bity_ic_icrc3::config::{ICRC3Config, ICRC3Properties};
@@ -17,7 +18,6 @@ use candid::{CandidType, Nat};
 use ic_cdk_macros::init;
 use icrc_ledger_types::icrc3::blocks::SupportedBlockType;
 use serde::{Deserialize, Serialize};
-use storage_api_canister::value_custom::CustomValue as Value;
 use tracing::info;
 
 #[derive(CandidType, Serialize, Deserialize, Debug)]
@@ -30,7 +30,7 @@ pub struct InitArgs {
     pub description: Option<String>,
     pub symbol: String,
     pub name: String,
-    pub logo: Option<Vec<u8>>,
+    pub logo: Option<String>,
     pub supply_cap: Option<Nat>,
     pub max_query_batch_size: Option<Nat>,
     pub max_update_batch_size: Option<Nat>,
@@ -56,9 +56,17 @@ fn init(args: Args) {
                 init_args.version,
                 init_args.commit_hash.clone(),
             );
-            let collection_metadata: CollectionMetadata =
-                CollectionMetadata::from(init_args.collection_metadata);
-            // let collection_metadata = CollectionMetadata::new();
+            let metadata: Metadata = Metadata::from(init_args.collection_metadata);
+
+            match init_args.logo.clone() {
+                Some(logo) => {
+                    let logo_url = logo.clone();
+                    if let Err(_) = url::Url::parse(&logo_url) {
+                        ic_cdk::trap(&format!("Invalid logo URL: {}", logo_url));
+                    }
+                }
+                None => {}
+            };
 
             let mut data = Data::new(
                 init_args.test_mode,
@@ -80,7 +88,7 @@ fn init(args: Args) {
                 init_args.tx_window.clone(),
                 init_args.permitted_drift,
                 init_args.max_canister_storage_threshold,
-                collection_metadata,
+                metadata,
                 init_args.approval_init,
             );
 

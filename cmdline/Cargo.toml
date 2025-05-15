@@ -1,0 +1,17 @@
+[package]
+name = "origyn_icrc7_cmdlinetools"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.37" }
+ic-agent = "0.40.0"
+candid = "0.10.13"
+sha2 = "0.10.2"
+anyhow = "1.0.57"
+serde = { version = "1.0.137", features = ["derive"] }
+tokio = { version = "1.19.2", features = ["full"] }
+icrc-ledger-types = "0.1.5"
+serde_bytes = "0.11.12"
+
+core_nft = { path = "../src/core_nft" }

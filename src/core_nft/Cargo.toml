@@ -32,6 +32,7 @@ ic-asset-certification = { workspace = true}
 ic-http-certification = { workspace = true}
 lazy_static = { workspace = true }
 sha2 = { workspace = true }
+url = { workspace = true }
 
 bity-ic-canister-logger = { workspace = true }
 bity-ic-canister-state-macros = { workspace = true }

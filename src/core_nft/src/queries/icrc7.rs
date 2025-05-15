@@ -1,6 +1,5 @@
 use crate::types::icrc7;
 use candid::Nat;
-use ic_cdk::update;
 use ic_cdk_macros::query;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value;
 
@@ -32,14 +31,8 @@ pub fn icrc7_collection_metadata() -> icrc7::icrc7_collection_metadata::Response
             ));
         }
 
-        if state.data.logo.is_some() {
-            metadata.push((
-                "icrc7:logo".to_string(),
-                ICRC3Value::Text(format!(
-                    "https://{}.raw.icp0.io/logo",
-                    ic_cdk::id().to_text()
-                )),
-            ));
+        if let Some(logo) = &state.data.logo {
+            metadata.push(("icrc7:logo".to_string(), ICRC3Value::Text(logo.clone())));
         }
 
         if let Some(supply_cap) = &state.data.supply_cap {
@@ -127,14 +120,7 @@ pub fn icrc7_description() -> icrc7::icrc7_description::Response {
 
 #[query]
 pub fn icrc7_logo() -> icrc7::icrc7_logo::Response {
-    if let Some(_) = read_state(|state| state.data.logo.clone()) {
-        Some(format!(
-            "https://{}.raw.icp0.io/logo",
-            ic_cdk::id().to_text()
-        ))
-    } else {
-        None
-    }
+    read_state(|state| state.data.logo.clone())
 }
 
 #[query]
@@ -187,8 +173,8 @@ pub fn icrc7_permitted_drift() -> icrc7::icrc7_permitted_drift::Response {
     read_state(|state| state.data.permitted_drift.clone())
 }
 
-#[update]
-pub async fn icrc7_token_metadata(
+#[query]
+pub fn icrc7_token_metadata(
     token_ids: icrc7::icrc7_token_metadata::Args,
 ) -> icrc7::icrc7_token_metadata::Response {
     let mut ret = Vec::new();
@@ -196,7 +182,7 @@ pub async fn icrc7_token_metadata(
         let token = read_state(|state| state.data.get_token_by_id(&token_id).cloned());
         match token {
             Some(token) => {
-                let metadata = token.token_metadata().await;
+                let metadata = read_state(|state| token.token_metadata(&state.data.metadata));
                 let mut metadata_vec: Vec<(String, ICRC3Value)> = metadata.into_iter().collect();
                 metadata_vec.sort_by(|a, b| a.0.cmp(&b.0));
                 ret.push(Some(metadata_vec));
@@ -232,19 +218,21 @@ pub fn icrc7_balance_of(
 }
 
 #[query]
-pub fn icrc7_tokens(args: icrc7::icrc7_tokens::Args) -> icrc7::icrc7_tokens::Response {
+pub fn icrc7_tokens(
+    prev: icrc7::icrc7_tokens::Args0,
+    take: icrc7::icrc7_tokens::Args1,
+) -> icrc7::icrc7_tokens::Response {
     read_state(|state| {
-        let prev = args.0.unwrap_or(Nat::from(0 as u64));
+        let prev = prev.unwrap_or(Nat::from(0 as u64));
         let take: usize = usize::try_from(
-            args.1
-                .unwrap_or_else(|| {
-                    state
-                        .data
-                        .default_take_value
-                        .clone()
-                        .unwrap_or(Nat::from(icrc7::DEFAULT_TAKE_VALUE))
-                })
-                .0,
+            take.unwrap_or_else(|| {
+                state
+                    .data
+                    .default_take_value
+                    .clone()
+                    .unwrap_or(Nat::from(icrc7::DEFAULT_TAKE_VALUE))
+            })
+            .0,
         )
         .unwrap_or(icrc7::DEFAULT_TAKE_VALUE);
 
@@ -259,9 +247,12 @@ pub fn icrc7_tokens(args: icrc7::icrc7_tokens::Args) -> icrc7::icrc7_tokens::Res
 }
 
 #[query]
-pub fn icrc7_tokens_of(args: icrc7::icrc7_tokens_of::Args) -> icrc7::icrc7_tokens_of::Response {
+pub fn icrc7_tokens_of(
+    account: icrc7::icrc7_tokens_of::Args0,
+    prev: icrc7::icrc7_tokens_of::Args1,
+    take: icrc7::icrc7_tokens_of::Args2,
+) -> icrc7::icrc7_tokens_of::Response {
     read_state(|state| {
-        let (account, prev, take) = args;
         let prev = prev.unwrap_or(Nat::from(0 as u64));
         let take: usize = usize::try_from(
             take.unwrap_or_else(|| {

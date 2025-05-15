@@ -1,25 +1,14 @@
-use crate::client::storage::{
-    cancel_upload, delete_file, finalize_upload, get_data, get_storage_size, http_request,
-    init_upload, insert_data, remove_data, store_chunk, update_data,
-};
+use crate::client::storage::{finalize_upload, init_upload, store_chunk};
 use crate::storage_suite::setup::setup_storage::upgrade_storage_canister;
 use bity_ic_types::BuildVersion;
 use candid::Nat;
 use storage_api_canister::lifecycle::Args;
 use storage_api_canister::post_upgrade::UpgradeArgs;
 
-use http::StatusCode;
-use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
 use sha2::{Digest, Sha256};
-use storage_api_canister::cancel_upload;
-use storage_api_canister::delete_file;
 use storage_api_canister::finalize_upload;
 use storage_api_canister::init_upload;
 use storage_api_canister::store_chunk;
-use storage_api_canister::updates::insert_data;
-use storage_api_canister::updates::remove_data;
-use storage_api_canister::updates::update_data;
-use storage_api_canister::value_custom::CustomValue;
 
 use crate::storage_suite::setup::setup::TestEnv;
 use crate::{storage_suite::setup::default_test_setup, utils::tick_n_blocks};
@@ -58,7 +47,7 @@ fn test_storage_after_update_simple() {
     let file_hash = hasher.finalize();
 
     let file_type = "image/png".to_string();
-    let media_hash_id = "test.png".to_string();
+    let media_hash_id = "/test.png".to_string();
 
     let init_upload_resp = init_upload(
         pic,

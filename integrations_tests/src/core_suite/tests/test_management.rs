@@ -1,14 +1,15 @@
 use crate::client::core_nft::{
-    cancel_upload, delete_file, finalize_upload, init_upload, mint, remove_authorized_principals,
-    remove_minting_authorities, store_chunk, update_authorized_principals,
-    update_minting_authorities, update_nft_metadata,
+    cancel_upload, delete_file, finalize_upload, get_upload_status, init_upload, mint,
+    remove_authorized_principals, remove_minting_authorities, store_chunk,
+    update_authorized_principals, update_collection_metadata, update_minting_authorities,
+    update_nft_metadata,
 };
-use candid::{Nat, Principal};
+use candid::{Encode, Nat, Principal};
 use icrc_ledger_types::icrc1::account::Account;
 
 use core_nft::types::management::{
     mint, remove_authorized_principals, remove_minting_authorities, update_authorized_principals,
-    update_minting_authorities, update_nft_metadata,
+    update_collection_metadata, update_minting_authorities, update_nft_metadata,
 };
 use http::StatusCode;
 use ic_cdk::println;
@@ -18,6 +19,7 @@ use storage_api_canister::delete_file;
 use storage_api_canister::finalize_upload;
 use storage_api_canister::init_upload;
 use storage_api_canister::store_chunk;
+use storage_api_canister::types::storage::UploadState;
 
 use crate::core_suite::setup::default_test_setup;
 use crate::core_suite::setup::setup::TestEnv;
@@ -27,6 +29,7 @@ use http::Request;
 use http_body_util::BodyExt;
 use ic_agent::Agent;
 use ic_http_gateway::{HttpGatewayClient, HttpGatewayRequestArgs};
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -1456,4 +1459,223 @@ fn test_add_then_remove_minting_authorities_unauthorized() {
         }),
     );
     assert!(matches!(result, Err((_, _))), "mint should panic");
+}
+
+#[test]
+fn test_get_upload_status() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let file_path = "./src/storage_suite/assets/test.png";
+    let upload_path = "/test_status.png";
+    let upload_path2 = "/test_status2.png";
+
+    let status_before = get_upload_status(
+        pic,
+        controller,
+        collection_canister_id,
+        &upload_path.to_string(),
+    );
+    assert!(
+        matches!(status_before, Err((_, _))),
+        "Should return error for non-existent upload"
+    );
+
+    let init_upload_resp = init_upload(
+        pic,
+        controller,
+        collection_canister_id,
+        &(init_upload::Args {
+            file_path: upload_path2.to_string(),
+            file_hash: "dummy_hash".to_string(),
+            file_size: 1024,
+            chunk_size: None,
+        }),
+    );
+    assert!(init_upload_resp.is_ok(), "Init upload should succeed");
+
+    let status_after_init = get_upload_status(
+        pic,
+        controller,
+        collection_canister_id,
+        &upload_path2.to_string(),
+    );
+    assert!(
+        matches!(status_after_init, Ok(UploadState::Init)),
+        "Should return Init state"
+    );
+
+    let _ = upload_file(
+        pic,
+        controller,
+        collection_canister_id,
+        file_path,
+        upload_path,
+    )
+    .expect("Upload failed");
+
+    let status_after_upload = get_upload_status(
+        pic,
+        controller,
+        collection_canister_id,
+        &upload_path.to_string(),
+    );
+    assert!(
+        matches!(status_after_upload, Ok(UploadState::Finalized)),
+        "Should return Finalized state"
+    );
+}
+
+#[test]
+fn test_get_all_uploads() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let file_path = "./src/storage_suite/assets/test.png";
+    let mut upload_paths = Vec::new();
+
+    for i in 0..3 {
+        let upload_path = format!("/test_all_uploads_{}.png", i);
+        let _ = upload_file(
+            pic,
+            controller,
+            collection_canister_id,
+            file_path,
+            &upload_path,
+        )
+        .expect("Upload failed");
+        upload_paths.push(upload_path);
+    }
+
+    let all_uploads: core_nft::types::management::get_all_uploads::Response =
+        crate::client::pocket::unwrap_response(pic.query_call(
+            collection_canister_id,
+            controller,
+            "get_all_uploads",
+            Encode!(&(), &()).unwrap(),
+        ));
+
+    assert_eq!(all_uploads.unwrap().len(), 3, "Should return all 3 uploads");
+
+    // Test pagination
+    let first_page: core_nft::types::management::get_all_uploads::Response =
+        crate::client::pocket::unwrap_response(pic.query_call(
+            collection_canister_id,
+            controller,
+            "get_all_uploads",
+            Encode!(&Some(Nat::from(0u64)), &Some(Nat::from(2u64))).unwrap(),
+        ));
+
+    assert_eq!(
+        first_page.unwrap().len(),
+        2,
+        "Should return 2 uploads for first page"
+    );
+
+    let second_page: core_nft::types::management::get_all_uploads::Response =
+        crate::client::pocket::unwrap_response(pic.query_call(
+            collection_canister_id,
+            controller,
+            "get_all_uploads",
+            Encode!(&Some(Nat::from(2u64)), &Some(Nat::from(2u64))).unwrap(),
+        ));
+
+    assert_eq!(
+        second_page.unwrap().len(),
+        1,
+        "Should return 1 upload for second page"
+    );
+}
+
+#[test]
+fn test_update_collection_metadata() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    // Test updating collection metadata
+    let result = update_collection_metadata(
+        pic,
+        controller,
+        collection_canister_id,
+        &(update_collection_metadata::Args {
+            description: Some("Test Description".to_string()),
+            symbol: Some("TEST".to_string()),
+            name: Some("Test Collection".to_string()),
+            logo: Some("https://google.com/test.png".to_string()),
+            supply_cap: Some(Nat::from(1000u64)),
+            max_query_batch_size: Some(Nat::from(100u64)),
+            max_update_batch_size: Some(Nat::from(50u64)),
+            max_take_value: Some(Nat::from(200u64)),
+            default_take_value: Some(Nat::from(20u64)),
+            max_memo_size: Some(Nat::from(32u64)),
+            atomic_batch_transfers: Some(true),
+            tx_window: Some(Nat::from(3600u64)),
+            permitted_drift: Some(Nat::from(60u64)),
+            max_canister_storage_threshold: Some(Nat::from(1000000u64)),
+            collection_metadata: Some(HashMap::new()),
+        }),
+    );
+    assert!(
+        result.is_ok(),
+        "Should update collection metadata successfully"
+    );
+}
+
+#[test]
+#[should_panic]
+fn test_update_collection_metadata_unauthorized() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    // Test unauthorized update
+    let unauthorized_result = update_collection_metadata(
+        pic,
+        nft_owner1,
+        collection_canister_id,
+        &(update_collection_metadata::Args {
+            description: Some("Unauthorized Update".to_string()),
+            symbol: None,
+            name: None,
+            logo: None,
+            supply_cap: None,
+            max_query_batch_size: None,
+            max_update_batch_size: None,
+            max_take_value: None,
+            default_take_value: None,
+            max_memo_size: None,
+            atomic_batch_transfers: None,
+            tx_window: None,
+            permitted_drift: None,
+            max_canister_storage_threshold: None,
+            collection_metadata: None,
+        }),
+    );
+    assert!(
+        matches!(unauthorized_result, Err((_, _))),
+        "Should fail for unauthorized principal"
+    );
 }

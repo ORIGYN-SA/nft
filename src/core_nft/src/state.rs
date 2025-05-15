@@ -1,8 +1,8 @@
-use crate::types::collection_metadata::CollectionMetadata;
 use crate::types::icrc37::{CollectionApprovals, TokenApprovals};
 use crate::types::nft::Icrc7Token;
 use crate::types::sub_canister;
 use crate::types::sub_canister::StorageSubCanisterManager;
+use crate::types::Metadata;
 
 use bity_ic_canister_state_macros::canister_state;
 use bity_ic_icrc3::transaction::TransactionType;
@@ -11,6 +11,7 @@ use bity_ic_types::{BuildVersion, TimestampNanos};
 use bity_ic_types::{Cycles, TimestampMillis};
 use bity_ic_utils::env::{CanisterEnv, Environment};
 use bity_ic_utils::memory::MemorySize;
+use storage_api_canister::types::storage::UploadState;
 
 use candid::{CandidType, Nat, Principal};
 use icrc_ledger_types::icrc1::account::Account;
@@ -73,7 +74,7 @@ pub struct Data {
     pub description: Option<String>,
     pub symbol: String,
     pub name: String,
-    pub logo: Option<Vec<u8>>,
+    pub logo: Option<String>,
     pub supply_cap: Option<Nat>,
     pub max_query_batch_size: Option<Nat>,
     pub max_update_batch_size: Option<Nat>,
@@ -84,12 +85,14 @@ pub struct Data {
     pub tx_window: Option<Nat>,
     pub permitted_drift: Option<Nat>,
     pub max_canister_storage_threshold: Option<Nat>,
-    pub collection_metadata: CollectionMetadata,
+    pub metadata: Metadata,
     pub tokens_list: HashMap<Nat, Icrc7Token>,
     pub approval_init: InitApprovalsArg,
     pub sub_canister_manager: StorageSubCanisterManager,
     pub token_approvals: TokenApprovals,
     pub collection_approvals: CollectionApprovals,
+    pub last_token_id: Nat,
+    pub media_redirections: HashMap<String, String>,
     // pub archive_init: Option<InitArchiveArg>,
 }
 
@@ -104,7 +107,7 @@ impl Data {
         description: Option<String>,
         symbol: String,
         name: String,
-        logo: Option<Vec<u8>>,
+        logo: Option<String>,
         supply_cap: Option<Nat>,
         max_query_batch_size: Option<Nat>,
         max_update_batch_size: Option<Nat>,
@@ -115,7 +118,7 @@ impl Data {
         tx_window: Option<Nat>,
         max_canister_storage_threshold: Option<Nat>,
         permitted_drift: Option<Nat>,
-        collection_metadata: CollectionMetadata,
+        metadata: Metadata,
         approval_init: InitApprovalsArg,
     ) -> Self {
         let sub_canister_manager = StorageSubCanisterManager::new(
@@ -157,12 +160,14 @@ impl Data {
             tx_window,
             permitted_drift,
             max_canister_storage_threshold,
-            collection_metadata,
+            metadata,
             tokens_list: HashMap::new(),
             approval_init,
             sub_canister_manager,
             token_approvals: HashMap::new(),
             collection_approvals: HashMap::new(),
+            last_token_id: Nat::from(1u64), // 0 is the reserved value for the collection metadata
+            media_redirections: HashMap::new(),
         }
     }
 
@@ -235,12 +240,14 @@ impl Clone for Data {
             tx_window: self.tx_window.clone(),
             permitted_drift: self.permitted_drift.clone(),
             max_canister_storage_threshold: self.max_canister_storage_threshold.clone(),
-            collection_metadata: self.collection_metadata.clone(),
+            metadata: self.metadata.clone(),
             tokens_list: self.tokens_list.clone(),
             approval_init: self.approval_init.clone(),
             sub_canister_manager: self.sub_canister_manager.clone(),
             token_approvals: self.token_approvals.clone(),
             collection_approvals: self.collection_approvals.clone(),
+            last_token_id: self.last_token_id.clone(),
+            media_redirections: self.media_redirections.clone(),
         }
     }
 }
@@ -265,13 +272,6 @@ pub struct CanisterInfo {
     pub commit_hash: String,
     pub memory_used: MemorySize,
     pub cycles_balance: Cycles,
-}
-
-#[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub enum UploadState {
-    Init,
-    InProgress,
-    Finalized,
 }
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug)]

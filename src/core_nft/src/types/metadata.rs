@@ -1,89 +1,205 @@
-use crate::utils::trace;
-use candid::{CandidType, Nat};
+use crate::memory::VM;
+use crate::types::value_custom::CustomValue as Value;
+use crate::{memory::get_metadata_nft_memory, utils::trace};
+
+use candid::{CandidType, Decode, Encode, Nat};
+use ic_stable_structures::{storable::Bound, StableBTreeMap, Storable};
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::collections::HashMap;
-use storage_api_canister::types::value_custom::CustomValue as Value;
 
-use crate::{
-    state::{mutate_state, read_state},
-    types::sub_canister::StorageCanister,
-};
+#[derive(Serialize, Deserialize, CandidType, Clone, Debug)]
+pub struct MetadataData {
+    pub data: HashMap<String, Value>,
+}
 
-#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+impl Storable for MetadataData {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(Encode!(self).unwrap())
+    }
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Decode!(&bytes, Self).unwrap()
+    }
+
+    const BOUND: Bound = Bound::Unbounded;
+}
+
+#[derive(Serialize, Deserialize, CandidType, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct NatWrapper(Nat);
+
+impl Storable for NatWrapper {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(Encode!(self).unwrap())
+    }
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Decode!(&bytes, Self).unwrap()
+    }
+
+    const BOUND: Bound = Bound::Unbounded;
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct Metadata {
-    data: HashMap<String, (String, StorageCanister)>,
+    #[serde(skip, default = "init_storage_raw")]
+    data: StableBTreeMap<NatWrapper, MetadataData, VM>,
+}
+
+impl Clone for Metadata {
+    fn clone(&self) -> Self {
+        Self {
+            data: init_storage_raw(),
+        }
+    }
+}
+
+fn init_storage_raw() -> StableBTreeMap<NatWrapper, MetadataData, VM> {
+    let memory = get_metadata_nft_memory();
+    StableBTreeMap::init(memory)
 }
 
 impl Metadata {
     pub fn new() -> Self {
         Self {
-            data: HashMap::new(),
+            data: init_storage_raw(),
         }
     }
 
     pub fn from(metadata: HashMap<String, Value>) -> Self {
         let mut new = Self {
-            data: HashMap::new(),
+            data: init_storage_raw(),
         };
 
         for (key, value) in metadata.iter() {
-            futures::executor::block_on(new.insert_data(None, key.clone(), value.clone()));
+            new.insert_data(None, key.clone(), value.clone());
         }
 
         new
     }
 
-    pub async fn insert_data(&mut self, nft_id: Option<Nat>, data_id: String, data: Value) {
+    pub fn insert_data(&mut self, nft_id: Option<Nat>, data_id: String, data: Value) {
         trace(&format!("Inserting data: {:?}", data_id));
-        let mut sub_canister_manager = read_state(|state| state.data.sub_canister_manager.clone());
 
-        match sub_canister_manager
-            .insert_data(data.clone(), data_id.clone(), nft_id.clone())
-            .await
+        let nat_wrapper = NatWrapper(nft_id.unwrap_or(Nat::from(0u64)));
+
+        let mut metadata_data = if let Some(existing_data) = self.data.get(&nat_wrapper) {
+            existing_data.data.clone()
+        } else {
+            HashMap::new()
+        };
+
+        metadata_data.insert(data_id, data);
+
+        self.data.insert(
+            nat_wrapper,
+            MetadataData {
+                data: metadata_data,
+            },
+        );
+    }
+
+    pub fn get_data(&self, nft_id: Option<Nat>, data_id: String) -> Result<Value, String> {
+        trace(&format!("Getting data: {:?}", data_id));
+        let metadata_data = self
+            .data
+            .get(&NatWrapper(nft_id.unwrap_or(Nat::from(0u64))))
+            .ok_or("Data not found".to_string())?;
+
+        match metadata_data
+            .data
+            .get(&data_id)
+            .ok_or("Data not found".to_string())
         {
-            Ok((hash_id, canister)) => {
-                self.data.insert(data_id, (hash_id, canister));
-            }
-            Err(e) => {
-                trace(&format!("Error inserting data: {:?}", e));
-                println!("Error inserting data: {:?}", e);
-            }
+            Ok(data) => Ok(data.clone()),
+            Err(e) => Err(e),
         }
-
-        mutate_state(|state| {
-            state.data.sub_canister_manager = sub_canister_manager;
-        });
     }
 
-    pub async fn get_data(&self, data_id: String) -> Result<Value, String> {
-        let (hash_id, canister) = self.data.get(&data_id).unwrap();
-        let data = read_state(|state| state.data.sub_canister_manager.clone());
-
-        data.get_data(canister.clone(), hash_id.clone()).await
-    }
-
-    pub async fn get_all_data(&self) -> HashMap<String, Value> {
+    pub fn get_all_data(&self, nft_id: Option<Nat>) -> Result<HashMap<String, Value>, String> {
+        trace(&format!("Getting all data for nft: {:?}", nft_id));
         let mut all_data = HashMap::new();
-        trace(&format!("Getting all data: {:?}", self.data));
 
-        for (data_id, (hash_id, canister)) in self.data.iter() {
-            let data = read_state(|state| state.data.sub_canister_manager.clone());
-
-            match data.get_data(canister.clone(), hash_id.clone()).await {
-                Ok(value) => {
-                    all_data.insert(data_id.to_string(), value);
+        if let Some(nft_id) = nft_id {
+            trace(&format!("Getting data for nft: {:?}", nft_id));
+            let metadata_data = self
+                .data
+                .get(&NatWrapper(nft_id))
+                .ok_or("Data not found".to_string());
+            trace(&format!("Metadata data: {:?}", metadata_data));
+            match metadata_data {
+                Ok(metadata_data) => {
+                    trace(&format!("Metadata data: {:?}", metadata_data));
+                    for (key, value) in metadata_data.data.iter() {
+                        trace(&format!("Key: {:?}, Value: {:?}", key, value));
+                        all_data.insert(key.clone(), value.clone());
+                    }
                 }
-                Err(e) => {
-                    trace(&format!("Error getting data: {:?}", e));
-                    println!("Error getting data: {:?}", e);
+                Err(e) => return Err(e),
+            }
+        } else {
+            for (_, metadata_data) in self.data.iter() {
+                for (key, value) in metadata_data.data.iter() {
+                    all_data.insert(key.clone(), value.clone());
                 }
             }
         }
 
-        all_data
+        Ok(all_data)
     }
 
-    // pub fn update_data(&mut self, key: String, value: Principal) {
-    //     self.data.insert(key, value);
-    // }
+    pub fn get_all_nfts_ids(&self) -> Result<Vec<Nat>, String> {
+        trace("Getting all nfts ids");
+        let mut all_nfts_ids = Vec::new();
+
+        for (key, _) in self.data.iter() {
+            all_nfts_ids.push(key.0.clone());
+        }
+
+        Ok(all_nfts_ids)
+    }
+
+    pub fn update_data(
+        &mut self,
+        nft_id: Option<Nat>,
+        data_id: String,
+        data: Value,
+    ) -> Result<Option<Value>, String> {
+        trace(&format!("Updating data: {:?}", data_id));
+        let metadata_data = self
+            .data
+            .get(&NatWrapper(nft_id.clone().unwrap_or(Nat::from(0u64))))
+            .ok_or("Data not found".to_string())?;
+
+        let mut metadata_data = metadata_data.clone();
+
+        let old_value = metadata_data.data.get(&data_id).cloned();
+
+        metadata_data.data.insert(data_id, data);
+
+        self.data
+            .insert(NatWrapper(nft_id.unwrap_or(Nat::from(0u64))), metadata_data);
+
+        trace(&format!("Old value: {:?}", old_value));
+
+        Ok(old_value)
+    }
+
+    pub fn delete_data(&mut self, nft_id: Option<Nat>, data_id: String) {
+        trace(&format!("Deleting data: {:?}", data_id));
+        let mut metadata_data = self
+            .data
+            .get(&NatWrapper(nft_id.unwrap_or(Nat::from(0u64))))
+            .unwrap();
+
+        metadata_data.data.remove(&data_id);
+    }
+
+    pub fn erase_all_data(&mut self, nft_id: Option<Nat>, datas: HashMap<String, Value>) {
+        trace(&format!("Erasing all data for nft: {:?}", nft_id));
+        self.data
+            .remove(&NatWrapper(nft_id.clone().unwrap_or(Nat::from(0u64))));
+
+        for (key, value) in datas.iter() {
+            self.insert_data(nft_id.clone(), key.clone(), value.clone());
+        }
+    }
 }

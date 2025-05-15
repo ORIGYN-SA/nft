@@ -1,12 +1,12 @@
-use super::NftMetadata;
+use super::Metadata;
+use crate::types::value_custom::CustomValue as Value;
 use crate::utils::trace;
+
 use candid::{CandidType, Decode, Encode, Nat};
 use ic_stable_structures::{storable::Bound, Storable};
 use icrc_ledger_types::{icrc::generic_value::ICRC3Value as Icrc3Value, icrc1::account::Account};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use storage_api_canister::types::value_custom::CustomValue as Value;
-use tracing::info;
 
 pub type Icrc7TokenMetadata = HashMap<String, Icrc3Value>;
 
@@ -17,7 +17,6 @@ pub struct Icrc7Token {
     pub token_description: Option<String>,
     pub token_logo: Option<String>,
     pub token_owner: Account,
-    pub token_metadata: NftMetadata,
 }
 
 impl Storable for Icrc7Token {
@@ -46,7 +45,6 @@ impl Icrc7Token {
             token_logo,
             token_owner,
             token_description,
-            token_metadata: NftMetadata::new(),
         }
     }
 
@@ -54,7 +52,7 @@ impl Icrc7Token {
         self.token_owner = to;
     }
 
-    pub async fn token_metadata(&self) -> Icrc7TokenMetadata {
+    pub fn token_metadata(&self, tokens_metadata: &Metadata) -> Icrc7TokenMetadata {
         let mut metadata = HashMap::<String, Icrc3Value>::new();
         metadata.insert("Name".into(), Icrc3Value::Text(self.token_name.clone()));
         metadata.insert("Symbol".into(), Icrc3Value::Text(self.token_name.clone()));
@@ -65,31 +63,70 @@ impl Icrc7Token {
             metadata.insert("Logo".into(), Icrc3Value::Text(logo.clone()));
         }
 
-        trace(&format!("nft token_metadata"));
+        match tokens_metadata.get_all_data(Some(self.token_id.clone())) {
+            Ok(data) => {
+                for (key, value) in data.iter() {
+                    trace(&format!(
+                        "nft token_metadata - key: {:?}, value: {:?}",
+                        key, value
+                    ));
+                    metadata.insert(key.clone(), value.0.clone());
+                }
+            }
+            Err(e) => {
+                trace(&format!("nft token_metadata - error: {:?}", e));
+            }
+        }
 
-        self.token_metadata
-            .get_all_data()
-            .await
-            .iter()
-            .for_each(|(key, value)| {
-                trace(&format!(
-                    "nft token_metadata - key: {:?}, value: {:?}",
-                    key, value
-                ));
-                metadata.insert(key.clone(), value.0.clone());
-            });
         metadata
     }
 
-    pub async fn add_metadata(&mut self, metadata: Icrc7TokenMetadata) {
-        info!("Adding metadata to token: {:?}", metadata);
+    pub fn add_metadata(&mut self, tokens_metadata: &mut Metadata, metadata: Icrc7TokenMetadata) {
         trace(&format!("nft add_metadata"));
+
         for (key, value) in metadata.iter() {
-            self.token_metadata
-                .insert_data(self.token_id.clone(), key.clone(), Value(value.clone()))
-                .await;
+            trace(&format!(
+                "nft add_metadata - key: {:?}, value: {:?}",
+                key, value
+            ));
+            tokens_metadata.insert_data(
+                Some(self.token_id.clone()),
+                key.clone(),
+                Value(value.clone()),
+            );
         }
+
         trace(&format!("nft add_metadata - finished"));
+    }
+
+    pub async fn remove_metadata(&mut self, tokens_metadata: &mut Metadata) {
+        trace(&format!("nft remove_metadata"));
+
+        tokens_metadata.delete_data(Some(self.token_id.clone()), "metadata".into());
+
+        trace(&format!("nft remove_metadata - finished"));
+    }
+
+    pub async fn update_metadata(
+        &mut self,
+        tokens_metadata: &mut Metadata,
+        metadata: Icrc7TokenMetadata,
+    ) -> Result<Option<Value>, String> {
+        trace(&format!("nft update_metadata"));
+
+        for (key, value) in metadata.iter() {
+            tokens_metadata
+                .update_data(
+                    Some(self.token_id.clone()),
+                    key.clone(),
+                    Value(value.clone()),
+                )
+                .unwrap();
+        }
+
+        trace(&format!("nft update_metadata - finished"));
+
+        Ok(None)
     }
 
     fn burn(&mut self) {

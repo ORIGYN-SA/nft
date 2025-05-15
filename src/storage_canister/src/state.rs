@@ -8,7 +8,6 @@ use bity_ic_types::{Cycles, TimestampMillis};
 use bity_ic_utils::env::{CanisterEnv, Environment};
 use bity_ic_utils::memory::MemorySize;
 use serde::{Deserialize, Serialize};
-use storage_api_canister::types::value_custom::CustomValue as Value;
 
 canister_state!(RuntimeState);
 
@@ -57,31 +56,6 @@ impl Data {
             storage: storage::StorageData::new(max_storage_size_wasm32),
             http_cache: HttpCache::default(),
         }
-    }
-
-    pub fn insert_data(
-        &mut self,
-        data: Value,
-        data_id: String,
-        nft_id: Option<Nat>,
-    ) -> Result<String, String> {
-        self.storage.insert_data(data, data_id, nft_id)
-    }
-
-    pub fn update_data(
-        &mut self,
-        hash_id: String,
-        data: Value,
-    ) -> Result<(String, Option<Value>), String> {
-        self.storage.update_data(hash_id, data)
-    }
-
-    pub fn remove_data(&mut self, hash_id: String) -> Result<Value, String> {
-        self.storage.remove_data(hash_id)
-    }
-
-    pub fn get_data(&self, hash_id: String) -> Result<Value, String> {
-        self.storage.get_data(hash_id)
     }
 }
 

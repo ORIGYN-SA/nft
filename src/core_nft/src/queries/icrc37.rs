@@ -11,11 +11,12 @@ use std::collections::HashMap;
 
 #[query]
 fn icrc37_get_token_approvals(
-    args: icrc37_get_token_approvals::Args,
+    token_id: icrc37_get_token_approvals::Args0,
+    prev: icrc37_get_token_approvals::Args1,
+    take: icrc37_get_token_approvals::Args2,
 ) -> icrc37_get_token_approvals::Response {
     read_state(|state| {
         let mut response = Vec::new();
-        let (token_id, prev, take) = args;
 
         let take_usize = take
             .map(|n| usize::try_from(n.0).unwrap_or(10))
@@ -75,26 +76,20 @@ fn icrc37_get_token_approvals(
 
 #[query]
 fn icrc37_get_collection_approvals(
-    args: icrc37_get_collection_approvals::Args,
+    account: icrc37_get_collection_approvals::Args0,
+    prev: icrc37_get_collection_approvals::Args1,
+    take: icrc37_get_collection_approvals::Args2,
 ) -> icrc37_get_collection_approvals::Response {
     read_state(|state| {
         let mut response = Vec::new();
-        let take_usize = args
-            .2
+        let take_usize = take
             .map(|n| usize::try_from(n.0).unwrap_or(10))
             .unwrap_or(10);
-
-        trace(&format!(
-            "state
-            .data
-            .collection_approvals: {:?}",
-            state.data.collection_approvals
-        ));
 
         let mut all_approvals: Vec<icrc37_get_collection_approvals::CollectionApproval> = state
             .data
             .collection_approvals
-            .get(&args.0)
+            .get(&account)
             .unwrap_or(&HashMap::new())
             .iter()
             .map(
@@ -119,9 +114,7 @@ fn icrc37_get_collection_approvals(
                 .cmp(&a.approval_info.created_at_time)
         });
 
-        trace(&format!("all_approvals: {:?}", all_approvals));
-
-        let start_index = if let Some(prev_approval) = args.1 {
+        let start_index = if let Some(prev_approval) = prev {
             all_approvals
                 .iter()
                 .position(|approval| {

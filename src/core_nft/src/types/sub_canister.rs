@@ -4,7 +4,7 @@ use crate::utils::trace;
 use bity_ic_subcanister_manager;
 use bity_ic_subcanister_manager::Canister;
 use bity_ic_utils::retry_async::retry_async;
-use candid::{CandidType, Nat, Principal};
+use candid::{CandidType, Principal};
 use canfund::manager::options::{CyclesThreshold, FundManagerOptions, FundStrategy};
 use ic_cdk::api::management_canister::main::{canister_status, CanisterIdRecord};
 use serde::{Deserialize, Serialize};
@@ -13,11 +13,8 @@ use storage_api_canister::delete_file;
 use storage_api_canister::finalize_upload;
 use storage_api_canister::init_upload;
 use storage_api_canister::store_chunk;
-use storage_api_canister::types::value_custom::CustomValue as Value;
-use storage_api_canister::utils::get_value_size;
 use storage_canister_c2c_client::{
-    cancel_upload, delete_file, finalize_upload, get_data, get_storage_size, init_upload,
-    insert_data, store_chunk,
+    cancel_upload, delete_file, finalize_upload, get_storage_size, init_upload, store_chunk,
 };
 
 const MAX_STORAGE_SIZE: u128 = 500 * 1024 * 1024 * 1024; // 500 GiB TODO maybe we should put a be less here ?
@@ -69,79 +66,6 @@ impl StorageSubCanisterManager {
             ),
             init_args,
             upgrade_args,
-        }
-    }
-
-    pub async fn insert_data(
-        &mut self,
-        data: Value,
-        data_id: String,
-        nft_id: Option<Nat>,
-    ) -> Result<(String, StorageCanister), String> {
-        let required_space = get_value_size(data.clone());
-        trace(&format!("SubCanisterManager Insert Data : {:?}", data_id));
-        trace(&format!(
-            "SubCanisterManager required space: {:?}",
-            required_space
-        ));
-
-        for canister in self.get_subcanisters_installed() {
-            match canister.get_storage_size().await {
-                Ok(size) if size + required_space <= MAX_STORAGE_SIZE => {
-                    match canister
-                        .insert_data(data.clone(), data_id.clone(), nft_id.clone())
-                        .await
-                    {
-                        Ok(hash_id) => {
-                            return Ok((hash_id, canister.clone()));
-                        }
-                        Err(_) => {
-                            continue;
-                        }
-                    }
-                }
-                _ => {
-                    continue;
-                }
-            }
-        }
-
-        trace(&format!(
-            "SubCanisterManager no canister available found, create a new one"
-        ));
-        // if no canister has enough space, create a new one
-        match self
-            .sub_canister_manager
-            .create_canister(self.init_args.clone())
-            .await
-        {
-            Ok(new_canister) => {
-                trace(&format!(
-                    "SubCanisterManager created a new canister with principal : {:?}",
-                    Box::new(new_canister.clone())
-                ));
-
-                if let Some(storage_canister) =
-                    (*new_canister).as_any().downcast_ref::<StorageCanister>()
-                {
-                    match storage_canister
-                        .insert_data(data.clone(), data_id.clone(), nft_id.clone())
-                        .await
-                    {
-                        Ok(hash_id) => {
-                            trace(&format!(
-                                "SubCanisterManager inserted data with hash_id : {:?}",
-                                hash_id
-                            ));
-                            Ok((hash_id, storage_canister.clone()))
-                        }
-                        Err(e) => Err(format!("{e:?}")),
-                    }
-                } else {
-                    Err("Failed to cast to StorageCanister".to_string())
-                }
-            }
-            Err(e) => Err(format!("{e:?}")),
         }
     }
 
@@ -227,14 +151,6 @@ impl StorageSubCanisterManager {
             .collect()
     }
 
-    pub async fn get_data(
-        &self,
-        canister: StorageCanister,
-        hash_id: String,
-    ) -> Result<Value, String> {
-        canister.get_data(hash_id).await
-    }
-
     pub fn list_canisters(&self) -> Vec<Box<impl Canister>> {
         self.sub_canister_manager.list_canisters()
     }
@@ -316,63 +232,6 @@ impl StorageCanister {
         {
             Ok(res) => Ok(res.0.settings.controllers),
             Err(e) => Err(CanisterError::CantFindControllers(format!("{e:?}"))),
-        }
-    }
-
-    async fn insert_data(
-        &self,
-        data: Value,
-        data_id: String,
-        nft_id: Option<Nat>,
-    ) -> Result<String, String> {
-        if self.state != bity_ic_subcanister_manager::CanisterState::Installed {
-            return Err("Canister is not installed".to_string());
-        }
-
-        let res = retry_async(
-            || {
-                insert_data(
-                    self.canister_id,
-                    insert_data::Args {
-                        data: data.clone(),
-                        data_id: data_id.clone(),
-                        nft_id: nft_id.clone(),
-                    },
-                )
-            },
-            3,
-        )
-        .await;
-
-        match res {
-            Ok(data_response) => match data_response {
-                Ok(data) => Ok(data.hash_id),
-                Err(e) => Err(format!("{e:?}")),
-            },
-            Err(e) => Err(format!("{e:?}")),
-        }
-    }
-
-    pub async fn get_data(&self, hash_id: String) -> Result<Value, String> {
-        let res = retry_async(
-            || {
-                get_data(
-                    self.canister_id,
-                    get_data::Args {
-                        hash_id: hash_id.clone(),
-                    },
-                )
-            },
-            3,
-        )
-        .await;
-
-        match res {
-            Ok(_data) => match _data {
-                Ok(data) => Ok(data.data_value),
-                Err(e) => Err(format!("{e:?}")),
-            },
-            Err(e) => Err(format!("{e:?}")),
         }
     }
 
