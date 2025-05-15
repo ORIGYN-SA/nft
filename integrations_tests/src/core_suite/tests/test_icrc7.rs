@@ -3,13 +3,13 @@ use crate::client::core_nft::{
     icrc7_default_take_value, icrc7_description, icrc7_logo, icrc7_max_memo_size,
     icrc7_max_query_batch_size, icrc7_max_take_value, icrc7_max_update_batch_size, icrc7_name,
     icrc7_owner_of, icrc7_permitted_drift, icrc7_supply_cap, icrc7_symbol, icrc7_token_metadata,
-    icrc7_tokens, icrc7_tokens_of, icrc7_total_supply, icrc7_transfer, icrc7_tx_window, mint,
-    update_minting_authorities, update_nft_metadata,
+    icrc7_total_supply, icrc7_transfer, icrc7_tx_window, mint, update_minting_authorities,
+    update_nft_metadata,
 };
 use crate::core_suite::setup::setup::{TestEnv, MINUTE_IN_MS};
 use crate::utils::mint_nft;
 use crate::utils::random_principal;
-use candid::{Nat, Principal};
+use candid::{Encode, Nat, Principal};
 use core_nft::types::icrc7;
 use core_nft::types::update_nft_metadata;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
@@ -253,14 +253,18 @@ fn test_icrc7_token_metadata_multiple_insert() {
                 token_metadata: Some(new_metadata),
             };
 
-            let _ = update_nft_metadata(
+            let ret = update_nft_metadata(
                 pic,
                 controller,
                 collection_canister_id,
                 &update_nft_metadata_args,
             );
 
-            pic.tick();
+            println!("ret: {:?}", ret);
+
+            tick_n_blocks(pic, 10);
+
+            println!("token_id: {:?}", token_id);
 
             let metadata = icrc7_token_metadata(
                 pic,
@@ -268,6 +272,8 @@ fn test_icrc7_token_metadata_multiple_insert() {
                 collection_canister_id,
                 &vec![token_id.clone()],
             );
+
+            println!("metadata: {:?}", metadata);
 
             assert_eq!(metadata[0].clone().unwrap()[0].0, "Description".to_string());
             assert_eq!(
@@ -317,6 +323,8 @@ fn test_icrc7_token_metadata_multiple_insert() {
                 token_logo: None,
                 token_metadata: Some(new_metadata_2),
             };
+
+            println!("update_nft_metadata_args_2");
 
             let _ = update_nft_metadata(
                 pic,
@@ -762,14 +770,11 @@ fn test_icrc7_transfer_no_argument() {
     println!("transfer_response: {:?}", transfer_response);
     assert!(transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err());
     assert_eq!(
-        transfer_response[0]
-            .as_ref()
-            .unwrap()
-            .as_ref()
-            .err()
-            .unwrap()
-            .1,
-        "No argument provided".to_string()
+        transfer_response[0].clone().unwrap().err().unwrap(),
+        icrc7::icrc7_transfer::TransferError::GenericError {
+            error_code: Nat::from(0u64),
+            message: "No argument provided".to_string(),
+        }
     );
 }
 
@@ -809,14 +814,11 @@ fn test_icrc7_transfer_exceed_max_batch_size() {
     println!("transfer_response: {:?}", transfer_response);
     assert!(transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err());
     assert_eq!(
-        transfer_response[0]
-            .as_ref()
-            .unwrap()
-            .as_ref()
-            .err()
-            .unwrap()
-            .1,
-        "Exceed Max allowed Update Batch Size".to_string()
+        transfer_response[0].clone().unwrap().err().unwrap(),
+        icrc7::icrc7_transfer::TransferError::GenericError {
+            error_code: Nat::from(0u64),
+            message: "Exceed Max allowed Update Batch Size".to_string(),
+        }
     );
 }
 
@@ -854,14 +856,8 @@ fn test_icrc7_transfer_anonymous_identity() {
     println!("transfer_response: {:?}", transfer_response);
     assert!(transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err());
     assert_eq!(
-        transfer_response[0]
-            .as_ref()
-            .unwrap()
-            .as_ref()
-            .err()
-            .unwrap()
-            .1,
-        "Anonymous Identity".to_string()
+        transfer_response[0].clone().unwrap().err().unwrap(),
+        icrc7::icrc7_transfer::TransferError::InvalidRecipient
     );
 }
 
@@ -899,14 +895,8 @@ fn test_icrc7_transfer_non_existing_token() {
     println!("transfer_response: {:?}", transfer_response);
     assert!(transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err());
     assert_eq!(
-        transfer_response[0]
-            .as_ref()
-            .unwrap()
-            .as_ref()
-            .err()
-            .unwrap()
-            .1,
-        "Token does not exist".to_string()
+        transfer_response[0].clone().unwrap().err().unwrap(),
+        icrc7::icrc7_transfer::TransferError::NonExistingTokenId
     );
 }
 
@@ -962,14 +952,11 @@ fn test_icrc7_transfer_invalid_memo() {
                 transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err()
             );
             assert_eq!(
-                transfer_response[0]
-                    .as_ref()
-                    .unwrap()
-                    .as_ref()
-                    .err()
-                    .unwrap()
-                    .1,
-                "Exceeds Max Memo Size".to_string()
+                transfer_response[0].clone().unwrap().err().unwrap(),
+                icrc7::icrc7_transfer::TransferError::GenericError {
+                    error_code: Nat::from(0u64),
+                    message: "Exceeds Max Memo Size".to_string(),
+                }
             );
         }
         Err(e) => {
@@ -1028,14 +1015,8 @@ fn test_icrc7_transfer_unauthorized() {
                 transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err()
             );
             assert_eq!(
-                transfer_response[0]
-                    .as_ref()
-                    .unwrap()
-                    .as_ref()
-                    .err()
-                    .unwrap()
-                    .1,
-                "Token owner does not match the sender".to_string()
+                transfer_response[0].clone().unwrap().err().unwrap(),
+                icrc7::icrc7_transfer::TransferError::InvalidRecipient
             );
         }
         Err(e) => {
@@ -1094,14 +1075,8 @@ fn test_icrc7_transfer_to_same_owner() {
                 transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err()
             );
             assert_eq!(
-                transfer_response[0]
-                    .as_ref()
-                    .unwrap()
-                    .as_ref()
-                    .err()
-                    .unwrap()
-                    .1,
-                "Cannot transfer to the same owner".to_string()
+                transfer_response[0].clone().unwrap().err().unwrap(),
+                icrc7::icrc7_transfer::TransferError::InvalidRecipient
             );
         }
         Err(e) => {
@@ -1220,7 +1195,14 @@ fn test_icrc7_tokens() {
         nft_owner2,
     } = test_env;
 
-    let tokens = icrc7_tokens(pic, controller, collection_canister_id, &(None, None));
+    let tokens: core_nft::types::icrc7::icrc7_tokens::Response =
+        crate::client::pocket::unwrap_response(pic.query_call(
+            collection_canister_id,
+            controller,
+            "icrc7_tokens",
+            Encode!(&(), &()).unwrap(),
+        ));
+
     println!("tokens: {:?}", tokens);
     assert!(tokens.is_empty());
 
@@ -1235,7 +1217,14 @@ fn test_icrc7_tokens() {
         collection_canister_id,
     );
 
-    let tokens = icrc7_tokens(pic, controller, collection_canister_id, &(None, None));
+    let tokens: core_nft::types::icrc7::icrc7_tokens::Response =
+        crate::client::pocket::unwrap_response(pic.query_call(
+            collection_canister_id,
+            controller,
+            "icrc7_tokens",
+            Encode!(&(), &()).unwrap(),
+        ));
+
     println!("tokens: {:?}", tokens);
     assert_eq!(tokens.len(), 1);
 
@@ -1250,7 +1239,13 @@ fn test_icrc7_tokens() {
         collection_canister_id,
     );
 
-    let tokens = icrc7_tokens(pic, controller, collection_canister_id, &(None, None));
+    let tokens: core_nft::types::icrc7::icrc7_tokens::Response =
+        crate::client::pocket::unwrap_response(pic.query_call(
+            collection_canister_id,
+            controller,
+            "icrc7_tokens",
+            Encode!(&(), &()).unwrap(),
+        ));
     println!("tokens: {:?}", tokens);
     assert_eq!(tokens.len(), 2);
 }
@@ -1268,19 +1263,24 @@ fn test_icrc7_tokens_of() {
         nft_owner2,
     } = test_env;
 
-    let tokens_of_owner1 = icrc7_tokens_of(
-        pic,
-        controller,
-        collection_canister_id,
-        &(
-            Account {
-                owner: nft_owner1,
-                subaccount: None,
-            },
-            None,
-            None,
-        ),
-    );
+    let tokens_of_owner1: core_nft::types::icrc7::icrc7_tokens_of::Response =
+        crate::client::pocket::unwrap_response(
+            pic.query_call(
+                collection_canister_id,
+                controller,
+                "icrc7_tokens_of",
+                Encode!(
+                    &Account {
+                        owner: nft_owner1,
+                        subaccount: None,
+                    },
+                    &(),
+                    &()
+                )
+                .unwrap(),
+            ),
+        );
+
     println!("tokens_of_owner1: {:?}", tokens_of_owner1);
     assert!(tokens_of_owner1.is_empty());
 
@@ -1295,19 +1295,24 @@ fn test_icrc7_tokens_of() {
         collection_canister_id,
     );
 
-    let tokens_of_owner1 = icrc7_tokens_of(
-        pic,
-        controller,
-        collection_canister_id,
-        &(
-            Account {
-                owner: nft_owner1,
-                subaccount: None,
-            },
-            None,
-            None,
-        ),
-    );
+    let tokens_of_owner1: core_nft::types::icrc7::icrc7_tokens_of::Response =
+        crate::client::pocket::unwrap_response(
+            pic.query_call(
+                collection_canister_id,
+                controller,
+                "icrc7_tokens_of",
+                Encode!(
+                    &Account {
+                        owner: nft_owner1,
+                        subaccount: None,
+                    },
+                    &(),
+                    &()
+                )
+                .unwrap(),
+            ),
+        );
+
     println!("tokens_of_owner1: {:?}", tokens_of_owner1);
     assert_eq!(tokens_of_owner1.len(), 1);
 
@@ -1322,19 +1327,24 @@ fn test_icrc7_tokens_of() {
         collection_canister_id,
     );
 
-    let tokens_of_owner2 = icrc7_tokens_of(
-        pic,
-        controller,
-        collection_canister_id,
-        &(
-            Account {
-                owner: nft_owner2,
-                subaccount: None,
-            },
-            None,
-            None,
-        ),
-    );
+    let tokens_of_owner2: core_nft::types::icrc7::icrc7_tokens_of::Response =
+        crate::client::pocket::unwrap_response(
+            pic.query_call(
+                collection_canister_id,
+                controller,
+                "icrc7_tokens_of",
+                Encode!(
+                    &Account {
+                        owner: nft_owner2,
+                        subaccount: None,
+                    },
+                    &(),
+                    &()
+                )
+                .unwrap(),
+            ),
+        );
+
     println!("tokens_of_owner2: {:?}", tokens_of_owner2);
     assert_eq!(tokens_of_owner2.len(), 1);
 }
@@ -1519,14 +1529,8 @@ fn test_icrc7_transfer_invalid_recipient() {
                 transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err()
             );
             assert_eq!(
-                transfer_response[0]
-                    .as_ref()
-                    .unwrap()
-                    .as_ref()
-                    .err()
-                    .unwrap()
-                    .1,
-                "Invalid recipient".to_string()
+                transfer_response[0].clone().unwrap().err().unwrap(),
+                icrc7::icrc7_transfer::TransferError::InvalidRecipient
             );
         }
         Err(e) => {
@@ -1588,14 +1592,12 @@ fn test_icrc7_transfer_permitted_drift() {
             assert!(
                 transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err()
             );
-            assert!(transfer_response[0]
-                .as_ref()
-                .unwrap()
-                .as_ref()
-                .err()
-                .unwrap()
-                .1
-                .contains("CreatedInFuture"));
+            assert_eq!(
+                transfer_response[0].clone().unwrap().err().unwrap(),
+                icrc7::icrc7_transfer::TransferError::CreatedInFuture {
+                    ledger_time: Nat::from(nanos),
+                }
+            );
         }
         Err(e) => {
             println!("Error minting NFT: {:?}", e);
@@ -1729,14 +1731,8 @@ fn test_icrc7_transfer_too_old() {
                 transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err()
             );
             assert_eq!(
-                transfer_response[0]
-                    .as_ref()
-                    .unwrap()
-                    .as_ref()
-                    .err()
-                    .unwrap()
-                    .1,
-                "TooOld".to_string()
+                transfer_response[0].clone().unwrap().err().unwrap(),
+                icrc7::icrc7_transfer::TransferError::TooOld
             );
         }
         Err(e) => {

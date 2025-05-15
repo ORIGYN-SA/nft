@@ -11,6 +11,7 @@ lazy_static! {
     // pub static ref SNS_GOVERNANCE: CanisterWasm = get_canister_wasm("sns_governance");
     // pub static ref SNS_ROOT: CanisterWasm = get_canister_wasm("sns_root");
     // pub static ref ICP_LEDGER: CanisterWasm = get_canister_wasm("ledger");
+    pub static ref REGISTRY_WASM: CanisterWasm = get_canister_wasm("registry");
 
     // Wasms in particular canister folder
     pub static ref CORE_WASM: CanisterWasm = get_canister_wasm_from_bin("core_nft");
@@ -55,7 +56,7 @@ pub fn local_bin() -> PathBuf {
         std::env::var("CARGO_MANIFEST_DIR")
             .expect("Failed to read CARGO_MANIFEST_DIR env variable"),
     );
-    file_path.push("wasms");
+    file_path.push("wasm");
     file_path
 }
 

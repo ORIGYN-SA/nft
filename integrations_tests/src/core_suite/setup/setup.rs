@@ -41,6 +41,7 @@ pub struct TestEnvBuilder {
     nft_owner1: Principal,
     nft_owner2: Principal,
     collection_id: CanisterId,
+    registry_id: CanisterId,
 }
 
 impl Default for TestEnvBuilder {
@@ -50,6 +51,7 @@ impl Default for TestEnvBuilder {
             nft_owner1: random_principal(),
             nft_owner2: random_principal(),
             collection_id: Principal::from_slice(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+            registry_id: Principal::from_slice(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
         }
     }
 }
@@ -77,6 +79,13 @@ impl TestEnvBuilder {
             .build();
 
         self.collection_id = pic.create_canister_with_settings(Some(self.controller.clone()), None);
+        self.registry_id = pic
+            .create_canister_with_id(
+                Some(self.controller.clone()),
+                None,
+                Principal::from_text("rwlgt-iiaaa-aaaaa-aaaaa-cai").unwrap(),
+            )
+            .unwrap();
 
         pic.tick();
         pic.advance_time(Duration::from_millis(MINUTE_IN_MS * 10));
@@ -85,8 +94,13 @@ impl TestEnvBuilder {
 
         let nft_init_args = Args::Init(init_args);
 
-        let collection_canister_id =
-            setup_core_canister(&mut pic, self.collection_id, nft_init_args, self.controller);
+        let collection_canister_id = setup_core_canister(
+            &mut pic,
+            self.collection_id,
+            self.registry_id,
+            nft_init_args,
+            self.controller,
+        );
 
         pic.tick();
         pic.advance_time(Duration::from_millis(MINUTE_IN_MS * 30));

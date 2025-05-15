@@ -1,14 +1,14 @@
 use crate::client::core_nft::{
-    icrc37_approve_collection, icrc37_approve_tokens, icrc37_get_collection_approvals,
-    icrc37_get_token_approvals, icrc37_is_approved, icrc37_max_approvals_per_token_or_collection,
-    icrc37_max_revoke_approvals, icrc37_revoke_collection_approvals, icrc37_revoke_token_approvals,
-    icrc37_transfer_from, icrc7_owner_of,
+    icrc37_approve_collection, icrc37_approve_tokens, icrc37_is_approved,
+    icrc37_max_approvals_per_token_or_collection, icrc37_max_revoke_approvals,
+    icrc37_revoke_collection_approvals, icrc37_revoke_token_approvals, icrc37_transfer_from,
+    icrc7_owner_of,
 };
 use crate::core_suite::setup::default_test_setup;
 use crate::core_suite::setup::setup::{TestEnv, MINUTE_IN_MS};
 use crate::utils::random_principal;
 use crate::utils::{mint_nft, tick_n_blocks};
-use candid::Nat;
+use candid::{Encode, Nat};
 use core_nft::types::icrc37;
 use icrc_ledger_types::icrc1::account::Account;
 use serde_bytes::ByteBuf;
@@ -109,6 +109,24 @@ fn test_icrc37_approve_collection() {
         nft_owner2,
     } = test_env;
 
+    let mint_return = mint_nft(
+        pic,
+        "test1".to_string(),
+        Account {
+            owner: controller,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+    );
+
+    match mint_return {
+        Ok(token_id) => {}
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
+    }
     let current_time = pic
         .get_time()
         .duration_since(UNIX_EPOCH)
@@ -144,19 +162,25 @@ fn test_icrc37_approve_collection() {
     }
 
     // Verify the collection approval exists
-    let approvals = icrc37_get_collection_approvals(
-        pic,
-        controller,
-        collection_canister_id,
-        &(
-            Account {
-                owner: nft_owner2,
-                subaccount: None,
-            },
-            None,
-            None,
-        ),
-    );
+    let approvals: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
+        crate::client::pocket::unwrap_response(
+            pic.query_call(
+                collection_canister_id,
+                controller,
+                "icrc37_get_collection_approvals",
+                Encode!(
+                    &Account {
+                        owner: controller,
+                        subaccount: None,
+                    },
+                    &(),
+                    &()
+                )
+                .unwrap(),
+            ),
+        );
+
+    println!("approvals: {:?}", approvals);
 
     assert!(!approvals.is_empty());
     assert_eq!(approvals[0].approval_info.spender.owner, nft_owner2);
@@ -1129,12 +1153,13 @@ fn test_icrc37_revoke_token_approvals_max_limit() {
                     .unwrap_or(10);
 
             // Get all current approvals
-            let approvals = icrc37_get_token_approvals(
-                pic,
-                controller,
-                collection_canister_id,
-                &(token_id.clone(), None, None),
-            );
+            let approvals: core_nft::types::icrc37::icrc37_get_token_approvals::Response =
+                crate::client::pocket::unwrap_response(pic.query_call(
+                    collection_canister_id,
+                    controller,
+                    "icrc37_get_token_approvals",
+                    Encode!(&token_id.clone(), &(), &()).unwrap(),
+                ));
 
             assert_eq!(approvals.len(), max_approvals);
 
@@ -1187,12 +1212,13 @@ fn test_icrc37_revoke_token_approvals_max_limit() {
                 .unwrap()
                 .as_nanos() as u64;
 
-            let remaining_approvals = icrc37_get_token_approvals(
-                pic,
-                controller,
-                collection_canister_id,
-                &(token_id.clone(), None, None),
-            );
+            let remaining_approvals: core_nft::types::icrc37::icrc37_get_token_approvals::Response =
+                crate::client::pocket::unwrap_response(pic.query_call(
+                    collection_canister_id,
+                    controller,
+                    "icrc37_get_token_approvals",
+                    Encode!(&token_id.clone(), &(), &()).unwrap(),
+                ));
 
             if let Some(approval) = remaining_approvals.first() {
                 let revoke_args = vec![
@@ -1353,19 +1379,23 @@ fn test_icrc37_revoke_collection_approvals_max_limit() {
             .unwrap_or(10);
 
     // Get all current approvals
-    let approvals = icrc37_get_collection_approvals(
-        pic,
-        controller,
-        collection_canister_id,
-        &(
-            Account {
-                owner: controller,
-                subaccount: None,
-            },
-            None,
-            None,
-        ),
-    );
+    let approvals: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
+        crate::client::pocket::unwrap_response(
+            pic.query_call(
+                collection_canister_id,
+                controller,
+                "icrc37_get_collection_approvals",
+                Encode!(
+                    &Account {
+                        owner: controller,
+                        subaccount: None,
+                    },
+                    &(),
+                    &()
+                )
+                .unwrap(),
+            ),
+        );
     println!("approvals: {:?}", approvals);
     assert_eq!(approvals.len(), max_approvals);
 
@@ -1417,19 +1447,23 @@ fn test_icrc37_revoke_collection_approvals_max_limit() {
         .unwrap()
         .as_nanos() as u64;
 
-    let remaining_approvals = icrc37_get_collection_approvals(
-        pic,
-        controller,
-        collection_canister_id,
-        &(
-            Account {
-                owner: controller,
-                subaccount: None,
-            },
-            None,
-            None,
-        ),
-    );
+    let remaining_approvals: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
+        crate::client::pocket::unwrap_response(
+            pic.query_call(
+                collection_canister_id,
+                controller,
+                "icrc37_get_collection_approvals",
+                Encode!(
+                    &Account {
+                        owner: controller,
+                        subaccount: None,
+                    },
+                    &(),
+                    &()
+                )
+                .unwrap(),
+            ),
+        );
 
     println!("remaining_approvals: {:?}", remaining_approvals);
 
@@ -1535,19 +1569,23 @@ fn test_icrc37_revoke_collection_approvals_within_limit() {
     }
 
     // Get all current approvals
-    let approvals = icrc37_get_collection_approvals(
-        pic,
-        controller,
-        collection_canister_id,
-        &(
-            Account {
-                owner: controller,
-                subaccount: None,
-            },
-            None,
-            None,
-        ),
-    );
+    let approvals: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
+        crate::client::pocket::unwrap_response(
+            pic.query_call(
+                collection_canister_id,
+                controller,
+                "icrc37_get_collection_approvals",
+                Encode!(
+                    &Account {
+                        owner: controller,
+                        subaccount: None,
+                    },
+                    &(),
+                    &()
+                )
+                .unwrap(),
+            ),
+        );
 
     assert_eq!(approvals.len(), max_revoke_approvals);
 
@@ -1593,19 +1631,23 @@ fn test_icrc37_revoke_collection_approvals_within_limit() {
     }
 
     // Verify all approvals have been revoked
-    let remaining_approvals = icrc37_get_collection_approvals(
-        pic,
-        controller,
-        collection_canister_id,
-        &(
-            Account {
-                owner: controller,
-                subaccount: None,
-            },
-            None,
-            None,
-        ),
-    );
+    let remaining_approvals: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
+        crate::client::pocket::unwrap_response(
+            pic.query_call(
+                collection_canister_id,
+                controller,
+                "icrc37_get_collection_approvals",
+                Encode!(
+                    &Account {
+                        owner: controller,
+                        subaccount: None,
+                    },
+                    &(),
+                    &()
+                )
+                .unwrap(),
+            ),
+        );
 
     assert!(remaining_approvals.is_empty());
 }
@@ -1671,19 +1713,23 @@ fn test_icrc37_approve_collection_with_nft() {
             }
 
             // Verify the collection approval exists
-            let approvals = icrc37_get_collection_approvals(
-                pic,
-                controller,
-                collection_canister_id,
-                &(
-                    Account {
-                        owner: nft_owner1,
-                        subaccount: None,
-                    },
-                    None,
-                    None,
-                ),
-            );
+            let approvals: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
+                crate::client::pocket::unwrap_response(
+                    pic.query_call(
+                        collection_canister_id,
+                        controller,
+                        "icrc37_get_collection_approvals",
+                        Encode!(
+                            &Account {
+                                owner: nft_owner1,
+                                subaccount: None,
+                            },
+                            &(),
+                            &()
+                        )
+                        .unwrap(),
+                    ),
+                );
 
             assert!(!approvals.is_empty());
             assert_eq!(approvals[0].approval_info.spender.owner, nft_owner2);
@@ -1896,12 +1942,14 @@ fn test_icrc37_approvals_reset_after_transfer_as_owner() {
             );
 
             // Verify token approvals are reset
-            let token_approvals = icrc37_get_token_approvals(
-                pic,
-                controller,
-                collection_canister_id,
-                &(token_id.clone(), None, None),
-            );
+            let token_approvals: core_nft::types::icrc37::icrc37_get_token_approvals::Response =
+                crate::client::pocket::unwrap_response(pic.query_call(
+                    collection_canister_id,
+                    controller,
+                    "icrc37_get_token_approvals",
+                    Encode!(&token_id.clone(), &(), &()).unwrap(),
+                ));
+
             assert!(token_approvals.is_empty());
         }
         Err(e) => {
@@ -2070,28 +2118,30 @@ fn test_icrc37_approvals_reset_after_transfer_with_approvals() {
             );
 
             // Verify token approvals are reset
-            let token_approvals = icrc37_get_token_approvals(
-                pic,
-                controller,
-                collection_canister_id,
-                &(token_id.clone(), None, None),
-            );
+            let token_approvals: core_nft::types::icrc37::icrc37_get_token_approvals::Response =
+                crate::client::pocket::unwrap_response(pic.query_call(
+                    collection_canister_id,
+                    controller,
+                    "icrc37_get_token_approvals",
+                    Encode!(&token_id.clone(), &(), &()).unwrap(),
+                ));
             assert!(token_approvals.is_empty());
 
             // Verify collection approvals are reset
-            let collection_approvals = icrc37_get_collection_approvals(
-                pic,
-                controller,
+            let collection_approvals: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
+            crate::client::pocket::unwrap_response(pic.query_call(
                 collection_canister_id,
-                &(
-                    Account {
+                controller,
+                "icrc37_get_collection_approvals",
+                Encode!(
+                    &Account {
                         owner: nft_owner1,
                         subaccount: None,
                     },
-                    None,
-                    None,
-                ),
-            );
+                    &(),
+                    &()
+                ).unwrap(),
+            ));
             assert!(collection_approvals.is_empty());
         }
         Err(e) => {

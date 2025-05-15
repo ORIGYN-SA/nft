@@ -2,7 +2,6 @@
 // You may want to manually adjust some of the types.
 #![allow(dead_code, unused_imports)]
 use candid::{self, CandidType, Deserialize, Principal};
-use ic_cdk::api::call::CallResult as Result;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
 use icrc_ledger_types::icrc1::account::Account;
 
@@ -44,8 +43,22 @@ pub enum TransferError {
 }
 
 pub mod icrc7_transfer {
+    use candid::Nat;
+    use serde::Serialize;
+    #[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
+    pub enum TransferError {
+        NonExistingTokenId,
+        InvalidRecipient,
+        Unauthorized,
+        TooOld,
+        CreatedInFuture { ledger_time: Nat },
+        Duplicate { duplicate_of: Nat },
+        GenericError { error_code: Nat, message: String },
+        GenericBatchError { error_code: Nat, message: String },
+    }
+
     use super::*;
-    pub type Response = Vec<Option<Result<()>>>;
+    pub type Response = Vec<Option<Result<Nat, TransferError>>>;
     pub type Args = Vec<TransferArg>;
 }
 
@@ -69,7 +82,8 @@ pub mod icrc7_owner_of {
 
 pub mod icrc7_tokens {
     use super::*;
-    pub type Args = (Option<candid::Nat>, Option<candid::Nat>);
+    pub type Args0 = Option<candid::Nat>;
+    pub type Args1 = Option<candid::Nat>;
     pub type Response = Vec<candid::Nat>;
 }
 
@@ -81,7 +95,9 @@ pub mod icrc7_token_metadata {
 
 pub mod icrc7_tokens_of {
     use super::*;
-    pub type Args = (Account, Option<candid::Nat>, Option<candid::Nat>);
+    pub type Args0 = Account;
+    pub type Args1 = Option<candid::Nat>;
+    pub type Args2 = Option<candid::Nat>;
     pub type Response = Vec<candid::Nat>;
 }
 

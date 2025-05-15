@@ -1,6 +1,5 @@
 use crate::client::storage::{
-    cancel_upload, delete_file, finalize_upload, init_upload, insert_data, remove_data,
-    store_chunk, update_data,
+    cancel_upload, delete_file, finalize_upload, init_upload, store_chunk,
 };
 use candid::Nat;
 
@@ -12,10 +11,6 @@ use storage_api_canister::delete_file;
 use storage_api_canister::finalize_upload;
 use storage_api_canister::init_upload;
 use storage_api_canister::store_chunk;
-use storage_api_canister::updates::insert_data;
-use storage_api_canister::updates::remove_data;
-use storage_api_canister::updates::update_data;
-use storage_api_canister::value_custom::CustomValue;
 
 use crate::storage_suite::setup::setup::TestEnv;
 use crate::utils::upload_file;
@@ -206,6 +201,8 @@ fn test_duplicate_upload() {
             chunk_size: None,
         }),
     );
+
+    println!("init_upload_resp_2: {:?}", init_upload_resp_2);
 
     match init_upload_resp_2 {
         Ok(_) => {
@@ -648,6 +645,8 @@ fn test_delete_file() {
             .await
     });
 
+    println!("response: {:?}", response.canister_response.status());
+
     match response.canister_response.status() {
         StatusCode::OK | StatusCode::TEMPORARY_REDIRECT => {
             println!("File is accessible");
@@ -801,57 +800,6 @@ fn test_non_governance_principal_rejection() {
                     storage_canister_id,
                     &(finalize_upload::Args {
                         file_path: file_path.clone(),
-                    }),
-                )
-                .map(|_| ())
-                .map_err(|e| format!("{:?}", e))
-            }))
-            .unwrap_or_else(|_| Err("panic occurred".to_string())),
-        ),
-        (
-            "insert_data",
-            std::panic::catch_unwind(AssertUnwindSafe(|| {
-                insert_data(
-                    pic,
-                    non_governance_principal,
-                    storage_canister_id,
-                    &(insert_data::Args {
-                        data: CustomValue(Icrc3Value::Text("test".to_string())),
-                        data_id: data_id.clone(),
-                        nft_id: Some(Nat::from(1 as u64)),
-                    }),
-                )
-                .map(|_| ())
-                .map_err(|e| format!("{:?}", e))
-            }))
-            .unwrap_or_else(|_| Err("panic occurred".to_string())),
-        ),
-        (
-            "remove_data",
-            std::panic::catch_unwind(AssertUnwindSafe(|| {
-                remove_data(
-                    pic,
-                    non_governance_principal,
-                    storage_canister_id,
-                    &(remove_data::Args {
-                        file_path: file_path.clone(),
-                    }),
-                )
-                .map(|_| ())
-                .map_err(|e| format!("{:?}", e))
-            }))
-            .unwrap_or_else(|_| Err("panic occurred".to_string())),
-        ),
-        (
-            "update_data",
-            std::panic::catch_unwind(AssertUnwindSafe(|| {
-                update_data(
-                    pic,
-                    non_governance_principal,
-                    storage_canister_id,
-                    &(update_data::Args {
-                        hash_id: hash_id.clone(),
-                        data: CustomValue(Icrc3Value::Text("test".to_string())),
                     }),
                 )
                 .map(|_| ())
