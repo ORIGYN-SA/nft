@@ -99,7 +99,7 @@ pub mod update_collection_metadata {
         pub description: Option<String>,
         pub symbol: Option<String>,
         pub name: Option<String>,
-        pub logo: Option<Vec<u8>>,
+        pub logo: Option<String>,
         pub supply_cap: Option<Nat>,
         pub max_query_batch_size: Option<Nat>,
         pub max_update_batch_size: Option<Nat>,

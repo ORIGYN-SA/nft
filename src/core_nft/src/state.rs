@@ -74,7 +74,7 @@ pub struct Data {
     pub description: Option<String>,
     pub symbol: String,
     pub name: String,
-    pub logo: Option<Vec<u8>>,
+    pub logo: Option<String>,
     pub supply_cap: Option<Nat>,
     pub max_query_batch_size: Option<Nat>,
     pub max_update_batch_size: Option<Nat>,
@@ -91,6 +91,8 @@ pub struct Data {
     pub sub_canister_manager: StorageSubCanisterManager,
     pub token_approvals: TokenApprovals,
     pub collection_approvals: CollectionApprovals,
+    pub last_token_id: Nat,
+    pub media_redirections: HashMap<String, String>,
     // pub archive_init: Option<InitArchiveArg>,
 }
 
@@ -105,7 +107,7 @@ impl Data {
         description: Option<String>,
         symbol: String,
         name: String,
-        logo: Option<Vec<u8>>,
+        logo: Option<String>,
         supply_cap: Option<Nat>,
         max_query_batch_size: Option<Nat>,
         max_update_batch_size: Option<Nat>,
@@ -164,6 +166,8 @@ impl Data {
             sub_canister_manager,
             token_approvals: HashMap::new(),
             collection_approvals: HashMap::new(),
+            last_token_id: Nat::from(1u64), // 0 is the reserved value for the collection metadata
+            media_redirections: HashMap::new(),
         }
     }
 
@@ -242,6 +246,8 @@ impl Clone for Data {
             sub_canister_manager: self.sub_canister_manager.clone(),
             token_approvals: self.token_approvals.clone(),
             collection_approvals: self.collection_approvals.clone(),
+            last_token_id: self.last_token_id.clone(),
+            media_redirections: self.media_redirections.clone(),
         }
     }
 }

@@ -31,14 +31,8 @@ pub fn icrc7_collection_metadata() -> icrc7::icrc7_collection_metadata::Response
             ));
         }
 
-        if state.data.logo.is_some() {
-            metadata.push((
-                "icrc7:logo".to_string(),
-                ICRC3Value::Text(format!(
-                    "https://{}.raw.icp0.io/logo",
-                    ic_cdk::id().to_text()
-                )),
-            ));
+        if let Some(logo) = &state.data.logo {
+            metadata.push(("icrc7:logo".to_string(), ICRC3Value::Text(logo.clone())));
         }
 
         if let Some(supply_cap) = &state.data.supply_cap {
@@ -126,14 +120,7 @@ pub fn icrc7_description() -> icrc7::icrc7_description::Response {
 
 #[query]
 pub fn icrc7_logo() -> icrc7::icrc7_logo::Response {
-    if let Some(_) = read_state(|state| state.data.logo.clone()) {
-        Some(format!(
-            "https://{}.raw.icp0.io/logo",
-            ic_cdk::id().to_text()
-        ))
-    } else {
-        None
-    }
+    read_state(|state| state.data.logo.clone())
 }
 
 #[query]

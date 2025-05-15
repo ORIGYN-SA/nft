@@ -723,6 +723,7 @@ dependencies = [
  "storage_api_canister",
  "storage_canister_c2c_client",
  "tracing",
+ "url",
 ]
 
 [[package]]

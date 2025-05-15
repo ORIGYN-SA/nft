@@ -1,17 +1,9 @@
 use crate::types::value_custom::CustomValue as Value;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as InternalValue;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 
 use crate::state::read_state;
 use crate::types::icrc7;
 use candid::Nat;
-
-pub fn hash_string_to_u64(s: &str) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    s.hash(&mut hasher);
-    hasher.finish()
-}
 
 pub fn check_memo(memo: Option<serde_bytes::ByteBuf>) -> Result<(), String> {
     if let Some(ref memo) = memo {

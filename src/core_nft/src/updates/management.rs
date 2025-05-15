@@ -4,7 +4,7 @@ use crate::types::http::{add_redirection, remove_redirection};
 use crate::types::sub_canister::StorageCanister;
 use crate::types::transaction::{Icrc3Transaction, TransactionData};
 use crate::types::{icrc7, management, nft};
-use crate::utils::{check_memo, hash_string_to_u64, trace};
+use crate::utils::{check_memo, trace};
 
 pub use candid::Nat;
 pub use ic_cdk::api::call::RejectionCode;
@@ -130,7 +130,7 @@ pub async fn mint(req: management::mint::Args) -> management::mint::Response {
     let _guard_principal =
         GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
 
-    let token_name_hash = Nat::from(hash_string_to_u64(&req.token_name));
+    let token_id = read_state(|state| state.data.last_token_id.clone());
 
     let token_list = read_state(|state| state.data.tokens_list.clone());
     let supply_cap = read_state(|state| {
@@ -155,7 +155,7 @@ pub async fn mint(req: management::mint::Args) -> management::mint::Response {
         }
     }
 
-    match token_list.contains_key(&token_name_hash.clone()) {
+    match token_list.contains_key(&token_id.clone()) {
         true => {
             return Err((
                 RejectionCode::CanisterError,
@@ -164,7 +164,7 @@ pub async fn mint(req: management::mint::Args) -> management::mint::Response {
         }
         false => {
             let new_token = nft::Icrc7Token::new(
-                token_name_hash.clone(),
+                token_id.clone(),
                 req.token_name,
                 req.token_description,
                 req.token_logo,
@@ -175,7 +175,7 @@ pub async fn mint(req: management::mint::Args) -> management::mint::Response {
                 btype: "7mint".to_string(),
                 timestamp: ic_cdk::api::time(),
                 tx: TransactionData {
-                    tid: Some(token_name_hash.clone()),
+                    tid: Some(token_id.clone()),
                     from: None,
                     to: Some(req.token_owner.clone()),
                     meta: None,
@@ -197,15 +197,13 @@ pub async fn mint(req: management::mint::Args) -> management::mint::Response {
             }
 
             mutate_state(|state| {
-                state
-                    .data
-                    .tokens_list
-                    .insert(token_name_hash.clone(), new_token);
+                state.data.last_token_id = token_id.clone() + Nat::from(1u64);
+                state.data.tokens_list.insert(token_id.clone(), new_token);
             });
         }
     }
 
-    Ok(token_name_hash.clone())
+    Ok(token_id.clone())
 }
 
 #[update(guard = "caller_is_governance_principal")]
@@ -530,9 +528,20 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
 
     let redirection_url = format!("https://{}.raw.icp0.io/{}", canister_id, media_path.clone());
 
-    add_redirection(media_path.clone(), redirection_url);
+    let path = if media_path.starts_with('/') {
+        media_path.clone()
+    } else {
+        format!("/{}", media_path)
+    };
+
+    add_redirection(path.clone(), redirection_url.clone());
 
     mutate_state(|state| {
+        state
+            .data
+            .media_redirections
+            .insert(path.clone(), redirection_url);
+
         state.internal_filestorage.insert(
             data.file_path.clone(),
             InternalFilestorageData {

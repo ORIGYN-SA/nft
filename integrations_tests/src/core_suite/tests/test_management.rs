@@ -1619,7 +1619,7 @@ fn test_update_collection_metadata() {
             description: Some("Test Description".to_string()),
             symbol: Some("TEST".to_string()),
             name: Some("Test Collection".to_string()),
-            logo: Some(vec![1, 2, 3, 4]),
+            logo: Some("https://google.com/test.png".to_string()),
             supply_cap: Some(Nat::from(1000u64)),
             max_query_batch_size: Some(Nat::from(100u64)),
             max_update_batch_size: Some(Nat::from(50u64)),
