@@ -87,16 +87,17 @@ deploy:
       
       UPLOAD_URL=$(echo $RELEASE_RESPONSE | jq -r '.upload_url' | sed 's/{?name,label}//')
       
-      for wasm_file in target/wasm32-unknown-unknown/release/*.wasm; do
-        if [ -f "$wasm_file" ]; then
-          filename=$(basename "$wasm_file")
-          curl -s -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Content-Type: application/octet-stream" \
-            --data-binary @"$wasm_file" \
-            "$UPLOAD_URL?name=$filename"
-        fi
-      done
+      curl -s -X POST \
+        -H "Authorization: token $GITHUB_TOKEN" \
+        -H "Content-Type: application/octet-stream" \
+        --data-binary @"src/storage_canister/wasm/storage_canister_canister.wasm.gz" \
+        "$UPLOAD_URL?name=storage_canister_canister.wasm.gz"
+        
+      curl -s -X POST \
+        -H "Authorization: token $GITHUB_TOKEN" \
+        -H "Content-Type: application/octet-stream" \
+        --data-binary @"src/core_nft/wasm/core_nft_canister.wasm.gz" \
+        "$UPLOAD_URL?name=core_nft_canister.wasm.gz"
   only:
     - master
   variables:
