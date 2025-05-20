@@ -100,6 +100,20 @@ deploy:
         -H "Content-Type: application/octet-stream" \
         --data-binary @"src/core_nft/wasm/core_nft_canister.wasm.gz" \
         "$UPLOAD_URL?name=core_nft_canister.wasm.gz"
+
+      curl -s -X POST \
+        -H "Authorization: token $GITHUB_TOKEN" \
+        -H "Content-Type: application/octet-stream" \
+        --data-binary @"./src/core_nft/wasm/can.did" \
+        "$UPLOAD_URL?name=core_nft_canister.did"
+
+      curl -s -X POST \
+        -H "Authorization: token $GITHUB_TOKEN" \
+        -H "Content-Type: application/octet-stream" \
+        --data-binary @"./src/storage_canister/wasm/can.did" \
+        "$UPLOAD_URL?name=storage_canister.did"
+        
+        
   only:
     - master
   variables:
