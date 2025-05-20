@@ -17,12 +17,8 @@ variables:
 cache:
   key: ${CI_COMMIT_REF_SLUG}
   paths:
-    - .cargo/
-    - target/
-    - ~/.cargo/bin/
-    - ~/.cargo/registry/index/
-    - ~/.cargo/registry/cache/
-    - ~/.cargo/git/db/
+    - src/storage_canister/wasm/storage_canister_canister.wasm.gz
+    - src/core_nft/wasm/core_nft_canister.wasm.gz
 
 default:
   interruptible: true
@@ -52,8 +48,8 @@ build:
     - bash ./scripts/build_all.sh
   artifacts:
     paths:
-      - target/
-      - .cargo/
+      - src/storage_canister/wasm/storage_canister_canister.wasm.gz
+      - src/core_nft/wasm/core_nft_canister.wasm.gz
       - /usr/local/bin/pocket-ic
     expire_in: 1 week
   resource_group: build
