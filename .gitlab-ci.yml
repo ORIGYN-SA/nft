@@ -61,6 +61,8 @@ test:
   needs: ["build"]
   resource_group: test
   script:
+    - apt-get update
+    - apt-get install -y pkg-config libssl-dev
     - bash ./scripts/run_integrations_tests.sh
   timeout: 30m
 
