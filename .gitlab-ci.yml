@@ -62,7 +62,7 @@ test:
   resource_group: test
   script:
     - apt-get update
-    - apt-get install -y pkg-config libssl-dev
+    - apt-get install -y pkg-config libssl-dev libunwind8
     - bash ./scripts/run_integrations_tests.sh
   timeout: 30m
 
