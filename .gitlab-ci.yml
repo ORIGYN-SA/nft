@@ -19,6 +19,8 @@ cache:
   paths:
     - src/storage_canister/wasm/storage_canister_canister.wasm.gz
     - src/core_nft/wasm/core_nft_canister.wasm.gz
+    - src/core_nft/wasm/can.did
+    - src/storage_canister/wasm/can.did
 
 default:
   interruptible: true
@@ -44,20 +46,22 @@ build:
     - wget https://github.com/dfinity/pocketic/releases/download/8.0.0/pocket-ic-x86_64-linux.gz
     - gunzip pocket-ic-x86_64-linux.gz
     - chmod +x pocket-ic-x86_64-linux
-    - mv pocket-ic-x86_64-linux /usr/local/bin/pocket-ic
+    - cp pocket-ic-x86_64-linux ./src/pocket-ic
     - bash ./scripts/build_all.sh
   artifacts:
     paths:
       - src/storage_canister/wasm/storage_canister_canister.wasm.gz
       - src/core_nft/wasm/core_nft_canister.wasm.gz
-      - /usr/local/bin/pocket-ic
+      - src/core_nft/wasm/can.did
+      - src/storage_canister/wasm/can.did
+      - src/pocket-ic
     expire_in: 1 week
   resource_group: build
 
 test:
   stage: test
   variables:
-    POCKET_IC_BIN: /usr/local/bin/pocket-ic
+    POCKET_IC_BIN: ./src/pocket-ic
   needs: ["build"]
   resource_group: test
   script:
@@ -112,7 +116,6 @@ deploy:
         -H "Content-Type: application/octet-stream" \
         --data-binary @"./src/storage_canister/wasm/can.did" \
         "$UPLOAD_URL?name=storage_canister.did"
-        
         
   only:
     - master
