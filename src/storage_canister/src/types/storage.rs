@@ -236,7 +236,13 @@ impl StorageData {
 
         trace(&format!("finalize_upload - file_path: {:?}", path));
 
-        Ok(finalize_upload::FinalizeUploadResp {})
+        Ok(finalize_upload::FinalizeUploadResp {
+            url: format!(
+                "https://{}.raw.icp0.io/{}",
+                ic_cdk::id().to_string(),
+                path.clone()
+            ),
+        })
     }
 
     pub fn get_all_files(&self) -> Vec<(InternalRawStorageMetadata, Vec<u8>)> {

@@ -11,7 +11,7 @@ lazy_static! {
     // pub static ref SNS_GOVERNANCE: CanisterWasm = get_canister_wasm("sns_governance");
     // pub static ref SNS_ROOT: CanisterWasm = get_canister_wasm("sns_root");
     // pub static ref ICP_LEDGER: CanisterWasm = get_canister_wasm("ledger");
-    pub static ref REGISTRY_WASM: CanisterWasm = get_canister_wasm("registry");
+    // pub static ref REGISTRY_WASM: CanisterWasm = get_canister_wasm("registry");
 
     // Wasms in particular canister folder
     pub static ref CORE_WASM: CanisterWasm = get_canister_wasm_from_bin("core_nft");

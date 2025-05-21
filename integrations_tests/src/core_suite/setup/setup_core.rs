@@ -1,4 +1,4 @@
-use crate::wasms::{CORE_WASM, REGISTRY_WASM};
+use crate::wasms::CORE_WASM;
 
 use candid::encode_one;
 use candid::types::value::IDLValue;
@@ -19,26 +19,6 @@ pub fn setup_core_canister(
     args: Args,
     controller: Principal,
 ) -> Principal {
-    pic.add_cycles(registry_canister_id, 100_000_000_000_000_000_000);
-
-    pic.set_controllers(
-        registry_canister_id,
-        Some(controller.clone()),
-        vec![controller.clone()],
-    )
-    .unwrap();
-
-    pic.tick();
-
-    pic.install_canister(
-        registry_canister_id,
-        REGISTRY_WASM.clone(),
-        encode_one(&RegistryCanisterInitPayload { mutations: vec![] }).unwrap(),
-        Some(controller.clone()),
-    );
-
-    pic.tick();
-
     let core_nft_wasm = CORE_WASM.clone();
     pic.add_cycles(core_canister_id, 100_000_000_000_000_000_000);
 

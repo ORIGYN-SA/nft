@@ -163,7 +163,7 @@ pub async fn mint(req: management::mint::Args) -> management::mint::Response {
             ));
         }
         false => {
-            let new_token = nft::Icrc7Token::new(
+            let mut new_token = nft::Icrc7Token::new(
                 token_id.clone(),
                 req.token_name,
                 req.token_description,
@@ -198,6 +198,9 @@ pub async fn mint(req: management::mint::Args) -> management::mint::Response {
 
             mutate_state(|state| {
                 state.data.last_token_id = token_id.clone() + Nat::from(1u64);
+                if let Some(metadata) = req.token_metadata {
+                    new_token.add_metadata(&mut state.data.metadata, metadata.clone());
+                }
                 state.data.tokens_list.insert(token_id.clone(), new_token);
             });
         }
@@ -553,7 +556,13 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
         );
     });
 
-    return Ok(finalize_upload::FinalizeUploadResp {});
+    let url = format!(
+        "https://{}.raw.icp0.io/{}",
+        ic_cdk::id().to_string(),
+        path.clone()
+    );
+
+    return Ok(finalize_upload::FinalizeUploadResp { url: url });
 }
 
 #[query]

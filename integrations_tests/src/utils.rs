@@ -41,6 +41,7 @@ pub fn mint_nft(
         token_logo: Some("logo".to_string()),
         token_owner: owner,
         memo: Some(serde_bytes::ByteBuf::from("memo")),
+        token_metadata: None,
     };
 
     let mint_call = mint(pic, controller, collection_canister_id, &mint_args);

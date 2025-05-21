@@ -8,6 +8,8 @@ pub struct Args {
 }
 
 #[derive(Serialize, Deserialize, CandidType, Debug)]
-pub struct FinalizeUploadResp {}
+pub struct FinalizeUploadResp {
+    pub url: String,
+}
 
 pub type Response = Result<FinalizeUploadResp>;

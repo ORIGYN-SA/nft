@@ -1,0 +1,10 @@
+{
+  "canisters": {
+    "nft": {
+      "candid": "https://github.com/ORIGYN-SA/nft/releases/download/v2025.05.21-db5cee0/core_nft_canister.did",
+      "type": "custom",
+      "wasm": "https://github.com/ORIGYN-SA/nft/releases/download/v2025.05.21-db5cee0/core_nft_canister.wasm.gz"
+    }
+  },
+  "version": 1
+}

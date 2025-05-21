@@ -1,10 +1,11 @@
 use crate::client::core_nft::{
-    cancel_upload, delete_file, finalize_upload, get_upload_status, init_upload, mint,
-    remove_authorized_principals, remove_minting_authorities, store_chunk,
+    cancel_upload, delete_file, finalize_upload, get_upload_status, icrc7_token_metadata,
+    init_upload, mint, remove_authorized_principals, remove_minting_authorities, store_chunk,
     update_authorized_principals, update_collection_metadata, update_minting_authorities,
     update_nft_metadata,
 };
 use candid::{Encode, Nat, Principal};
+use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
 use icrc_ledger_types::icrc1::account::Account;
 
 use core_nft::types::management::{
@@ -1368,6 +1369,7 @@ fn test_mint_unauthorized() {
                 subaccount: None,
             },
             memo: None,
+            token_metadata: None,
         }),
     );
     assert!(matches!(result, Err((_, _))), "mint should panic");
@@ -1407,6 +1409,7 @@ fn test_mint_authorized() {
                 subaccount: None,
             },
             memo: None,
+            token_metadata: None,
         }),
     );
     assert!(result.is_ok(), "Should succeed with authorized principal");
@@ -1456,9 +1459,57 @@ fn test_add_then_remove_minting_authorities_unauthorized() {
                 subaccount: None,
             },
             memo: None,
+            token_metadata: None,
         }),
     );
     assert!(matches!(result, Err((_, _))), "mint should panic");
+}
+
+#[test]
+fn test_mint_with_metadata() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let mut metadata = HashMap::new();
+    metadata.insert("test".to_string(), Value::Text("test".to_string()));
+    metadata.insert("test2".to_string(), Value::Nat(Nat::from(1u64)));
+
+    let result = mint(
+        pic,
+        controller,
+        collection_canister_id,
+        &(mint::Args {
+            token_name: "test".to_string(),
+            token_description: None,
+            token_logo: None,
+            token_owner: Account {
+                owner: nft_owner1,
+                subaccount: None,
+            },
+            memo: None,
+            token_metadata: Some(metadata),
+        }),
+    );
+    assert!(result.is_ok(), "Should succeed with authorized principal");
+
+    let token_id = result.unwrap();
+    let token_metadata: Vec<Option<Vec<(String, Value)>>> =
+        icrc7_token_metadata(pic, controller, collection_canister_id, &vec![token_id]);
+    assert_eq!(
+        token_metadata,
+        vec![Some(vec![
+            ("Name".to_string(), Value::Text("test".to_string())),
+            ("Symbol".to_string(), Value::Text("test".to_string())),
+            ("test".to_string(), Value::Text("test".to_string())),
+            ("test2".to_string(), Value::Nat(Nat::from(1u64)))
+        ])]
+    );
 }
 
 #[test]

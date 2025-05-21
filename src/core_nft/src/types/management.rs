@@ -18,6 +18,7 @@ pub mod mint {
         pub token_logo: Option<String>,
         pub token_owner: Account,
         pub memo: Option<serde_bytes::ByteBuf>,
+        pub token_metadata: Option<HashMap<String, Value>>,
     }
     pub type Response = Result<Nat>;
 }

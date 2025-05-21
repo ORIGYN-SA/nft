@@ -26,7 +26,7 @@ pub fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
 #[update(guard = "caller_is_governance_principal")]
 pub fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Response {
     match mutate_state(|state| state.data.finalize_upload(data)) {
-        Ok(_) => Ok(finalize_upload::FinalizeUploadResp {}),
+        Ok(resp) => Ok(resp),
         Err(e) => Err((RejectionCode::CanisterError, e)),
     }
 }
