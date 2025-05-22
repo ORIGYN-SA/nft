@@ -2,6 +2,23 @@
 
 This guide will walk you through the process of deploying and managing an NFT collection on Internet Computer using the ICRC-7 standard.
 
+## Environment Variables Setup
+
+To make it easier to use the commands, you can set up the following environment variables in your shell:
+
+```bash
+# Canister IDs
+export NFT_CANISTER_ID="YOUR_CANISTER_ID"
+
+# Principals
+export YOUR_PRINCIPAL_ID="YOUR_PRINCIPAL_ID"
+
+# Configuration
+export COLLECTION_NAME="MyCollection"
+export COLLECTION_SYMBOL="MC"
+export IDENTITY_FILE="identity.pem"
+```
+
 ## Prerequisites
 
 - Internet Computer SDK (dfx) installed
@@ -10,12 +27,22 @@ This guide will walk you through the process of deploying and managing an NFT co
 
 ## Step 1: Update canister_ids.json
 
-Create or update your `canister_ids.json` file with your canister ID:
+Update your `canister_ids.json` file with your canister ID using this command:
 
+```bash
+sed -i '' "s/YOUR_CANISTER_ID/$NFT_CANISTER_ID/g" canister_ids.json
+```
+
+Or if you're on Linux:
+```bash
+sed -i "s/YOUR_CANISTER_ID/$NFT_CANISTER_ID/g" canister_ids.json
+```
+
+The file should look like this:
 ```json
 {
   "nft": {
-    "ic": "YOUR_CANISTER_ID"
+    "ic": "$NFT_CANISTER_ID"
   }
 }
 ```
@@ -26,7 +53,7 @@ Before deploying, check the latest version of the NFT canister at [ORIGYN NFT Re
 
 ## Step 3: Deploy the Collection
 
-Deploy your collection using the following command. Replace the principal ID with your own:
+Deploy your collection using the following command:
 
 ```bash
 dfx deploy --network ic nft --mode reinstall --argument '(
@@ -38,10 +65,10 @@ dfx deploy --network ic nft --mode reinstall --argument '(
     max_canister_storage_threshold = null;
     logo = null;
     permitted_drift = null;
-    name = "MyCollection";
-    minting_authorities = vec { principal "YOUR_PRINCIPAL_ID";};
+    name = "$COLLECTION_NAME";
+    minting_authorities = vec { principal "$YOUR_PRINCIPAL_ID";};
     description = null;
-    authorized_principals = vec { principal "YOUR_PRINCIPAL_ID";};
+    authorized_principals = vec { principal "$YOUR_PRINCIPAL_ID";};
     version = record { major = 0 : nat32; minor = 0 : nat32; patch = 0 : nat32;};
     max_take_value = null;
     max_update_batch_size = null;
@@ -50,7 +77,7 @@ dfx deploy --network ic nft --mode reinstall --argument '(
     max_memo_size = null;
     atomic_batch_transfers = null;
     collection_metadata = vec {};
-    symbol = "MC";
+    symbol = "$COLLECTION_SYMBOL";
     approval_init = record {
       max_approvals_per_token_or_collection = opt (10 : nat);
       max_revoke_approvals = opt (10 : nat);
@@ -65,7 +92,7 @@ dfx deploy --network ic nft --mode reinstall --argument '(
 - Replace `YOUR_PRINCIPAL_ID` with your actual principal ID
 - The `test_mode` parameter is set to `true` for testing purposes
 
-## Step 4: Upload Files
+## Step 4: Upload Files on the collection
 
 1. First, compile the command-line tools:
 ```bash
@@ -76,33 +103,36 @@ cargo build --release
 2. Upload files using the compiled tool:
 ```bash
 ../target/release/origyn_icrc7_cmdlinetools upload-file \
-  <CANISTER_ID> \
+  $NFT_CANISTER_ID \
   <FILE_PATH> \
   <STORAGE_PATH> \
-  <IDENTITY_FILE>
+  $IDENTITY_FILE
 ```
 
 Example:
 ```bash
 ../target/release/origyn_icrc7_cmdlinetools upload-file \
-  4sbzm-jaaaa-aaaaa-qah3a-cai \
-  ~/Desktop/image.png \
-  images/image.png \
-  identity.pem
+  $NFT_CANISTER_ID \
+  ./origynlogo.png \
+  origynlogo.png \
+  $IDENTITY_FILE
 ```
+
+identity.pem is the .pem file of the identity who as the right to manage/upload media on the collection. IE : it as to be in `authorized_principals`, and you can export it with `dfx identity export identity_name > identity.pem`
 
 ## Step 5: Minting NFTs
 
+Go back to your example directory : `cd ../example`
 To mint an NFT, you need to be an authorized minting authority. Here's how to mint an NFT with metadata:
 
 ```bash
-dfx canister call nft mint '(
+dfx canister call nft mint --network ic '(
   record {
     token_name = "My NFT";
     token_description = opt "Description of my NFT";
     token_logo = opt "https://example.com/logo.png";
     token_owner = record {
-      owner = principal "YOUR_PRINCIPAL_ID";
+      owner = principal "$YOUR_PRINCIPAL_ID";
       subaccount = null;
     };
     memo = null;
@@ -133,13 +163,13 @@ The `token_metadata` field accepts a vector of key-value pairs where values can 
 After minting, you can verify the NFT metadata using:
 
 ```bash
-dfx canister call nft icrc7_token_metadata '(vec { 1 })'
+dfx canister call nft --network ic icrc7_token_metadata '(vec { 1 })'
 ```
 This will return the metadata for the NFT with ID 1, including both the standard metadata (Name, Symbol) and any custom metadata you provided during minting.
 
 and check who's the owner of the nft with :
 ```bash
-dfx canister call nft icrc7_owner_of '(vec { 1 })'
+dfx canister call nft --network ic icrc7_owner_of '(vec { 1 })'
 ```
 
 

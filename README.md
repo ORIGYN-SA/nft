@@ -1,38 +1,57 @@
-# ICRC7 NFT Implementation
+# ICRC7/ICRC37 Implementation for Internet Computer
 
-This project implements an NFT (Non-Fungible Token) standard on the Internet Computer (IC) blockchain, following the ICRC7 specification. It provides a robust and scalable solution for managing digital assets on the IC network.
+This repository contains the first complete and production-ready implementation of the ICRC7/ICRC37 NFT standard for the Internet Computer. This implementation is currently under review by the DFINITY Foundation for community validation.
 
-## Project Structure
+## Overview
 
-The project is organized as a Rust workspace with multiple components:
+This project provides a complete solution for NFT management on the Internet Computer, consisting of three main components:
 
-- `src/core_nft`: Core NFT implementation
-- `src/storage_canister`: Storage management for NFT assets
-- `src/storage_api_canister`: API interface for storage operations
-- `src/external_canisters`: External canister integrations
-- `integrations_tests`: Integration test suite
+1. **Core NFT Canister**: A full implementation of the ICRC7/ICRC37 standard for NFT management
+2. **Storage Canister**: A high-performance storage solution for NFT assets
+3. **Integration Tests**: Comprehensive test suite ensuring reliability and correctness
 
-## Features
+## Key Features
 
-- ICRC7 compliant NFT implementation
-- Secure storage management
-- Integration with Internet Computer's native features
-- Comprehensive test coverage
+- Full ICRC7/ICRC37 standard compliance
+- Production-ready implementation
+- Complete integration test coverage
+- High-performance storage solution
+- Transaction history using ICRC3 standard
+- Certified HTTP asset serving
+- Stable memory storage with heap caching
+- Fine-grained access control for assets
 
-## Prerequisites
+## Components
 
-- Rust (latest stable version)
-- DFX (Internet Computer SDK)
-- Git
-- Pocket-IC (for integration tests)
-- Candid-extractor
+### Core NFT Canister (`src/core_nft`)
+The main NFT ledger implementation that handles all NFT operations according to the ICRC7/ICRC37 standard. It uses the ICRC3 standard for transaction history and can work with any storage solution.
+
+[Read more about Core NFT Canister](./src/core_nft/README.md)
+
+### Storage Canister (`src/storage_canister`)
+A specialized storage solution that serves assets via HTTP endpoints. Unlike DFINITY's asset canisters, it uses stable memory for storage with an intelligent caching system in heap memory.
+
+[Read more about Storage Canister](./src/storage_canister/README.md)
+
+### Integration Tests (`integrations_tests`)
+A comprehensive test suite that ensures the reliability and correctness of the implementation. The tests cover all aspects of the NFT standard and storage functionality.
+
+[Read more about Integration Tests](./integrations_tests/README.md)
 
 ## Getting Started
 
+### Prerequisites
+
+- Internet Computer SDK (dfx)
+- PocketIC for running integration tests
+- Rust toolchain
+
+### Installation
+
 1. Clone the repository:
 ```bash
-git clone [repository-url]
-cd icrc7_nft
+git clone https://github.com/ORIGYN-SA/nft.git
+cd icrc7
 ```
 
 2. Build the project:
@@ -40,51 +59,30 @@ cd icrc7_nft
 bash ./scripts/build_all.sh
 ```
 
-This script will:
-- Build the storage canister
-- Build the core NFT canister
-
-You can get your canister wasm, wasm.gz, and candid definition here :
-`./src/core_nft/wasm/`
-`./src/storage_canister/wasm/`
-
-## Development
-
-The project uses Rust's workspace feature to manage multiple crates. Each component can be developed and tested independently.
-
-### Running Tests
-
-1. Set the Pocket-IC binary path:
+3. Run integration tests:
 ```bash
-export POCKET_IC_BIN=/usr/local/bin/pocket-ic
-```
-
-2. Run the integration tests:
-```bash
+export POCKET_IC_BIN=/path/to/pocket-ic
 bash ./scripts/run_integrations_tests.sh
 ```
 
-This will:
-- Build all canisters
-- Copy the core NFT canister WASM to the integration tests
-- Run the integration test suite
+## Why This Implementation?
 
-## Deployment
-
-Deployment instructions for both local and mainnet environments will be added soon.
-
-## Management CLI
-
-COMING SOON
+This is currently the only complete implementation of the ICRC7/ICRC37 standard that:
+- Is fully compliant with the standard
+- Has complete integration test coverage
+- Is production-ready
+- Is under review by DFINITY Foundation
+- Uses modern IC features like certified HTTP and stable memory
+- Provides a flexible storage solution
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request, or contact contact@origyn.ch
+We welcome contributions! Please read our contributing guidelines and submit pull requests.
 
 ## License
 
-[Add your license information here]
+[License information]
 
-## Contact
+## Support
 
-[Add your contact information here]
+For support, please open an issue in the GitHub repository or contact us through `gautier.wojda@bity.com`. 
