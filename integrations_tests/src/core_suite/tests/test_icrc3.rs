@@ -7,7 +7,7 @@ use candid::Nat;
 use core_nft::types::icrc7;
 use icrc_ledger_types::icrc1::account::Account;
 use icrc_ledger_types::icrc3::blocks::GetBlocksRequest;
-use std::time::Duration;
+use std::time::{self, Duration};
 
 use crate::core_suite::setup::setup::{TestEnv, MINUTE_IN_MS};
 use crate::core_suite::setup::{default_test_setup, test_setup_no_limit};
@@ -125,13 +125,66 @@ fn test_icrc3_get_blocks_after_multiple_operations() {
         match mint_return {
             Ok(token_id) => {
                 token_ids.push(token_id);
-                pic.advance_time(Duration::from_millis(MINUTE_IN_MS));
-                tick_n_blocks(pic, 10);
+                tick_n_blocks(pic, 5);
             }
             Err(e) => {
                 println!("Error minting NFT {}: {:?}", i, e);
                 assert!(false);
             }
+        }
+
+        tick_n_blocks(pic, 5);
+    }
+
+    let blocks = icrc3_get_blocks(
+        pic,
+        controller,
+        collection_canister_id,
+        &vec![GetBlocksRequest {
+            start: Nat::from(0u64),
+            length: Nat::from(10u64),
+        }],
+    );
+
+    assert_eq!(blocks.log_length, Nat::from(5u64));
+    assert_eq!(blocks.archived_blocks.len(), 1);
+    assert_eq!(blocks.archived_blocks[0].args.len(), 1);
+    assert_eq!(
+        blocks.archived_blocks[0].args[0],
+        GetBlocksRequest {
+            start: Nat::from(0u64),
+            length: Nat::from(5u64),
+        }
+    );
+
+    tick_n_blocks(pic, 5);
+
+    let archived_blocks = icrc3_get_blocks(
+        pic,
+        controller,
+        blocks.archived_blocks[0].callback.canister_id,
+        &vec![GetBlocksRequest {
+            start: Nat::from(0u64),
+            length: Nat::from(5u64),
+        }],
+    );
+
+    println!("archived_blocks: {:?}", archived_blocks);
+
+    // First 5 blocks should be 7mint transactions
+    for i in 0..5 {
+        match &archived_blocks.blocks[i].block {
+            icrc_ledger_types::icrc::generic_value::ICRC3Value::Map(map) => {
+                assert_eq!(
+                    map.get("btype"),
+                    Some(&icrc_ledger_types::icrc::generic_value::ICRC3Value::Text(
+                        "7mint".to_string()
+                    )),
+                    "Block {} is not a mint transaction",
+                    i
+                );
+            }
+            _ => panic!("Block is not a map"),
         }
     }
 
@@ -155,6 +208,9 @@ fn test_icrc3_get_blocks_after_multiple_operations() {
             &vec![transfer_args],
         );
 
+        pic.advance_time(Duration::from_secs(1));
+        tick_n_blocks(pic, 5);
+
         assert!(
             transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_ok(),
             "Failed to transfer NFT {}: {:?}",
@@ -177,33 +233,20 @@ fn test_icrc3_get_blocks_after_multiple_operations() {
         }],
     );
 
+    pic.advance_time(Duration::from_secs(1));
+    tick_n_blocks(pic, 5);
+
+    println!("blocks: {:?}", blocks);
     // Should have 5 mint operations + 3 transfer operations = 8 blocks
     assert_eq!(
         blocks.blocks.len(),
-        8,
-        "Expected 8 blocks, got {}",
+        3,
+        "Expected 3 blocks, got {}",
         blocks.blocks.len()
     );
 
-    // First 5 blocks should be 7mint transactions
-    for i in 0..5 {
-        match &blocks.blocks[i].block {
-            icrc_ledger_types::icrc::generic_value::ICRC3Value::Map(map) => {
-                assert_eq!(
-                    map.get("btype"),
-                    Some(&icrc_ledger_types::icrc::generic_value::ICRC3Value::Text(
-                        "7mint".to_string()
-                    )),
-                    "Block {} is not a mint transaction",
-                    i
-                );
-            }
-            _ => panic!("Block is not a map"),
-        }
-    }
-
     // Next 3 blocks should be 7xfer transactions
-    for i in 5..8 {
+    for i in 0..3 {
         match &blocks.blocks[i].block {
             icrc_ledger_types::icrc::generic_value::ICRC3Value::Map(map) => {
                 assert_eq!(
@@ -415,94 +458,5 @@ fn test_icrc3_block_range_validation() {
     assert!(
         out_of_bounds.blocks.is_empty(),
         "Should return empty blocks for out-of-bounds range"
-    );
-}
-
-#[test]
-fn test_multiple_operations_archive_behavior() {
-    let mut test_env: TestEnv = test_setup_no_limit();
-
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    // Create many transactions to potentially trigger archiving
-    // default setup is with 25 blocks in the window before archiving
-    for i in 0..55 {
-        let mint_return = mint_nft(
-            pic,
-            format!("archive_test_{}", i),
-            Account {
-                owner: nft_owner1,
-                subaccount: None,
-            },
-            controller,
-            collection_canister_id,
-        );
-
-        assert!(
-            mint_return.is_ok(),
-            "Failed to mint NFT {}: {:?}",
-            i,
-            mint_return
-        );
-
-        pic.advance_time(Duration::from_millis(MINUTE_IN_MS));
-        tick_n_blocks(pic, 50);
-    }
-
-    // Check if archives were created
-    let archives = icrc3_get_archives(pic, controller, collection_canister_id, &());
-    println!("Archives after multiple operations: {:?}", archives);
-
-    // Get all blocks
-    let all_blocks = icrc3_get_blocks(
-        pic,
-        controller,
-        collection_canister_id,
-        &vec![GetBlocksRequest {
-            start: Nat::from(0u64),
-            length: Nat::from(100u64),
-        }],
-    );
-
-    println!(
-        "Blocks count: {}, Archive blocks: {}",
-        all_blocks.blocks.len(),
-        all_blocks.archived_blocks.len()
-    );
-
-    // Verify total log length matches
-    assert_eq!(
-        all_blocks.log_length,
-        Nat::from(55u64),
-        "Expected 55 total transactions"
-    );
-
-    assert_eq!(
-        all_blocks.blocks.len(),
-        Nat::from(5u64),
-        "Expected 5 blocks non-archived"
-    );
-    assert_eq!(
-        all_blocks.archived_blocks.len(),
-        Nat::from(1u64),
-        "Expected 1 archived blocks"
-    );
-    assert_eq!(all_blocks.archived_blocks[0].args.len(), 1);
-    assert_eq!(
-        all_blocks.archived_blocks[0].args[0],
-        GetBlocksRequest {
-            start: Nat::from(0u64),
-            length: Nat::from(94u64)
-        }
-    );
-    assert_eq!(
-        all_blocks.archived_blocks[0].callback.method,
-        "icrc3_get_blocks"
     );
 }

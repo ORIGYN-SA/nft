@@ -27,8 +27,8 @@ async fn icrc3_get_archives(_: GetArchivesArg) -> GetArchivesResponse {
 }
 
 #[query]
-async fn icrc3_get_blocks(args: GetBlocksArg) -> GetBlocksResult {
-    icrc3_get_blocks_impl::<Icrc3Transaction>(args).await
+fn icrc3_get_blocks(args: GetBlocksArg) -> GetBlocksResult {
+    icrc3_get_blocks_impl::<Icrc3Transaction>(args)
 }
 
 #[query]

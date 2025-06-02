@@ -7,7 +7,6 @@ use crate::{
     types::transaction::Icrc3Transaction,
 };
 use candid::{Nat, Principal};
-use ic_cdk::api::call::RejectionCode;
 use ic_cdk_macros::update;
 use icrc_ledger_types::icrc1::account::Account;
 
@@ -143,7 +142,7 @@ pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_t
             },
         };
 
-        match icrc3_add_transaction(transaction).await {
+        match icrc3_add_transaction(transaction) {
             Ok(transaction_id) => {
                 txn_results[index] = Some(Ok(Nat::from(transaction_id)));
             }

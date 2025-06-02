@@ -4,7 +4,7 @@ use std::time::Duration;
 use crate::lifecycle::init_canister;
 use crate::lifecycle::Args;
 pub use crate::state::InitApprovalsArg;
-use crate::state::{init_icrc3, Data, RuntimeState};
+use crate::state::{init_icrc3, start_default_archive_job, Data, RuntimeState};
 use crate::types::http::certify_all_assets;
 use crate::types::value_custom::CustomValue as Value;
 use crate::types::Metadata;
@@ -154,6 +154,7 @@ fn init(args: Args) {
 
             init_canister(runtime_state);
             init_icrc3(icrc3_config);
+            start_default_archive_job();
             certify_all_assets();
 
             info!("Init complete.")

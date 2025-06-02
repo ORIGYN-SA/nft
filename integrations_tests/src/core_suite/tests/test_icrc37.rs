@@ -1809,6 +1809,9 @@ fn test_icrc37_approvals_reset_after_transfer_as_owner() {
         collection_canister_id,
     );
 
+    pic.advance_time(Duration::from_secs(1));
+    tick_n_blocks(pic, 5);
+
     match mint_return {
         Ok(token_id) => {
             let current_time = pic
@@ -1838,6 +1841,9 @@ fn test_icrc37_approvals_reset_after_transfer_as_owner() {
                 icrc37_approve_tokens(pic, nft_owner1, collection_canister_id, &token_approve_args);
             assert!(token_approve_response.is_ok());
 
+            pic.advance_time(Duration::from_secs(1));
+            tick_n_blocks(pic, 5);
+
             // Approve collection for nft_owner2
             let collection_approval_info = icrc37::ApprovalInfo {
                 spender: Account {
@@ -1863,6 +1869,9 @@ fn test_icrc37_approvals_reset_after_transfer_as_owner() {
             );
             assert!(collection_approve_response.is_ok());
 
+            pic.advance_time(Duration::from_secs(1));
+            tick_n_blocks(pic, 5);
+
             // First transfer using nft_owner2 (authorized)
             let transfer_args_1 = vec![icrc37::icrc37_transfer_from::TransferFromArg {
                 spender_subaccount: None,
@@ -1883,6 +1892,9 @@ fn test_icrc37_approvals_reset_after_transfer_as_owner() {
                 icrc37_transfer_from(pic, nft_owner2, collection_canister_id, &transfer_args_1);
             assert!(transfer_response_1.is_ok());
 
+            pic.advance_time(Duration::from_secs(1));
+            tick_n_blocks(pic, 5);
+
             // Verify the token is now owned by nft_owner2
             let owner_of_1 = icrc7_owner_of(
                 pic,
@@ -1898,6 +1910,9 @@ fn test_icrc37_approvals_reset_after_transfer_as_owner() {
                     subaccount: None
                 })
             );
+
+            pic.advance_time(Duration::from_secs(1));
+            tick_n_blocks(pic, 5);
 
             // Try second transfer using nft_owner2 (should succeed as nft_owner2 is now the owner)
             let transfer_args_2 = vec![icrc37::icrc37_transfer_from::TransferFromArg {
@@ -1925,6 +1940,9 @@ fn test_icrc37_approvals_reset_after_transfer_as_owner() {
                 icrc37::icrc37_transfer_from::TransferFromResult::Err(_) => assert!(false),
             }
 
+            pic.advance_time(Duration::from_secs(1));
+            tick_n_blocks(pic, 5);
+
             // Verify the token is now owned by nft_owner3
             let owner_of_2 = icrc7_owner_of(
                 pic,
@@ -1941,6 +1959,9 @@ fn test_icrc37_approvals_reset_after_transfer_as_owner() {
                 })
             );
 
+            pic.advance_time(Duration::from_secs(1));
+            tick_n_blocks(pic, 5);
+
             // Verify token approvals are reset
             let token_approvals: core_nft::types::icrc37::icrc37_get_token_approvals::Response =
                 crate::client::pocket::unwrap_response(pic.query_call(
@@ -1949,6 +1970,9 @@ fn test_icrc37_approvals_reset_after_transfer_as_owner() {
                     "icrc37_get_token_approvals",
                     Encode!(&token_id.clone(), &(), &()).unwrap(),
                 ));
+
+            pic.advance_time(Duration::from_secs(1));
+            tick_n_blocks(pic, 5);
 
             assert!(token_approvals.is_empty());
         }
@@ -1985,6 +2009,9 @@ fn test_icrc37_approvals_reset_after_transfer_with_approvals() {
         collection_canister_id,
     );
 
+    pic.advance_time(Duration::from_secs(1));
+    tick_n_blocks(pic, 5);
+
     match mint_return {
         Ok(token_id) => {
             let current_time = pic
@@ -2014,6 +2041,9 @@ fn test_icrc37_approvals_reset_after_transfer_with_approvals() {
                 icrc37_approve_tokens(pic, nft_owner1, collection_canister_id, &token_approve_args);
             assert!(token_approve_response.is_ok());
 
+            pic.advance_time(Duration::from_secs(1));
+            tick_n_blocks(pic, 5);
+
             // Approve collection for nft_owner2
             let collection_approval_info = icrc37::ApprovalInfo {
                 spender: Account {
@@ -2039,6 +2069,9 @@ fn test_icrc37_approvals_reset_after_transfer_with_approvals() {
             );
             assert!(collection_approve_response.is_ok());
 
+            pic.advance_time(Duration::from_secs(1));
+            tick_n_blocks(pic, 5);
+
             // First transfer using nft_owner2 (authorized)
             let transfer_args_1 = vec![icrc37::icrc37_transfer_from::TransferFromArg {
                 spender_subaccount: None,
@@ -2059,6 +2092,9 @@ fn test_icrc37_approvals_reset_after_transfer_with_approvals() {
                 icrc37_transfer_from(pic, nft_owner2, collection_canister_id, &transfer_args_1);
             assert!(transfer_response_1.is_ok());
 
+            pic.advance_time(Duration::from_secs(1));
+            tick_n_blocks(pic, 5);
+
             // Verify the token is now owned by nft_owner3
             let owner_of_1 = icrc7_owner_of(
                 pic,
@@ -2074,6 +2110,9 @@ fn test_icrc37_approvals_reset_after_transfer_with_approvals() {
                     subaccount: None
                 })
             );
+
+            pic.advance_time(Duration::from_secs(1));
+            tick_n_blocks(pic, 5);
 
             // Try second transfer using nft_owner2 (should fail as approvals should be reset)
             let transfer_args_2 = vec![icrc37::icrc37_transfer_from::TransferFromArg {
@@ -2101,6 +2140,9 @@ fn test_icrc37_approvals_reset_after_transfer_with_approvals() {
                 icrc37::icrc37_transfer_from::TransferFromResult::Err(_) => assert!(true),
             }
 
+            pic.advance_time(Duration::from_secs(1));
+            tick_n_blocks(pic, 5);
+
             // Verify the token is still owned by nft_owner3
             let owner_of_2 = icrc7_owner_of(
                 pic,
@@ -2117,6 +2159,9 @@ fn test_icrc37_approvals_reset_after_transfer_with_approvals() {
                 })
             );
 
+            pic.advance_time(Duration::from_secs(1));
+            tick_n_blocks(pic, 5);
+
             // Verify token approvals are reset
             let token_approvals: core_nft::types::icrc37::icrc37_get_token_approvals::Response =
                 crate::client::pocket::unwrap_response(pic.query_call(
@@ -2126,6 +2171,9 @@ fn test_icrc37_approvals_reset_after_transfer_with_approvals() {
                     Encode!(&token_id.clone(), &(), &()).unwrap(),
                 ));
             assert!(token_approvals.is_empty());
+
+            pic.advance_time(Duration::from_secs(1));
+            tick_n_blocks(pic, 5);
 
             // Verify collection approvals are reset
             let collection_approvals: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
@@ -2142,6 +2190,9 @@ fn test_icrc37_approvals_reset_after_transfer_with_approvals() {
                     &()
                 ).unwrap(),
             ));
+            pic.advance_time(Duration::from_secs(1));
+            tick_n_blocks(pic, 5);
+
             assert!(collection_approvals.is_empty());
         }
         Err(e) => {

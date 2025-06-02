@@ -420,6 +420,8 @@ fn test_icrc7_token_metadata_multiple_insert_dup_name() {
         collection_canister_id,
     );
 
+    tick_n_blocks(pic, 5);
+
     match mint_return {
         Ok(token_id) => {
             let mut new_metadata: HashMap<String, Value> = HashMap::new();
@@ -441,7 +443,7 @@ fn test_icrc7_token_metadata_multiple_insert_dup_name() {
                 &update_nft_metadata_args,
             );
 
-            pic.tick();
+            tick_n_blocks(pic, 5);
 
             let metadata = icrc7_token_metadata(
                 pic,
@@ -501,6 +503,7 @@ fn test_icrc7_token_metadata_multiple_insert_dup_name() {
                 collection_canister_id,
                 &update_nft_metadata_args_2,
             );
+            tick_n_blocks(pic, 5);
 
             let metadata_2 = icrc7_token_metadata(
                 pic,
@@ -574,6 +577,7 @@ fn test_icrc7_supply_cap() {
 
     // Mint tokens up to supply cap
     for i in 0..supply_cap {
+        println!("Minting token: {}", i);
         let mint_return = mint_nft(
             pic,
             format!("test{}", i),
@@ -584,6 +588,8 @@ fn test_icrc7_supply_cap() {
             controller,
             collection_canister_id,
         );
+        pic.advance_time(Duration::from_secs(1));
+        tick_n_blocks(pic, 5);
         assert!(mint_return.is_ok());
     }
 
@@ -1444,6 +1450,9 @@ fn test_icrc7_transfer_batch() {
             controller,
             collection_canister_id,
         );
+
+        tick_n_blocks(pic, 5);
+
         if let Ok(token_id) = mint_return {
             token_ids.push(token_id);
         }
@@ -1478,6 +1487,7 @@ fn test_icrc7_transfer_batch() {
                 subaccount: None
             })
         );
+        tick_n_blocks(pic, 5);
     }
 }
 
@@ -1841,6 +1851,8 @@ fn test_icrc7_transfer_batch_with_memo() {
         if let Ok(token_id) = mint_return {
             token_ids.push(token_id);
         }
+
+        tick_n_blocks(pic, 5);
     }
 
     let current_time = pic
@@ -1879,6 +1891,8 @@ fn test_icrc7_transfer_batch_with_memo() {
                 subaccount: None
             })
         );
+
+        tick_n_blocks(pic, 5);
     }
 }
 
@@ -1916,6 +1930,8 @@ fn test_icrc7_transfer_batch_with_subaccounts() {
         if let Ok(token_id) = mint_return {
             token_ids.push(token_id);
         }
+
+        tick_n_blocks(pic, 5);
     }
 
     let current_time = pic
@@ -1973,6 +1989,7 @@ fn test_icrc7_transfer_batch_with_subaccounts() {
                 }
             })
         );
+        tick_n_blocks(pic, 5);
     }
 }
 
@@ -2001,6 +2018,8 @@ fn test_icrc7_transfer_batch_with_time_constraints() {
             controller,
             collection_canister_id,
         );
+
+        tick_n_blocks(pic, 5);
         if let Ok(token_id) = mint_return {
             token_ids.push(token_id);
         }
@@ -2042,6 +2061,7 @@ fn test_icrc7_transfer_batch_with_time_constraints() {
                 subaccount: None
             })
         );
+        tick_n_blocks(pic, 5);
     }
 }
 
@@ -2148,6 +2168,7 @@ fn test_icrc7_transfer_with_supply_cap() {
             collection_canister_id,
         );
         assert!(mint_return.is_ok());
+        tick_n_blocks(pic, 5);
     }
 
     let mint_return = mint_nft(
@@ -2161,6 +2182,7 @@ fn test_icrc7_transfer_with_supply_cap() {
         collection_canister_id,
     );
     assert!(mint_return.is_err());
+    tick_n_blocks(pic, 5);
 
     let total_supply = icrc7_total_supply(pic, controller, collection_canister_id, &());
     assert_eq!(total_supply, Nat::from(supply_cap));
@@ -2192,6 +2214,8 @@ fn test_icrc7_transfer_chain() {
         collection_canister_id,
     );
 
+    tick_n_blocks(pic, 5);
+
     match mint_return {
         Ok(token_id) => {
             let current_time = pic
@@ -2217,6 +2241,7 @@ fn test_icrc7_transfer_chain() {
                 transfer_response_1[0].is_some()
                     && transfer_response_1[0].as_ref().unwrap().is_ok()
             );
+            tick_n_blocks(pic, 5);
 
             let transfer_args_2 = vec![icrc7::TransferArg {
                 to: Account {
@@ -2253,6 +2278,7 @@ fn test_icrc7_transfer_chain() {
                 transfer_response_3[0].is_some()
                     && transfer_response_3[0].as_ref().unwrap().is_ok()
             );
+            tick_n_blocks(pic, 5);
 
             let owner_of = icrc7_owner_of(pic, controller, collection_canister_id, &vec![token_id]);
             assert_eq!(
@@ -2262,6 +2288,7 @@ fn test_icrc7_transfer_chain() {
                     subaccount: None
                 })
             );
+            tick_n_blocks(pic, 5);
         }
         Err(e) => {
             println!("Error minting NFT: {:?}", e);
@@ -2291,6 +2318,7 @@ fn test_icrc7_transfer_with_metadata_updates() {
         controller,
         collection_canister_id,
     );
+    tick_n_blocks(pic, 5);
 
     match mint_return {
         Ok(token_id) => {
@@ -2318,7 +2346,7 @@ fn test_icrc7_transfer_with_metadata_updates() {
                 collection_canister_id,
                 &update_nft_metadata_args,
             );
-            pic.tick();
+            tick_n_blocks(pic, 5);
 
             let transfer_args = vec![icrc7::TransferArg {
                 to: Account {
@@ -2336,6 +2364,7 @@ fn test_icrc7_transfer_with_metadata_updates() {
             assert!(
                 transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_ok()
             );
+            tick_n_blocks(pic, 5);
 
             let mut new_metadata_2: HashMap<String, Value> = HashMap::new();
             new_metadata_2.insert("test3".to_string(), Value::Text("test3".to_string()));
@@ -2355,7 +2384,7 @@ fn test_icrc7_transfer_with_metadata_updates() {
                 collection_canister_id,
                 &update_nft_metadata_args_2,
             );
-            pic.tick();
+            tick_n_blocks(pic, 5);
 
             let owner_of = icrc7_owner_of(
                 pic,
@@ -2370,6 +2399,7 @@ fn test_icrc7_transfer_with_metadata_updates() {
                     subaccount: None
                 })
             );
+            tick_n_blocks(pic, 5);
 
             let metadata =
                 icrc7_token_metadata(pic, controller, collection_canister_id, &vec![token_id]);
@@ -2378,6 +2408,7 @@ fn test_icrc7_transfer_with_metadata_updates() {
                 metadata[0].clone().unwrap()[2].1,
                 Value::Text("test2".to_string())
             );
+            tick_n_blocks(pic, 5);
         }
         Err(e) => {
             println!("Error minting NFT: {:?}", e);

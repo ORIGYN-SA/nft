@@ -1,6 +1,6 @@
 use crate::lifecycle::init_canister;
 use crate::memory::get_upgrades_memory;
-use crate::state::{read_state, replace_icrc3, RuntimeState};
+use crate::state::{read_state, replace_icrc3, start_default_archive_job, RuntimeState};
 use crate::types::http::add_redirection;
 use crate::Args;
 
@@ -52,6 +52,7 @@ fn post_upgrade(args: Args) {
             bity_ic_canister_logger::init_with_logs(state.env.is_test_mode(), logs, traces);
             init_canister(state.clone());
             replace_icrc3(icrc3);
+            start_default_archive_job();
 
             let media_redirections = read_state(|state| state.data.media_redirections.clone());
             for (path, redirection_url) in media_redirections {

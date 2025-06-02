@@ -13,10 +13,7 @@ use ic_cdk_macros::update;
 use icrc_ledger_types::icrc1::account::Account;
 use std::collections::HashMap;
 
-async fn verify_approval_timing(
-    created_at_time: u64,
-    current_time: u64,
-) -> Result<(), (bool, u64)> {
+fn verify_approval_timing(created_at_time: u64, current_time: u64) -> Result<(), (bool, u64)> {
     let permited_drift = read_state(|state| state.data.permitted_drift.clone())
         .unwrap_or(Nat::from(crate::types::icrc7::DEFAULT_PERMITTED_DRIFT));
 
@@ -46,30 +43,28 @@ async fn verify_approval_timing(
 }
 
 #[update]
-async fn icrc37_approve_tokens(
-    args: icrc37_approve_tokens::Args,
-) -> icrc37_approve_tokens::Response {
+fn icrc37_approve_tokens(args: icrc37_approve_tokens::Args) -> icrc37_approve_tokens::Response {
     let caller = ic_cdk::caller();
 
     let mut results = Vec::with_capacity(args.len());
 
     for arg in args {
         let current_time = ic_cdk::api::time(); // get current time each time because of the async calls.
-        let result = approve_token(arg, caller, current_time).await;
+        let result = approve_token(arg, caller, current_time);
         results.push(Some(result));
     }
 
     Ok(results)
 }
 
-async fn approve_token(
+fn approve_token(
     arg: icrc37_approve_tokens::ApproveTokenArg,
     caller: Principal,
     current_time: u64,
 ) -> icrc37_approve_tokens::ApproveTokenResult {
     use icrc37_approve_tokens::{ApproveTokenError, ApproveTokenResult};
 
-    match verify_approval_timing(arg.approval_info.created_at_time, current_time).await {
+    match verify_approval_timing(arg.approval_info.created_at_time, current_time) {
         Err((true, ledger_time)) => {
             return ApproveTokenResult::Err(ApproveTokenError::CreatedInFuture { ledger_time });
         }
@@ -173,7 +168,7 @@ async fn approve_token(
         },
     };
 
-    let index = match icrc3_add_transaction(transaction).await {
+    let index = match icrc3_add_transaction(transaction) {
         Ok(index) => index,
         Err(e) => {
             return ApproveTokenResult::Err(ApproveTokenError::GenericError {
@@ -197,7 +192,7 @@ async fn approve_token(
 }
 
 #[update]
-async fn icrc37_approve_collection(
+fn icrc37_approve_collection(
     args: icrc37_approve_collection::Args,
 ) -> icrc37_approve_collection::Response {
     let caller = ic_cdk::caller();
@@ -206,21 +201,21 @@ async fn icrc37_approve_collection(
 
     for arg in args {
         let current_time = ic_cdk::api::time(); // get current time each time because of the async calls.
-        let result = approve_collection(arg, caller, current_time).await;
+        let result = approve_collection(arg, caller, current_time);
         results.push(Some(result));
     }
 
     Ok(results)
 }
 
-async fn approve_collection(
+fn approve_collection(
     arg: icrc37_approve_collection::ApproveCollectionArg,
     caller: Principal,
     current_time: u64,
 ) -> icrc37_approve_collection::ApproveCollectionResult {
     use icrc37_approve_collection::{ApproveCollectionError, ApproveCollectionResult};
 
-    match verify_approval_timing(arg.approval_info.created_at_time, current_time).await {
+    match verify_approval_timing(arg.approval_info.created_at_time, current_time) {
         Err((true, ledger_time)) => {
             return ApproveCollectionResult::Err(ApproveCollectionError::CreatedInFuture {
                 ledger_time,
@@ -318,7 +313,7 @@ async fn approve_collection(
         },
     };
 
-    let index = match icrc3_add_transaction(transaction).await {
+    let index = match icrc3_add_transaction(transaction) {
         Ok(index) => index,
         Err(e) => {
             return ApproveCollectionResult::Err(ApproveCollectionError::GenericError {
@@ -341,7 +336,7 @@ async fn approve_collection(
 }
 
 #[update]
-async fn icrc37_revoke_token_approvals(
+fn icrc37_revoke_token_approvals(
     args: icrc37_revoke_token_approvals::Args,
 ) -> icrc37_revoke_token_approvals::Response {
     let caller = ic_cdk::caller();
@@ -375,14 +370,14 @@ async fn icrc37_revoke_token_approvals(
     for arg in args {
         let current_time = ic_cdk::api::time();
 
-        let result = revoke_token_approvals(arg, caller, current_time).await;
+        let result = revoke_token_approvals(arg, caller, current_time);
         results.push(Some(result));
     }
 
     Ok(results)
 }
 
-async fn revoke_token_approvals(
+fn revoke_token_approvals(
     arg: icrc37_revoke_token_approvals::RevokeTokenApprovalArg,
     caller: Principal,
     current_time: u64,
@@ -390,7 +385,7 @@ async fn revoke_token_approvals(
     use icrc37_revoke_token_approvals::{RevokeTokenApprovalError, RevokeTokenApprovalResponse};
 
     if let Some(created_at_time) = arg.created_at_time {
-        match verify_approval_timing(created_at_time, current_time).await {
+        match verify_approval_timing(created_at_time, current_time) {
             Err((true, ledger_time)) => {
                 return RevokeTokenApprovalResponse::Err(
                     RevokeTokenApprovalError::CreatedInFuture { ledger_time },
@@ -456,7 +451,7 @@ async fn revoke_token_approvals(
         },
     };
 
-    let index = match icrc3_add_transaction(transaction).await {
+    let index = match icrc3_add_transaction(transaction) {
         Ok(index) => index,
         Err(e) => {
             return RevokeTokenApprovalResponse::Err(RevokeTokenApprovalError::GenericError {
@@ -477,7 +472,7 @@ async fn revoke_token_approvals(
 }
 
 #[update]
-async fn icrc37_revoke_collection_approvals(
+fn icrc37_revoke_collection_approvals(
     args: icrc37_revoke_collection_approvals::Args,
 ) -> icrc37_revoke_collection_approvals::Response {
     let caller = ic_cdk::caller();
@@ -510,14 +505,14 @@ async fn icrc37_revoke_collection_approvals(
 
     for arg in args {
         let current_time = ic_cdk::api::time();
-        let result = revoke_collection_approvals(arg, caller, current_time).await;
+        let result = revoke_collection_approvals(arg, caller, current_time);
         results.push(Some(result));
     }
 
     Ok(results)
 }
 
-async fn revoke_collection_approvals(
+fn revoke_collection_approvals(
     arg: icrc37_revoke_collection_approvals::RevokeCollectionApprovalArg,
     caller: Principal,
     current_time: u64,
@@ -527,7 +522,7 @@ async fn revoke_collection_approvals(
     };
 
     if let Some(created_at_time) = arg.created_at_time {
-        match verify_approval_timing(created_at_time, current_time).await {
+        match verify_approval_timing(created_at_time, current_time) {
             Err((true, ledger_time)) => {
                 return RevokeCollectionApprovalResult::Err(
                     RevokeCollectionApprovalError::CreatedInFuture { ledger_time },
@@ -577,7 +572,7 @@ async fn revoke_collection_approvals(
         },
     };
 
-    let index = match icrc3_add_transaction(transaction).await {
+    let index = match icrc3_add_transaction(transaction) {
         Ok(index) => index,
         Err(e) => {
             return RevokeCollectionApprovalResult::Err(
@@ -597,21 +592,21 @@ async fn revoke_collection_approvals(
 }
 
 #[update]
-async fn icrc37_transfer_from(args: icrc37_transfer_from::Args) -> icrc37_transfer_from::Response {
+fn icrc37_transfer_from(args: icrc37_transfer_from::Args) -> icrc37_transfer_from::Response {
     let caller = ic_cdk::caller();
 
     let mut results = Vec::with_capacity(args.len());
 
     for arg in args {
         let current_time = ic_cdk::api::time();
-        let result = transfer_from(arg, caller, current_time).await;
+        let result = transfer_from(arg, caller, current_time);
         results.push(Some(result));
     }
 
     Ok(results)
 }
 
-async fn transfer_from(
+fn transfer_from(
     arg: icrc37_transfer_from::TransferFromArg,
     caller: Principal,
     current_time: u64,
@@ -619,7 +614,7 @@ async fn transfer_from(
     use icrc37_transfer_from::{TransferFromError, TransferFromResult};
 
     if let Some(created_at_time) = arg.created_at_time {
-        match verify_approval_timing(created_at_time, current_time).await {
+        match verify_approval_timing(created_at_time, current_time) {
             Err((true, ledger_time)) => {
                 return TransferFromResult::Err(TransferFromError::CreatedInFuture { ledger_time });
             }
@@ -715,7 +710,7 @@ async fn transfer_from(
         },
     };
 
-    let index = match icrc3_add_transaction(transaction).await {
+    let index = match icrc3_add_transaction(transaction) {
         Ok(index) => index,
         Err(e) => match e {
             Icrc3Error::Icrc3Error(e) => {

@@ -125,7 +125,9 @@ pub async fn update_collection_metadata(
 }
 
 #[update(guard = "caller_is_minting_authority")]
-pub async fn mint(req: management::mint::Args) -> management::mint::Response {
+pub fn mint(req: management::mint::Args) -> management::mint::Response {
+    trace("Minting NFT");
+    trace(&format!("timestamp: {:?}", ic_cdk::api::time()));
     let caller = ic_cdk::caller();
     let _guard_principal =
         GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
@@ -186,7 +188,7 @@ pub async fn mint(req: management::mint::Args) -> management::mint::Response {
                 },
             };
 
-            match icrc3_add_transaction(transaction).await {
+            match icrc3_add_transaction(transaction) {
                 Ok(_) => {}
                 Err(e) => {
                     return Err((
@@ -210,7 +212,7 @@ pub async fn mint(req: management::mint::Args) -> management::mint::Response {
 }
 
 #[update(guard = "caller_is_governance_principal")]
-pub async fn update_nft_metadata(
+pub fn update_nft_metadata(
     req: management::update_nft_metadata::Args,
 ) -> management::update_nft_metadata::Response {
     trace("Updating NFT metadata");
@@ -280,7 +282,7 @@ pub async fn update_nft_metadata(
                 },
             };
 
-            match icrc3_add_transaction(transaction).await {
+            match icrc3_add_transaction(transaction) {
                 Ok(_) => {}
                 Err(e) => {
                     return Err((
@@ -321,7 +323,7 @@ pub async fn update_nft_metadata(
 }
 
 #[update(guard = "caller_is_governance_principal")]
-pub async fn burn_nft(token_id: Nat) -> Result<(), (RejectionCode, String)> {
+pub fn burn_nft(token_id: Nat) -> Result<(), (RejectionCode, String)> {
     let caller = ic_cdk::caller();
     let _guard_principal =
         GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
@@ -351,7 +353,7 @@ pub async fn burn_nft(token_id: Nat) -> Result<(), (RejectionCode, String)> {
         },
     };
 
-    match icrc3_add_transaction(transaction).await {
+    match icrc3_add_transaction(transaction) {
         Ok(_) => {}
         Err(e) => {
             return Err((
