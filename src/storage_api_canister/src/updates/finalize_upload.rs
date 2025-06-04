@@ -1,4 +1,4 @@
-use candid::{CandidType, Nat};
+use candid::CandidType;
 use ic_cdk::api::call::CallResult as Result;
 use serde::{Deserialize, Serialize};
 

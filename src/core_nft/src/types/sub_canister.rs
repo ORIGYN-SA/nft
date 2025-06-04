@@ -219,6 +219,7 @@ impl StorageCanister {
         }
     }
 
+    #[allow(dead_code)]
     async fn get_canister_controllers(&self) -> Result<Vec<Principal>, CanisterError> {
         match retry_async(
             || {

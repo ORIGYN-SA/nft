@@ -1,6 +1,6 @@
 use crate::{
     state::mutate_state,
-    types::http::{self, get_asset_headers, ASSET_ROUTER, HTTP_TREE, NO_CACHE_ASSET_CACHE_CONTROL},
+    types::http::{get_asset_headers, ASSET_ROUTER, HTTP_TREE, NO_CACHE_ASSET_CACHE_CONTROL},
     utils::trace,
 };
 use bity_ic_canister_logger::LogEntry;

@@ -2,8 +2,9 @@ use crate::memory::VM;
 use crate::types::value_custom::CustomValue as Value;
 use crate::{memory::get_metadata_nft_memory, utils::trace};
 
-use candid::{CandidType, Decode, Encode, Nat};
+use candid::{CandidType, Nat};
 use ic_stable_structures::{storable::Bound, StableBTreeMap, Storable};
+use minicbor::{decode, encode, Decode as MinicborDecode, Encode as MinicborEncode};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -15,27 +16,83 @@ pub struct MetadataData {
 
 impl Storable for MetadataData {
     fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(Encode!(self).unwrap())
+        let mut buffer = Vec::new();
+        encode(self, &mut buffer).expect("failed to encode MetadataData");
+        Cow::Owned(buffer)
     }
+
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        Decode!(&bytes, Self).unwrap()
+        decode(&bytes).expect("failed to decode MetadataData")
     }
 
     const BOUND: Bound = Bound::Unbounded;
 }
 
-#[derive(Serialize, Deserialize, CandidType, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct NatWrapper(Nat);
+impl<C> MinicborEncode<C> for MetadataData {
+    fn encode<W: minicbor::encode::Write>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        _ctx: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>> {
+        e.map(self.data.len() as u64)?;
+        for (k, v) in &self.data {
+            e.str(k)?;
+            v.encode(e, _ctx)?;
+        }
+        Ok(())
+    }
+}
+
+impl<'b, C> MinicborDecode<'b, C> for MetadataData {
+    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+        let len = d.map()?.unwrap();
+        let mut data = HashMap::new();
+        for _ in 0..len {
+            let k = d.str()?.to_string();
+            let v = Value::decode(d, ctx)?;
+            data.insert(k, v);
+        }
+        Ok(MetadataData { data })
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, CandidType, PartialEq, Eq, PartialOrd, Ord)]
+pub struct NatWrapper(pub Nat);
 
 impl Storable for NatWrapper {
     fn to_bytes(&self) -> Cow<[u8]> {
-        Cow::Owned(Encode!(self).unwrap())
+        let mut buffer = Vec::new();
+        encode(self, &mut buffer).expect("failed to encode NatWrapper");
+        Cow::Owned(buffer)
     }
+
     fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        Decode!(&bytes, Self).unwrap()
+        decode(&bytes).expect("failed to decode NatWrapper")
     }
 
     const BOUND: Bound = Bound::Unbounded;
+}
+
+impl<C> MinicborEncode<C> for NatWrapper {
+    fn encode<W: minicbor::encode::Write>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        _ctx: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>> {
+        let n = self.0.to_string().parse::<u64>().unwrap();
+        e.u64(n)?;
+        Ok(())
+    }
+}
+
+impl<'b, C> MinicborDecode<'b, C> for NatWrapper {
+    fn decode(
+        d: &mut minicbor::Decoder<'b>,
+        _ctx: &mut C,
+    ) -> Result<Self, minicbor::decode::Error> {
+        let n = d.u64()?;
+        Ok(NatWrapper(Nat::from(n)))
+    }
 }
 
 #[derive(Serialize, Deserialize)]

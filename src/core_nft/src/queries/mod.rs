@@ -5,7 +5,6 @@ pub mod icrc3;
 pub mod icrc37;
 pub mod icrc7;
 
-pub use http_request::*;
 pub use icrc10::*;
 pub use icrc21::*;
 pub use icrc3::*;

@@ -1,4 +1,3 @@
-use candid::Nat;
 use ic_asset_certification::Asset;
 use storage_api_canister::cancel_upload;
 use storage_api_canister::delete_file;

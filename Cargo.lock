@@ -307,9 +307,9 @@ dependencies = [
 
 [[package]]
 name = "bity-ic-icrc3"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5bd449b48a1017d20a53afc525e11b794d4815d6620f33d922a86ea203cb326"
+checksum = "847754c0abe716601adfce62cdf6b6289a6a73d56a55934aea94306c0ffd2985"
 dependencies = [
  "bity-ic-canister-time",
  "bity-ic-icrc3-archive-api",
@@ -328,7 +328,6 @@ dependencies = [
  "ic0",
  "icrc-ledger-types 0.1.8",
  "leb128",
- "minicbor 0.25.1",
  "serde",
  "serde_bytes",
  "serde_cbor",
@@ -339,15 +338,16 @@ dependencies = [
 
 [[package]]
 name = "bity-ic-icrc3-archive-api"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4370f66923a8c180170f479a9a06a56ce14b2e85e95a28d8b2fe3a17431cad6a"
+checksum = "385e8be110b5f1fc9bef42d08c94806dd8d3691fa8d328d3c1c4d2c75b7de924"
 dependencies = [
  "bity-ic-types",
  "candid",
  "hex",
  "ic-stable-structures",
  "icrc-ledger-types 0.1.8",
+ "minicbor 1.0.0",
  "serde",
  "serde_bytes",
  "serde_cbor",
@@ -356,9 +356,9 @@ dependencies = [
 
 [[package]]
 name = "bity-ic-icrc3-archive-c2c-client"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b7d4e33f98dc75f98b15db84146eabe723da6a0c7d9a4da09e641e8bc1fd57e"
+checksum = "be5117371e12005b33cc350bf8762ef60be9a073016e0fdee1a22c40bdd35bd8"
 dependencies = [
  "bity-ic-canister-client",
  "bity-ic-icrc3-archive-api",
@@ -717,6 +717,7 @@ dependencies = [
  "ic0",
  "icrc-ledger-types 0.1.8",
  "lazy_static",
+ "minicbor 1.0.0",
  "serde",
  "serde_bytes",
  "serde_cbor",
@@ -2204,11 +2205,11 @@ dependencies = [
 
 [[package]]
 name = "minicbor"
-version = "0.25.1"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0452a60c1863c1f50b5f77cd295e8d2786849f35883f0b9e18e7e6e1b5691b0"
+checksum = "50699691433ccd88fbe1f11e9155691d71fc363595109f35a92b77be2e0158f6"
 dependencies = [
- "minicbor-derive 0.15.3",
+ "minicbor-derive 0.17.0",
 ]
 
 [[package]]
@@ -2224,9 +2225,9 @@ dependencies = [
 
 [[package]]
 name = "minicbor-derive"
-version = "0.15.3"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd2209fff77f705b00c737016a48e73733d7fbccb8b007194db148f03561fb70"
+checksum = "512ce2c37128698ea15c99b3518936c78a8b112b92468e7b95b9fa045666ebd8"
 dependencies = [
  "proc-macro2",
  "quote",

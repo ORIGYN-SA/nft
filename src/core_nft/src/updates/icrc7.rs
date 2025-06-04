@@ -21,19 +21,18 @@ pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_t
         ))];
     }
 
-    let (max_update_batch_size, atomic_batch_transfers, tx_window, permitted_drift) =
-        read_state(|state| {
-            (
-                state
-                    .data
-                    .max_update_batch_size
-                    .clone()
-                    .unwrap_or(Nat::from(icrc7::DEFAULT_MAX_UPDATE_BATCH_SIZE)),
-                state.data.atomic_batch_transfers.unwrap_or(false),
-                state.data.tx_window.clone(),
-                state.data.permitted_drift.clone(),
-            )
-        });
+    let (max_update_batch_size, _, tx_window, permitted_drift) = read_state(|state| {
+        (
+            state
+                .data
+                .max_update_batch_size
+                .clone()
+                .unwrap_or(Nat::from(icrc7::DEFAULT_MAX_UPDATE_BATCH_SIZE)),
+            state.data.atomic_batch_transfers.unwrap_or(false),
+            state.data.tx_window.clone(),
+            state.data.permitted_drift.clone(),
+        )
+    });
 
     let max_batch_size = usize::try_from(max_update_batch_size.0).unwrap();
     if args.len() > max_batch_size {

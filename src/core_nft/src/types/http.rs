@@ -1,4 +1,4 @@
-use ic_asset_certification::{Asset, AssetConfig, AssetEncoding, AssetRedirectKind, AssetRouter};
+use ic_asset_certification::{AssetConfig, AssetRedirectKind, AssetRouter};
 use ic_cdk::api::set_certified_data;
 use ic_http_certification::{
     HeaderField, HttpCertification, HttpCertificationPath, HttpCertificationTree,
@@ -6,7 +6,7 @@ use ic_http_certification::{
 };
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{state::read_state, utils::trace};
+use crate::utils::trace;
 
 thread_local! {
     pub static HTTP_TREE: Rc<RefCell<HttpCertificationTree>> = Default::default();
@@ -23,7 +23,7 @@ thread_local! {
     );
 }
 
-const IMMUTABLE_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
+// const IMMUTABLE_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
 pub const NO_CACHE_ASSET_CACHE_CONTROL: &str = "public, no-cache, no-store";
 
 pub fn add_redirection(from_url: String, to_url: String) -> Option<()> {

@@ -603,11 +603,11 @@ pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response
     let _guard_principal =
         GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
 
-    let (media_path, canister_id) =
+    let canister_id =
         match read_state(|state| state.internal_filestorage.get(&data.file_path).cloned()) {
             Some(data) => match data.state {
-                UploadState::Init => (data.path, data.canister),
-                UploadState::InProgress => (data.path, data.canister),
+                UploadState::Init => data.canister,
+                UploadState::InProgress => data.canister,
                 UploadState::Finalized => {
                     return Err((
                         RejectionCode::CanisterError,

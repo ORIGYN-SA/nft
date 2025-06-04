@@ -1,5 +1,4 @@
-use candid::Nat;
-use candid::{Decode, Encode};
+use candid::{Decode, Nat};
 use ic_cdk::query;
 
 use crate::state::read_state;
@@ -53,8 +52,8 @@ fn create_consent_info(
         };
 
     let consent_message = icrc21::icrc21_canister_call_consent_message::icrc21_consent_message {
-        GenericDisplayMessage: generic_message,
-        FieldsDisplayMessage: fields_message,
+        generic_display_message: generic_message,
+        fields_display_message: fields_message,
     };
 
     let consent_info = icrc21::icrc21_canister_call_consent_message::icrc21_consent_info {

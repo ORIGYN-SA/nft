@@ -2,8 +2,7 @@ use super::Metadata;
 use crate::types::value_custom::CustomValue as Value;
 use crate::utils::trace;
 
-use candid::{CandidType, Decode, Encode, Nat};
-use ic_stable_structures::{storable::Bound, Storable};
+use candid::{CandidType, Nat};
 use icrc_ledger_types::{icrc::generic_value::ICRC3Value as Icrc3Value, icrc1::account::Account};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -17,18 +16,6 @@ pub struct Icrc7Token {
     pub token_description: Option<String>,
     pub token_logo: Option<String>,
     pub token_owner: Account,
-}
-
-impl Storable for Icrc7Token {
-    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
-        Decode!(bytes.as_ref(), Self).unwrap()
-    }
-
-    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
-        std::borrow::Cow::Owned(Encode!(self).unwrap())
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
 }
 
 impl Icrc7Token {
@@ -127,12 +114,5 @@ impl Icrc7Token {
         trace(&format!("nft update_metadata - finished"));
 
         Ok(None)
-    }
-
-    fn burn(&mut self) {
-        self.token_owner = Account {
-            owner: ic_cdk::id(),
-            subaccount: None,
-        };
     }
 }

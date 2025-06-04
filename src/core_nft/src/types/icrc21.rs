@@ -63,11 +63,11 @@ pub mod icrc21_canister_call_consent_message {
     pub struct icrc21_consent_message {
         // Message for a generic display able to handle large documents and do proper line wrapping and pagination / scrolling.
         // Uses Markdown formatting, no external resources (e.g. images) are allowed.
-        pub GenericDisplayMessage: String,
+        pub generic_display_message: String,
         // Message for a simple display able to handle multiple fields title and content.
         // It's able to do line wrapping and splits fields into multiple pages if they're too long.
         // Uses plain text, without any embedded formatting elements.
-        pub FieldsDisplayMessage: icrc21_field_display_message,
+        pub fields_display_message: icrc21_field_display_message,
     }
 
     #[allow(non_camel_case_types)]

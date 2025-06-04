@@ -1,14 +1,14 @@
 use ic_cdk::export_candid;
 
-use crate::types::icrc10;
-use crate::types::icrc21;
-use crate::types::icrc7;
-use crate::types::management;
-use storage_api_canister::updates::cancel_upload;
-use storage_api_canister::updates::delete_file;
-use storage_api_canister::updates::finalize_upload;
-use storage_api_canister::updates::init_upload;
-use storage_api_canister::updates::store_chunk;
+pub use crate::types::icrc10;
+pub use crate::types::icrc21;
+pub use crate::types::icrc7;
+pub use crate::types::management;
+pub use storage_api_canister::updates::cancel_upload;
+pub use storage_api_canister::updates::delete_file;
+pub use storage_api_canister::updates::finalize_upload;
+pub use storage_api_canister::updates::init_upload;
+pub use storage_api_canister::updates::store_chunk;
 
 mod guards;
 mod jobs;
