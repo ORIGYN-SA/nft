@@ -41,13 +41,22 @@ impl Icrc7Token {
 
     pub fn token_metadata(&self, tokens_metadata: &Metadata) -> Icrc7TokenMetadata {
         let mut metadata = HashMap::<String, Icrc3Value>::new();
-        metadata.insert("Name".into(), Icrc3Value::Text(self.token_name.clone()));
-        metadata.insert("Symbol".into(), Icrc3Value::Text(self.token_name.clone()));
+        metadata.insert(
+            "icrc7:name".into(),
+            Icrc3Value::Text(self.token_name.clone()),
+        );
+        metadata.insert(
+            "icrc7:symbol".into(),
+            Icrc3Value::Text(self.token_name.clone()),
+        );
         if let Some(ref description) = self.token_description {
-            metadata.insert("Description".into(), Icrc3Value::Text(description.clone()));
+            metadata.insert(
+                "icrc7:description".into(),
+                Icrc3Value::Text(description.clone()),
+            );
         }
         if let Some(ref logo) = self.token_logo {
-            metadata.insert("Logo".into(), Icrc3Value::Text(logo.clone()));
+            metadata.insert("icrc7:logo".into(), Icrc3Value::Text(logo.clone()));
         }
 
         match tokens_metadata.get_all_data(Some(self.token_id.clone())) {
@@ -57,7 +66,12 @@ impl Icrc7Token {
                         "nft token_metadata - key: {:?}, value: {:?}",
                         key, value
                     ));
-                    metadata.insert(key.clone(), value.0.clone());
+                    let prefixed_key = if !key.starts_with("icrc7:") {
+                        format!("icrc7:{}", key)
+                    } else {
+                        key.clone()
+                    };
+                    metadata.insert(prefixed_key, value.0.clone());
                 }
             }
             Err(e) => {

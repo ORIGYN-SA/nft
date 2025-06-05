@@ -256,7 +256,12 @@ pub fn update_nft_metadata(
             if let Some(metadata) = req.token_metadata.clone() {
                 let mut btree_metadata = BTreeMap::new();
                 for (key, value) in metadata {
-                    btree_metadata.insert(key.clone(), value.clone());
+                    let prefixed_key = if !key.starts_with("icrc7:") {
+                        format!("icrc7:{}", key)
+                    } else {
+                        key.clone()
+                    };
+                    btree_metadata.insert(prefixed_key, value.clone());
                 }
                 metadata_map.insert(
                     "icrc7:token_metadata".to_string(),
