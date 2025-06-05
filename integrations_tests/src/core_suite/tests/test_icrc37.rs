@@ -40,11 +40,7 @@ fn test_icrc37_approve_tokens() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             let approval_info = icrc37::ApprovalInfo {
                 spender: Account {
@@ -127,11 +123,7 @@ fn test_icrc37_approve_collection() {
             assert!(false);
         }
     }
-    let current_time = pic
-        .get_time()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos() as u64;
+    let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
     let approval_info = icrc37::ApprovalInfo {
         spender: Account {
@@ -211,11 +203,7 @@ fn test_icrc37_revoke_token_approvals() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             // First approve the token
             let approval_info = icrc37::ApprovalInfo {
@@ -318,11 +306,7 @@ fn test_icrc37_transfer_from() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             // First approve the token
             let approval_info = icrc37::ApprovalInfo {
@@ -451,11 +435,7 @@ fn test_icrc37_transfer_from_unauthorized_account() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             let approval_info = icrc37::ApprovalInfo {
                 spender: Account {
@@ -553,11 +533,7 @@ fn test_icrc37_transfer_from_multiple_approvals_unauthorized() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             // Approve for nft_owner2
             let approval_info_2 = icrc37::ApprovalInfo {
@@ -671,11 +647,7 @@ fn test_icrc37_transfer_from_single_approval_authorized() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             // Approve for nft_owner2
             let approval_info = icrc37::ApprovalInfo {
@@ -773,11 +745,7 @@ fn test_icrc37_transfer_from_multiple_approvals_authorized() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             // Approve for nft_owner2
             let approval_info_2 = icrc37::ApprovalInfo {
@@ -893,11 +861,7 @@ fn test_icrc37_transfer_from_multiple_approvals_sequential_transfers() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             // Approve for nft_owner2
             let approval_info_2 = icrc37::ApprovalInfo {
@@ -1070,11 +1034,7 @@ fn test_icrc37_revoke_token_approvals_max_limit() {
 
             // First, try to approve up to the limit
             for i in 0..max_approvals {
-                let current_time = pic
-                    .get_time()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos() as u64;
+                let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
                 let spender = random_principal();
                 let approval_info = icrc37::ApprovalInfo {
@@ -1109,11 +1069,7 @@ fn test_icrc37_revoke_token_approvals_max_limit() {
                 tick_n_blocks(pic, 10);
             }
 
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             // Then try to approve one more, which should fail
             let spender = random_principal();
@@ -1165,11 +1121,7 @@ fn test_icrc37_revoke_token_approvals_max_limit() {
 
             // Try to revoke approvals one by one
             for approval in approvals.iter().take(max_revoke_approvals) {
-                let current_time = pic
-                    .get_time()
-                    .duration_since(UNIX_EPOCH)
-                    .unwrap()
-                    .as_nanos() as u64;
+                let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
                 let revoke_args = vec![
                     icrc37::icrc37_revoke_token_approvals::RevokeTokenApprovalArg {
@@ -1206,11 +1158,7 @@ fn test_icrc37_revoke_token_approvals_max_limit() {
             }
 
             // Try to revoke one more approval, which should fail
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             let remaining_approvals: core_nft::types::icrc37::icrc37_get_token_approvals::Response =
                 crate::client::pocket::unwrap_response(pic.query_call(
@@ -1259,11 +1207,7 @@ fn test_icrc37_revoke_collection_approvals_max_limit() {
         nft_owner2,
     } = test_env;
 
-    let current_time = pic
-        .get_time()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos() as u64;
+    let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
     let mint_return = mint_nft(
         pic,
@@ -1294,11 +1238,7 @@ fn test_icrc37_revoke_collection_approvals_max_limit() {
 
     // First, try to approve up to the limit
     for i in 0..max_approvals {
-        let current_time = pic
-            .get_time()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
+        let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
         let spender = random_principal();
 
@@ -1336,11 +1276,7 @@ fn test_icrc37_revoke_collection_approvals_max_limit() {
     }
 
     // Then try to approve one more, which should fail
-    let current_time = pic
-        .get_time()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos() as u64;
+    let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
     let spender = random_principal();
 
@@ -1401,11 +1337,7 @@ fn test_icrc37_revoke_collection_approvals_max_limit() {
 
     // Try to revoke approvals one by one
     for approval in approvals.iter().take(max_revoke_approvals) {
-        let current_time = pic
-            .get_time()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
+        let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
         let revoke_args = vec![
             icrc37::icrc37_revoke_collection_approvals::RevokeCollectionApprovalArg {
@@ -1441,11 +1373,7 @@ fn test_icrc37_revoke_collection_approvals_max_limit() {
     }
 
     // Try to revoke one more approval, which should fail
-    let current_time = pic
-        .get_time()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos() as u64;
+    let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
     let remaining_approvals: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
         crate::client::pocket::unwrap_response(
@@ -1530,11 +1458,7 @@ fn test_icrc37_revoke_collection_approvals_within_limit() {
 
     // Create approvals up to max_revoke_approvals
     for i in 0..max_revoke_approvals {
-        let current_time = pic
-            .get_time()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
+        let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
         let spender = random_principal();
         let approval_info = icrc37::ApprovalInfo {
@@ -1591,11 +1515,7 @@ fn test_icrc37_revoke_collection_approvals_within_limit() {
 
     // Try to revoke approvals one by one
     for approval in approvals {
-        let current_time = pic
-            .get_time()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos() as u64;
+        let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
         let revoke_args = vec![
             icrc37::icrc37_revoke_collection_approvals::RevokeCollectionApprovalArg {
@@ -1677,11 +1597,7 @@ fn test_icrc37_approve_collection_with_nft() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             // Approve collection for nft_owner2
             let approval_info = icrc37::ApprovalInfo {
@@ -1814,11 +1730,7 @@ fn test_icrc37_approvals_reset_after_transfer_as_owner() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             // Approve token for nft_owner2
             let token_approval_info = icrc37::ApprovalInfo {
@@ -2014,11 +1926,7 @@ fn test_icrc37_approvals_reset_after_transfer_with_approvals() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             // Approve token for nft_owner2
             let token_approval_info = icrc37::ApprovalInfo {
@@ -2228,11 +2136,7 @@ fn test_icrc37_approve_and_revoke_before_transfer() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             let approval_info = icrc37::ApprovalInfo {
                 spender: Account {
@@ -2349,11 +2253,7 @@ fn test_icrc37_approve_with_expiration() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             // Approve token for nft_owner2 with expiration in 1 minute
             let approval_info = icrc37::ApprovalInfo {
@@ -2456,11 +2356,7 @@ fn test_icrc37_approve_with_subaccount() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             let approval_info = icrc37::ApprovalInfo {
                 spender: Account {
@@ -2556,11 +2452,7 @@ fn test_icrc37_approve_with_memo() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             let approval_info = icrc37::ApprovalInfo {
                 spender: Account {

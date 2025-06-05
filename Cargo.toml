@@ -52,7 +52,7 @@ time = { version = "0.3.41", features = [
   "parsing",
   "formatting",
 ] }
-pocket-ic = "7.0.0"
+pocket-ic = "9.0.1"
 async-trait = "0.1.88"
 enum_dispatch = "0.3.13"
 typetag = "0.2.18"
@@ -73,5 +73,5 @@ bity-ic-stable-memory           = "0.1.0"
 bity-ic-types                   = "0.1.0"
 bity-ic-utils                   = "0.1.0"
 bity-ic-subcanister-manager     = "0.2.4"
-bity-ic-icrc3                   = "0.2.4"
+bity-ic-icrc3                   = "0.2.5"
 bity-ic-icrc3-macros            = "0.2.0" 

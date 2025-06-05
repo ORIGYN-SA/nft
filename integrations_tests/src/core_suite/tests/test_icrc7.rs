@@ -3,10 +3,9 @@ use crate::client::core_nft::{
     icrc7_default_take_value, icrc7_description, icrc7_logo, icrc7_max_memo_size,
     icrc7_max_query_batch_size, icrc7_max_take_value, icrc7_max_update_batch_size, icrc7_name,
     icrc7_owner_of, icrc7_permitted_drift, icrc7_supply_cap, icrc7_symbol, icrc7_token_metadata,
-    icrc7_total_supply, icrc7_transfer, icrc7_tx_window, mint, update_minting_authorities,
-    update_nft_metadata,
+    icrc7_total_supply, icrc7_transfer, icrc7_tx_window, update_nft_metadata,
 };
-use crate::core_suite::setup::setup::{TestEnv, MINUTE_IN_MS};
+use crate::core_suite::setup::setup::TestEnv;
 use crate::utils::mint_nft;
 use crate::utils::random_principal;
 use candid::{Encode, Nat, Principal};
@@ -16,7 +15,7 @@ use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
 use icrc_ledger_types::icrc1::account::Account;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, UNIX_EPOCH};
 
 use crate::{core_suite::setup::default_test_setup, utils::tick_n_blocks};
 
@@ -1574,11 +1573,7 @@ fn test_icrc7_transfer_permitted_drift() {
 
     match mint_return {
         Ok(token_id) => {
-            let nanos = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let nanos = pic.get_time().as_nanos_since_unix_epoch();
             let future_time = nanos + 100_000_000;
 
             let transfer_args = icrc7::TransferArg {
@@ -1640,11 +1635,7 @@ fn test_icrc7_transfer_within_permitted_drift() {
 
     match mint_return {
         Ok(token_id) => {
-            let nanos = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let nanos = pic.get_time().as_nanos_since_unix_epoch();
             let future_time = nanos + 10_000_000;
             let transfer_args = icrc7::TransferArg {
                 to: Account {
@@ -1710,11 +1701,7 @@ fn test_icrc7_transfer_too_old() {
 
     match mint_return {
         Ok(token_id) => {
-            let nanos = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let nanos = pic.get_time().as_nanos_since_unix_epoch();
             let old_time = nanos - 3_600_000_000_000;
             println!("old_time: {:?}", old_time);
             let transfer_args = icrc7::TransferArg {
@@ -1776,11 +1763,7 @@ fn test_icrc7_transfer_old_but_valid() {
 
     match mint_return {
         Ok(token_id) => {
-            let nanos = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let nanos = pic.get_time().as_nanos_since_unix_epoch();
             let old_time = nanos - 5_000_000_000; // 5 seconds
             println!("old_time: {:?}", old_time);
             let transfer_args = icrc7::TransferArg {
@@ -1855,11 +1838,7 @@ fn test_icrc7_transfer_batch_with_memo() {
         tick_n_blocks(pic, 5);
     }
 
-    let current_time = pic
-        .get_time()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos() as u64;
+    let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
     let transfer_args: Vec<icrc7::TransferArg> = token_ids
         .iter()
@@ -1934,11 +1913,7 @@ fn test_icrc7_transfer_batch_with_subaccounts() {
         tick_n_blocks(pic, 5);
     }
 
-    let current_time = pic
-        .get_time()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos() as u64;
+    let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
     let transfer_args: Vec<icrc7::TransferArg> = token_ids
         .iter()
@@ -2025,11 +2000,7 @@ fn test_icrc7_transfer_batch_with_time_constraints() {
         }
     }
 
-    let current_time = pic
-        .get_time()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos() as u64;
+    let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
     let transfer_args: Vec<icrc7::TransferArg> = token_ids
         .iter()
@@ -2089,11 +2060,7 @@ fn test_icrc7_transfer_with_max_memo_size() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             let max_memo_size = icrc7_max_memo_size(pic, controller, collection_canister_id, &())
                 .unwrap_or(Nat::from(icrc7::DEFAULT_MAX_MEMO_SIZE))
@@ -2218,11 +2185,7 @@ fn test_icrc7_transfer_chain() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             let transfer_args_1 = vec![icrc7::TransferArg {
                 to: Account {
@@ -2322,11 +2285,7 @@ fn test_icrc7_transfer_with_metadata_updates() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             let mut new_metadata: HashMap<String, Value> = HashMap::new();
             new_metadata.insert("test1".to_string(), Value::Text("test1".to_string()));
@@ -2441,11 +2400,7 @@ fn test_icrc7_transfer_after_fail() {
 
     match mint_return {
         Ok(token_id) => {
-            let current_time = pic
-                .get_time()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_nanos() as u64;
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
             let transfer_args_1 = vec![icrc7::TransferArg {
                 to: Account {
