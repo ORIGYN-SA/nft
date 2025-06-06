@@ -17,7 +17,10 @@ use serde_bytes::ByteBuf;
 use std::collections::HashMap;
 use std::time::{Duration, UNIX_EPOCH};
 
-use crate::{core_suite::setup::default_test_setup, utils::tick_n_blocks};
+use crate::{
+    core_suite::setup::{default_test_setup, test_setup_atomic_batch_transfers},
+    utils::tick_n_blocks,
+};
 
 #[test]
 fn test_icrc7_name() {
@@ -845,6 +848,50 @@ fn test_icrc7_transfer_exceed_max_batch_size() {
 
     println!("transfer_response: {:?}", transfer_response);
     assert!(transfer_response.len() == usize::try_from(max_update_batch_size.0).unwrap());
+}
+
+#[test]
+fn test_icrc7_transfer_atomic_batch_transfers() {
+    let mut test_env: TestEnv = test_setup_atomic_batch_transfers();
+    println!("test_env: {:?}", test_env);
+
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let max_update_batch_size =
+        icrc7_max_update_batch_size(pic, controller, collection_canister_id, &())
+            .unwrap_or(Nat::from(icrc7::DEFAULT_MAX_UPDATE_BATCH_SIZE));
+
+    let transfer_args: Vec<icrc7::TransferArg> =
+        (0..u64::try_from(max_update_batch_size.0.clone()).unwrap() + 1)
+            .map(|_| icrc7::TransferArg {
+                to: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                token_id: Nat::from(1 as u64),
+                memo: None,
+                from_subaccount: None,
+                created_at_time: None,
+            })
+            .collect();
+
+    let transfer_response = icrc7_transfer(pic, controller, collection_canister_id, &transfer_args);
+
+    println!("transfer_response: {:?}", transfer_response);
+    assert!(transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err());
+    assert_eq!(
+        transfer_response[0].clone().unwrap().err().unwrap(),
+        icrc7::icrc7_transfer::TransferError::GenericError {
+            error_code: Nat::from(0u64),
+            message: "Exceed Max allowed Update Batch Size".to_string(),
+        }
+    );
 }
 
 #[test]
