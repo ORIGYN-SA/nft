@@ -165,37 +165,43 @@ fn test_icrc7_token_metadata_simple() {
                 &vec![token_id.clone()],
             );
 
-            assert_eq!(metadata[0].clone().unwrap()[0].0, "Description".to_string());
+            assert_eq!(
+                metadata[0].clone().unwrap()[0].0,
+                "icrc7:description".to_string()
+            );
             assert_eq!(
                 metadata[0].clone().unwrap()[0].1,
                 Value::Text("description".to_string())
             );
-            assert_eq!(metadata[0].clone().unwrap()[1].0, "Logo".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[1].0, "icrc7:logo".to_string());
             assert_eq!(
                 metadata[0].clone().unwrap()[1].1,
                 Value::Text("logo".to_string())
             );
-            assert_eq!(metadata[0].clone().unwrap()[2].0, "Name".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[2].0, "icrc7:name".to_string());
             assert_eq!(
                 metadata[0].clone().unwrap()[2].1,
                 Value::Text("test1".to_string())
             );
-            assert_eq!(metadata[0].clone().unwrap()[3].0, "Symbol".to_string());
+            assert_eq!(
+                metadata[0].clone().unwrap()[3].0,
+                "icrc7:symbol".to_string()
+            );
             assert_eq!(
                 metadata[0].clone().unwrap()[3].1,
                 Value::Text("test1".to_string())
             );
-            assert_eq!(metadata[0].clone().unwrap()[4].0, "test1".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[4].0, "icrc7:test1".to_string());
             assert_eq!(
                 metadata[0].clone().unwrap()[4].1,
                 Value::Text("test1".to_string())
             );
-            assert_eq!(metadata[0].clone().unwrap()[5].0, "test2".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[5].0, "icrc7:test2".to_string());
             assert_eq!(
                 metadata[0].clone().unwrap()[5].1,
                 Value::Nat(Nat::from(1 as u64))
             );
-            assert_eq!(metadata[0].clone().unwrap()[6].0, "test3".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[6].0, "icrc7:test3".to_string());
             assert_eq!(
                 metadata[0].clone().unwrap()[6].1,
                 Value::Blob(ByteBuf::from(logo_data))
@@ -452,32 +458,38 @@ fn test_icrc7_token_metadata_multiple_insert_dup_name() {
             );
 
             println!("metadata: {:?}", metadata);
-            assert_eq!(metadata[0].clone().unwrap()[0].0, "Description".to_string());
+            assert_eq!(
+                metadata[0].clone().unwrap()[0].0,
+                "icrc7:description".to_string()
+            );
             assert_eq!(
                 metadata[0].clone().unwrap()[0].1,
                 Value::Text("description".to_string())
             );
-            assert_eq!(metadata[0].clone().unwrap()[1].0, "Logo".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[1].0, "icrc7:logo".to_string());
             assert_eq!(
                 metadata[0].clone().unwrap()[1].1,
                 Value::Text("logo".to_string())
             );
-            assert_eq!(metadata[0].clone().unwrap()[2].0, "Name".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[2].0, "icrc7:name".to_string());
             assert_eq!(
                 metadata[0].clone().unwrap()[2].1,
                 Value::Text("test1".to_string())
             );
-            assert_eq!(metadata[0].clone().unwrap()[3].0, "Symbol".to_string());
+            assert_eq!(
+                metadata[0].clone().unwrap()[3].0,
+                "icrc7:symbol".to_string()
+            );
             assert_eq!(
                 metadata[0].clone().unwrap()[3].1,
                 Value::Text("test1".to_string())
             );
-            assert_eq!(metadata[0].clone().unwrap()[4].0, "test1".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[4].0, "icrc7:test1".to_string());
             assert_eq!(
                 metadata[0].clone().unwrap()[4].1,
                 Value::Text("test1".to_string())
             );
-            assert_eq!(metadata[0].clone().unwrap()[5].0, "test2".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[5].0, "icrc7:test2".to_string());
             assert_eq!(
                 metadata[0].clone().unwrap()[5].1,
                 Value::Nat(Nat::from(1 as u64))
@@ -515,33 +527,48 @@ fn test_icrc7_token_metadata_multiple_insert_dup_name() {
 
             assert_eq!(
                 metadata_2[0].clone().unwrap()[0].0,
-                "Description".to_string()
+                "icrc7:description".to_string()
             );
             assert_eq!(
                 metadata_2[0].clone().unwrap()[0].1,
                 Value::Text("description".to_string())
             );
-            assert_eq!(metadata_2[0].clone().unwrap()[1].0, "Logo".to_string());
+            assert_eq!(
+                metadata_2[0].clone().unwrap()[1].0,
+                "icrc7:logo".to_string()
+            );
             assert_eq!(
                 metadata_2[0].clone().unwrap()[1].1,
                 Value::Text("logo".to_string())
             );
-            assert_eq!(metadata_2[0].clone().unwrap()[2].0, "Name".to_string());
+            assert_eq!(
+                metadata_2[0].clone().unwrap()[2].0,
+                "icrc7:name".to_string()
+            );
             assert_eq!(
                 metadata_2[0].clone().unwrap()[2].1,
                 Value::Text("test1".to_string())
             );
-            assert_eq!(metadata_2[0].clone().unwrap()[3].0, "Symbol".to_string());
+            assert_eq!(
+                metadata_2[0].clone().unwrap()[3].0,
+                "icrc7:symbol".to_string()
+            );
             assert_eq!(
                 metadata_2[0].clone().unwrap()[3].1,
                 Value::Text("test1".to_string())
             );
-            assert_eq!(metadata_2[0].clone().unwrap()[4].0, "test1".to_string());
+            assert_eq!(
+                metadata_2[0].clone().unwrap()[4].0,
+                "icrc7:test1".to_string()
+            );
             assert_eq!(
                 metadata_2[0].clone().unwrap()[4].1,
                 Value::Text("test4".to_string())
             );
-            assert_eq!(metadata_2[0].clone().unwrap()[5].0, "test2".to_string());
+            assert_eq!(
+                metadata_2[0].clone().unwrap()[5].0,
+                "icrc7:test2".to_string()
+            );
             assert_eq!(
                 metadata_2[0].clone().unwrap()[5].1,
                 Value::Nat(Nat::from(2 as u64))
@@ -801,7 +828,7 @@ fn test_icrc7_transfer_exceed_max_batch_size() {
             .unwrap_or(Nat::from(icrc7::DEFAULT_MAX_UPDATE_BATCH_SIZE));
 
     let transfer_args: Vec<icrc7::TransferArg> =
-        (0..u64::try_from(max_update_batch_size.0).unwrap() + 1)
+        (0..u64::try_from(max_update_batch_size.0.clone()).unwrap() + 1)
             .map(|_| icrc7::TransferArg {
                 to: Account {
                     owner: nft_owner2,
@@ -817,14 +844,7 @@ fn test_icrc7_transfer_exceed_max_batch_size() {
     let transfer_response = icrc7_transfer(pic, controller, collection_canister_id, &transfer_args);
 
     println!("transfer_response: {:?}", transfer_response);
-    assert!(transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err());
-    assert_eq!(
-        transfer_response[0].clone().unwrap().err().unwrap(),
-        icrc7::icrc7_transfer::TransferError::GenericError {
-            error_code: Nat::from(0u64),
-            message: "Exceed Max allowed Update Batch Size".to_string(),
-        }
-    );
+    assert!(transfer_response.len() == usize::try_from(max_update_batch_size.0).unwrap());
 }
 
 #[test]
@@ -862,7 +882,10 @@ fn test_icrc7_transfer_anonymous_identity() {
     assert!(transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err());
     assert_eq!(
         transfer_response[0].clone().unwrap().err().unwrap(),
-        icrc7::icrc7_transfer::TransferError::InvalidRecipient
+        icrc7::icrc7_transfer::TransferError::GenericError {
+            error_code: Nat::from(0u64),
+            message: "Anonymous caller not allowed to transfer".to_string(),
+        }
     );
 }
 
@@ -2362,7 +2385,7 @@ fn test_icrc7_transfer_with_metadata_updates() {
 
             let metadata =
                 icrc7_token_metadata(pic, controller, collection_canister_id, &vec![token_id]);
-            assert_eq!(metadata[0].clone().unwrap()[2].0, "Name".to_string());
+            assert_eq!(metadata[0].clone().unwrap()[2].0, "icrc7:name".to_string());
             assert_eq!(
                 metadata[0].clone().unwrap()[2].1,
                 Value::Text("test2".to_string())

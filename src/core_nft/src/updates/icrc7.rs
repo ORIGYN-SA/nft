@@ -101,7 +101,7 @@ pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_t
         ))];
     }
 
-    let (max_update_batch_size, _, _, _) = read_state(|state| {
+    let (max_update_batch_size, atomic_batch_transfers) = read_state(|state| {
         (
             state
                 .data
@@ -109,13 +109,13 @@ pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_t
                 .clone()
                 .unwrap_or(Nat::from(icrc7::DEFAULT_MAX_UPDATE_BATCH_SIZE)),
             state.data.atomic_batch_transfers.unwrap_or(false),
-            state.data.tx_window.clone(),
-            state.data.permitted_drift.clone(),
         )
     });
 
     let max_batch_size = usize::try_from(max_update_batch_size.0).unwrap();
-    if args.len() > max_batch_size {
+
+    // If atomic_batch_transfers is true, reject the entire batch if it exceeds the limit
+    if atomic_batch_transfers && args.len() > max_batch_size {
         return vec![Some(Err(
             icrc7::icrc7_transfer::TransferError::GenericError {
                 error_code: Nat::from(0u64),
@@ -133,6 +133,7 @@ pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_t
         ))];
     }
 
+    // Process only up to max_batch_size transfers
     args.iter()
         .take(max_batch_size)
         .map(transfer_nft)

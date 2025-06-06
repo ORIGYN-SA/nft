@@ -1504,10 +1504,10 @@ fn test_mint_with_metadata() {
     assert_eq!(
         token_metadata,
         vec![Some(vec![
-            ("Name".to_string(), Value::Text("test".to_string())),
-            ("Symbol".to_string(), Value::Text("test".to_string())),
-            ("test".to_string(), Value::Text("test".to_string())),
-            ("test2".to_string(), Value::Nat(Nat::from(1u64)))
+            ("icrc7:name".to_string(), Value::Text("test".to_string())),
+            ("icrc7:symbol".to_string(), Value::Text("test".to_string())),
+            ("icrc7:test".to_string(), Value::Text("test".to_string())),
+            ("icrc7:test2".to_string(), Value::Nat(Nat::from(1u64)))
         ])]
     );
 }
