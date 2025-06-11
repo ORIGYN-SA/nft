@@ -5,7 +5,6 @@ pub use crate::types::icrc21;
 pub use crate::types::icrc7;
 pub use crate::types::management;
 pub use storage_api_canister::updates::cancel_upload;
-pub use storage_api_canister::updates::delete_file;
 pub use storage_api_canister::updates::finalize_upload;
 pub use storage_api_canister::updates::init_upload;
 pub use storage_api_canister::updates::store_chunk;

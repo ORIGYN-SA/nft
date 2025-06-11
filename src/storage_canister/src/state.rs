@@ -1,13 +1,12 @@
-use bity_ic_canister_state_macros::canister_state;
-use candid::{CandidType, Nat, Principal};
-use storage_api_canister::{cancel_upload, delete_file, finalize_upload, init_upload, store_chunk};
-// use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
 use crate::types::storage;
+use bity_ic_canister_state_macros::canister_state;
 use bity_ic_types::BuildVersion;
 use bity_ic_types::{Cycles, TimestampMillis};
 use bity_ic_utils::env::{CanisterEnv, Environment};
 use bity_ic_utils::memory::MemorySize;
+use candid::{CandidType, Nat, Principal};
 use serde::{Deserialize, Serialize};
+use storage_api_canister::{cancel_upload, finalize_upload, init_upload, store_chunk};
 
 canister_state!(RuntimeState);
 
@@ -86,13 +85,6 @@ impl Data {
         media_hash_id: String,
     ) -> Result<cancel_upload::CancelUploadResp, String> {
         self.storage.cancel_upload(media_hash_id)
-    }
-
-    pub fn delete_file(
-        &mut self,
-        media_hash_id: String,
-    ) -> Result<delete_file::DeleteFileResp, String> {
-        self.storage.delete_file(media_hash_id)
     }
 }
 

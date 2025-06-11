@@ -7,7 +7,6 @@ pub use crate::state::InitApprovalsArg;
 use crate::state::{init_icrc3, start_default_archive_job, Data, RuntimeState};
 use crate::types::http::certify_all_assets;
 use crate::types::value_custom::CustomValue as Value;
-use crate::types::Metadata;
 
 use bity_ic_canister_tracing_macros::trace;
 use bity_ic_icrc3::config::{ICRC3Config, ICRC3Properties};
@@ -56,7 +55,6 @@ fn init(args: Args) {
                 init_args.version,
                 init_args.commit_hash.clone(),
             );
-            let metadata: Metadata = Metadata::from(init_args.collection_metadata);
 
             match init_args.logo.clone() {
                 Some(logo) => {
@@ -88,7 +86,6 @@ fn init(args: Args) {
                 init_args.tx_window.clone(),
                 init_args.permitted_drift,
                 init_args.max_canister_storage_threshold,
-                metadata,
                 init_args.approval_init,
             );
 

@@ -14,11 +14,11 @@ use icrc_ledger_types::icrc1::account::Account;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 pub use storage_api_canister::cancel_upload;
-pub use storage_api_canister::delete_file;
 pub use storage_api_canister::finalize_upload;
 pub use storage_api_canister::init_upload;
 pub use storage_api_canister::store_chunk;
 use storage_api_canister::types::storage::UploadState;
+use url::Url;
 
 #[update(guard = "caller_is_governance_principal")]
 pub async fn update_collection_metadata(
@@ -112,15 +112,6 @@ pub async fn update_collection_metadata(
         });
     }
 
-    if let Some(collection_metadata) = req.collection_metadata {
-        mutate_state(|state| {
-            state
-                .data
-                .metadata
-                .erase_all_data(None, collection_metadata);
-        });
-    }
-
     Ok(())
 }
 
@@ -165,11 +156,10 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
             ));
         }
         false => {
-            let mut new_token = nft::Icrc7Token::new(
+            let new_token = nft::Icrc7Token::new(
                 token_id.clone(),
                 req.token_name,
-                req.token_description,
-                req.token_logo,
+                Url::parse(&req.token_metadata_url).unwrap(),
                 req.token_owner,
             );
 
@@ -200,9 +190,6 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
 
             mutate_state(|state| {
                 state.data.last_token_id = token_id.clone() + Nat::from(1u64);
-                if let Some(metadata) = req.token_metadata {
-                    new_token.add_metadata(&mut state.data.metadata, metadata.clone());
-                }
                 state.data.tokens_list.insert(token_id.clone(), new_token);
             });
         }
@@ -226,48 +213,23 @@ pub fn update_nft_metadata(
 
     match token_list.contains_key(&token_name_hash.clone()) {
         true => {
-            trace(&format!("token_list: true"));
             let mut token = token_list.get(&token_name_hash.clone()).unwrap().clone();
+
             let mut metadata_map = BTreeMap::new();
-            if let Some(name) = req.token_name {
-                trace(&format!("name: {:?}", name));
-                token.token_name = name.clone();
-                metadata_map.insert(
-                    "icrc7:token_name".to_string(),
-                    Icrc3Value::Text(name.clone()),
-                );
-            }
-            if let Some(description) = req.token_description {
-                trace(&format!("description: {:?}", description));
-                token.token_description = Some(description.clone());
-                metadata_map.insert(
-                    "icrc7:token_description".to_string(),
-                    Icrc3Value::Text(description.clone()),
-                );
-            }
-            if let Some(logo) = req.token_logo {
-                trace(&format!("logo: {:?}", logo));
-                token.token_logo = Some(logo.clone());
-                metadata_map.insert(
-                    "icrc7:token_logo".to_string(),
-                    Icrc3Value::Text(logo.clone()),
-                );
-            }
-            if let Some(metadata) = req.token_metadata.clone() {
-                let mut btree_metadata = BTreeMap::new();
-                for (key, value) in metadata {
-                    let prefixed_key = if !key.starts_with("icrc7:") {
-                        format!("icrc7:{}", key)
-                    } else {
-                        key.clone()
-                    };
-                    btree_metadata.insert(prefixed_key, value.clone());
-                }
-                metadata_map.insert(
-                    "icrc7:token_metadata".to_string(),
-                    Icrc3Value::Map(btree_metadata),
-                );
-            }
+
+            metadata_map.insert(
+                "icrc7:previous_metadata_url".to_string(),
+                Icrc3Value::Text(token.token_metadata_url.clone()),
+            );
+
+            metadata_map.insert(
+                "icrc7:new_metadata_url".to_string(),
+                Icrc3Value::Text(req.token_metadata_url.clone()),
+            );
+
+            let meta = Icrc3Value::Map(metadata_map);
+
+            token.token_metadata_url = req.token_metadata_url;
 
             let transaction = Icrc3Transaction {
                 btype: "7update_token".to_string(),
@@ -279,7 +241,7 @@ pub fn update_nft_metadata(
                         subaccount: None,
                     }),
                     to: None,
-                    meta: Some(Icrc3Value::Map(metadata_map)),
+                    meta: Some(meta),
                     memo: None,
                     created_at_time: Some(Nat::from(ic_cdk::api::time())),
                     spender: None,
@@ -296,14 +258,6 @@ pub fn update_nft_metadata(
                     ));
                 }
             };
-
-            if let Some(metadata) = req.token_metadata {
-                trace(&format!("Adding metadata to token: {:?}", metadata));
-
-                mutate_state(|state| {
-                    token.add_metadata(&mut state.data.metadata, metadata.clone());
-                });
-            }
 
             mutate_state(|state| {
                 state
@@ -659,75 +613,6 @@ pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response
     });
 
     Ok(cancel_upload::CancelUploadResp {})
-}
-
-#[update(guard = "caller_is_governance_principal")]
-pub async fn delete_file(data: delete_file::Args) -> delete_file::Response {
-    let caller = ic_cdk::caller();
-    let _guard_principal =
-        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
-
-    let (media_path, canister_id) =
-        match read_state(|state| state.internal_filestorage.get(&data.file_path).cloned()) {
-            Some(data) => match data.state {
-                UploadState::Init => {
-                    return Err((
-                        RejectionCode::CanisterError,
-                        "Upload didnt started".to_string(),
-                    ));
-                }
-                UploadState::InProgress => {
-                    return Err((
-                        RejectionCode::CanisterError,
-                        "Upload in progress".to_string(),
-                    ));
-                }
-                UploadState::Finalized => (data.path, data.canister),
-            },
-            None => {
-                return Err((
-                    RejectionCode::CanisterError,
-                    "Upload not initiated".to_string(),
-                ));
-            }
-        };
-
-    let canister: StorageCanister = match read_state(|state| {
-        state
-            .data
-            .sub_canister_manager
-            .get_canister(canister_id.clone())
-    }) {
-        Some(canister) => canister,
-        None => {
-            mutate_state(|state| {
-                state.internal_filestorage.remove(&data.file_path);
-            });
-            return Err((
-                RejectionCode::CanisterError,
-                "Storage canister not found. Cancelling the upload.".to_string(),
-            ));
-        }
-    };
-
-    match canister.delete_file(data.clone()).await {
-        Ok(_) => {}
-        Err(e) => {
-            trace(&format!("Error storing chunk: {:?}", e));
-            return Err((RejectionCode::CanisterError, e));
-        }
-    }
-
-    mutate_state(|state| {
-        state.internal_filestorage.remove(&data.file_path);
-    });
-
-    remove_redirection(
-        media_path.clone(),
-        format!("https://{}.raw.icp0.io{}", canister_id, media_path.clone()),
-    );
-
-    Ok(delete_file::DeleteFileResp {})
 }
 
 #[update(guard = "caller_is_governance_principal")]
