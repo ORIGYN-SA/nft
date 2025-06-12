@@ -9,12 +9,11 @@ use canfund::manager::options::{CyclesThreshold, FundManagerOptions, FundStrateg
 use ic_cdk::api::management_canister::main::{canister_status, CanisterIdRecord};
 use serde::{Deserialize, Serialize};
 use storage_api_canister::cancel_upload;
-use storage_api_canister::delete_file;
 use storage_api_canister::finalize_upload;
 use storage_api_canister::init_upload;
 use storage_api_canister::store_chunk;
 use storage_canister_c2c_client::{
-    cancel_upload, delete_file, finalize_upload, get_storage_size, init_upload, store_chunk,
+    cancel_upload, finalize_upload, get_storage_size, init_upload, store_chunk,
 };
 
 const MAX_STORAGE_SIZE: u128 = 500 * 1024 * 1024 * 1024; // 500 GiB TODO maybe we should put a be less here ?
@@ -305,25 +304,6 @@ impl StorageCanister {
 
         match res {
             Ok(cancel_upload_response) => match cancel_upload_response {
-                Ok(data) => Ok(data),
-                Err(e) => Err(format!("{e:?}")),
-            },
-            Err(e) => Err(format!("{e:?}")),
-        }
-    }
-
-    pub async fn delete_file(
-        &self,
-        data: delete_file::Args,
-    ) -> Result<delete_file::DeleteFileResp, String> {
-        if self.state != bity_ic_subcanister_manager::CanisterState::Installed {
-            return Err("Canister is not installed".to_string());
-        }
-
-        let res = retry_async(|| delete_file(self.canister_id, data.clone()), 3).await;
-
-        match res {
-            Ok(delete_file_response) => match delete_file_response {
                 Ok(data) => Ok(data),
                 Err(e) => Err(format!("{e:?}")),
             },

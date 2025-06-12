@@ -14,11 +14,9 @@ pub mod mint {
     #[derive(CandidType, Serialize, Deserialize, Clone)]
     pub struct Args {
         pub token_name: String,
-        pub token_description: Option<String>,
-        pub token_logo: Option<String>,
+        pub token_metadata_url: String,
         pub token_owner: Account,
         pub memo: Option<serde_bytes::ByteBuf>,
-        pub token_metadata: Option<HashMap<String, Value>>,
     }
     pub type Response = Result<Nat>;
 }
@@ -30,9 +28,7 @@ pub mod update_nft_metadata {
     pub struct Args {
         pub token_id: Nat,
         pub token_name: Option<String>,
-        pub token_description: Option<String>,
-        pub token_logo: Option<String>,
-        pub token_metadata: Option<HashMap<String, Value>>,
+        pub token_metadata_url: String,
     }
     pub type Response = Result<Nat>;
 }

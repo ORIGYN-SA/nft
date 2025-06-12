@@ -7,7 +7,6 @@ pub use crate::types::icrc37;
 pub use crate::types::icrc7;
 pub use crate::types::management;
 use storage_api_canister::cancel_upload;
-use storage_api_canister::delete_file;
 // use storage_api_canister::finalize_upload;
 use storage_api_canister::init_upload;
 // use storage_api_canister::store_chunk;
@@ -30,7 +29,6 @@ pub fn icrc21_canister_call_consent_message(
         // "store_chunk" => handle_store_chunk_consent(args), -> not necessary?
         // "finalize_upload" => handle_finalize_upload_consent(args), -> not necessary?
         "cancel_upload" => handle_cancel_upload_consent(args),
-        "delete_file" => handle_delete_file_consent(args),
         "update_minting_authorities" => handle_update_minting_authorities_consent(args),
         "remove_minting_authorities" => handle_remove_minting_authorities_consent(args),
         "update_authorized_principals" => handle_update_authorized_principals_consent(args),
@@ -99,9 +97,6 @@ fn handle_transfer_consent(
                 let token = read_state(|state| state.data.get_token_by_id(&arg.token_id).cloned());
                 if let Some(token) = token {
                     fields.push(("Token Name".to_string(), token.token_name));
-                    if let Some(description) = token.token_description {
-                        fields.push(("Description".to_string(), description));
-                    }
                 }
             }
 
@@ -154,9 +149,6 @@ fn handle_approve_tokens_consent(
                 let token = read_state(|state| state.data.get_token_by_id(&arg.token_id).cloned());
                 if let Some(token) = token {
                     fields.push(("Token Name".to_string(), token.token_name));
-                    if let Some(description) = token.token_description {
-                        fields.push(("Description".to_string(), description));
-                    }
                 }
             }
 
@@ -255,9 +247,6 @@ fn handle_revoke_token_approvals_consent(
                 let token = read_state(|state| state.data.get_token_by_id(&arg.token_id).cloned());
                 if let Some(token) = token {
                     fields.push(("Token Name".to_string(), token.token_name));
-                    if let Some(description) = token.token_description {
-                        fields.push(("Description".to_string(), description));
-                    }
                 }
             }
 
@@ -358,9 +347,6 @@ fn handle_transfer_from_consent(
                 let token = read_state(|state| state.data.get_token_by_id(&arg.token_id).cloned());
                 if let Some(token) = token {
                     fields.push(("Token Name".to_string(), token.token_name));
-                    if let Some(description) = token.token_description {
-                        fields.push(("Description".to_string(), description));
-                    }
                 }
             }
 
@@ -393,12 +379,6 @@ fn handle_mint_consent(
             ];
 
             fields.push(("Token Name".to_string(), mint_args.token_name.clone()));
-            if let Some(description) = &mint_args.token_description {
-                fields.push(("Description".to_string(), description.clone()));
-            }
-            if let Some(logo) = &mint_args.token_logo {
-                fields.push(("Logo".to_string(), logo.clone()));
-            }
             fields.push((
                 "Owner".to_string(),
                 format!("{}", mint_args.token_owner.owner),
@@ -438,15 +418,6 @@ fn handle_update_nft_metadata_consent(
             if let Some(name) = &update_args.token_name {
                 fields.push(("New Token Name".to_string(), name.clone()));
             }
-            if let Some(description) = &update_args.token_description {
-                fields.push(("New Description".to_string(), description.clone()));
-            }
-            if let Some(logo) = &update_args.token_logo {
-                fields.push(("New Logo".to_string(), logo.clone()));
-            }
-            if let Some(metadata) = &update_args.token_metadata {
-                fields.push(("New Metadata".to_string(), format!("{:?}", metadata)));
-            }
 
             let generic_message = format!(
                 "You are about to update metadata for NFT {}. Method: update_nft_metadata",
@@ -482,9 +453,6 @@ fn handle_burn_nft_consent(
             let token = read_state(|state| state.data.get_token_by_id(&token_id).cloned());
             if let Some(token) = token {
                 fields.push(("Token Name".to_string(), token.token_name));
-                if let Some(description) = token.token_description {
-                    fields.push(("Description".to_string(), description));
-                }
             }
 
             let generic_message = format!(
@@ -613,34 +581,6 @@ fn handle_cancel_upload_consent(
             )
         }
         Err(_) => create_error_response("Failed to decode cancel_upload arguments".to_string()),
-    }
-}
-
-fn handle_delete_file_consent(
-    args: icrc21::icrc21_canister_call_consent_message::Args,
-) -> icrc21::icrc21_canister_call_consent_message::Response {
-    match Decode!(&args.arg, delete_file::Args) {
-        Ok(delete_args) => {
-            let mut fields = vec![
-                ("Action".to_string(), "Delete File".to_string()),
-                ("Method".to_string(), "delete_file".to_string()),
-            ];
-
-            fields.push(("File Path".to_string(), delete_args.file_path.clone()));
-
-            let generic_message = format!(
-                "You are about to delete file '{}'. This action cannot be undone. Method: delete_file",
-                delete_args.file_path
-            );
-
-            create_consent_info(
-                generic_message,
-                "Delete File".to_string(),
-                fields,
-                args.user_preferences.metadata,
-            )
-        }
-        Err(_) => create_error_response("Failed to decode delete_file arguments".to_string()),
     }
 }
 

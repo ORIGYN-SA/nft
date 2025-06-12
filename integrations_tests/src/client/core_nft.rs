@@ -22,9 +22,7 @@ use core_nft::types::management::{
     remove_minting_authorities, update_authorized_principals, update_collection_metadata,
     update_minting_authorities, update_nft_metadata,
 };
-use storage_api_canister::updates::{
-    cancel_upload, delete_file, finalize_upload, init_upload, store_chunk,
-};
+use storage_api_canister::updates::{cancel_upload, finalize_upload, init_upload, store_chunk};
 
 generate_pocket_query_call!(icrc7_collection_metadata);
 generate_pocket_query_call!(icrc7_symbol);
@@ -66,7 +64,6 @@ generate_pocket_update_call!(init_upload);
 generate_pocket_update_call!(store_chunk);
 generate_pocket_update_call!(finalize_upload);
 generate_pocket_update_call!(cancel_upload);
-generate_pocket_update_call!(delete_file);
 generate_pocket_update_call!(update_collection_metadata);
 
 generate_pocket_query_call!(get_upload_status);

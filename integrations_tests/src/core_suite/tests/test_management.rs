@@ -1,11 +1,10 @@
 use crate::client::core_nft::{
-    cancel_upload, delete_file, finalize_upload, get_upload_status, icrc7_token_metadata,
-    init_upload, mint, remove_authorized_principals, remove_minting_authorities, store_chunk,
+    cancel_upload, finalize_upload, get_upload_status, icrc7_token_metadata, init_upload, mint,
+    remove_authorized_principals, remove_minting_authorities, store_chunk,
     update_authorized_principals, update_collection_metadata, update_minting_authorities,
     update_nft_metadata,
 };
 use candid::{Encode, Nat, Principal};
-use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
 use icrc_ledger_types::icrc1::account::Account;
 
 use core_nft::types::management::{
@@ -16,7 +15,6 @@ use http::StatusCode;
 use ic_cdk::println;
 use sha2::{Digest, Sha256};
 use storage_api_canister::cancel_upload;
-use storage_api_canister::delete_file;
 use storage_api_canister::finalize_upload;
 use storage_api_canister::init_upload;
 use storage_api_canister::store_chunk;
@@ -24,12 +22,16 @@ use storage_api_canister::types::storage::UploadState;
 
 use crate::core_suite::setup::default_test_setup;
 use crate::core_suite::setup::setup::TestEnv;
-use crate::utils::upload_file;
+use crate::utils::{
+    extract_metadata_file_path, fetch_metadata_json, setup_http_client, upload_file,
+    upload_metadata,
+};
 use bytes::Bytes;
 use http::Request;
 use http_body_util::BodyExt;
 use ic_agent::Agent;
 use ic_http_gateway::{HttpGatewayClient, HttpGatewayRequestArgs};
+use serde_json::{self, json};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Read;
@@ -545,110 +547,6 @@ fn test_cancel_upload() {
                 e
             );
             assert!(true);
-        }
-    }
-}
-
-#[test]
-fn test_delete_file() {
-    let mut test_env: TestEnv = default_test_setup();
-    println!("test_env: {:?}", test_env);
-
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let file_path = "./src/storage_suite/assets/test.png";
-    let upload_path = "/test_delete.png";
-
-    let buffer = upload_file(
-        pic,
-        controller,
-        collection_canister_id,
-        file_path,
-        upload_path,
-    )
-    .expect("Upload failed");
-
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let url = pic.auto_progress();
-    println!("url: {:?}", url);
-
-    let agent = Agent::builder().with_url(url).build().unwrap();
-    rt.block_on(async {
-        agent.fetch_root_key().await.unwrap();
-    });
-    let http_gateway = HttpGatewayClient::builder()
-        .with_agent(agent)
-        .build()
-        .unwrap();
-
-    // Initial request to get the file
-    let response = rt.block_on(async {
-        http_gateway
-            .request(HttpGatewayRequestArgs {
-                canister_id: collection_canister_id.clone(),
-                canister_request: Request::builder()
-                    .uri(format!("/test_delete.png").as_str())
-                    .body(Bytes::new())
-                    .unwrap(),
-            })
-            .send()
-            .await
-    });
-
-    match response.canister_response.status() {
-        StatusCode::OK | StatusCode::TEMPORARY_REDIRECT => {
-            println!("File is accessible");
-        }
-        _ => {
-            panic!("File should be accessible");
-        }
-    }
-
-    let delete_file_resp = delete_file(
-        pic,
-        controller,
-        collection_canister_id,
-        &(delete_file::Args {
-            file_path: "/test_delete.png".to_string(),
-        }),
-    );
-
-    match delete_file_resp {
-        Ok(resp) => {
-            println!("delete_file_resp: {:?}", resp);
-        }
-        Err(e) => {
-            println!("delete_file_resp error: {:?}", e);
-            assert!(false);
-        }
-    }
-
-    // Attempt to get the deleted file
-    let response = rt.block_on(async {
-        http_gateway
-            .request(HttpGatewayRequestArgs {
-                canister_id: collection_canister_id.clone(),
-                canister_request: Request::builder()
-                    .uri(format!("/test_delete.png").as_str())
-                    .body(Bytes::new())
-                    .unwrap(),
-            })
-            .send()
-            .await
-    });
-
-    match response.canister_response.status() {
-        StatusCode::OK | StatusCode::TEMPORARY_REDIRECT => {
-            panic!("File should not be found after deletion");
-        }
-        _ => {
-            println!("File not found or server error");
         }
     }
 }
@@ -1172,6 +1070,20 @@ fn test_update_nft_metadata_unauthorized() {
         nft_owner2,
     } = test_env;
 
+    let metadata_json = json!({
+        "description": "Unauthorized test metadata",
+        "name": "unauthorized_test",
+        "attributes": [
+            {
+                "trait_type": "unauthorized",
+                "value": "should_fail"
+            }
+        ]
+    });
+
+    let metadata_url =
+        upload_metadata(pic, controller, collection_canister_id, metadata_json).unwrap();
+
     let unauthorized_principal = nft_owner1;
     let _ = update_nft_metadata(
         pic,
@@ -1180,9 +1092,7 @@ fn test_update_nft_metadata_unauthorized() {
         &(update_nft_metadata::Args {
             token_id: Nat::from(0u64),
             token_name: None,
-            token_description: None,
-            token_logo: None,
-            token_metadata: None,
+            token_metadata_url: metadata_url.to_string(),
         }),
     );
 }
@@ -1285,29 +1195,6 @@ fn test_cancel_upload_unauthorized() {
 }
 
 #[test]
-#[should_panic]
-fn test_delete_file_unauthorized() {
-    let mut test_env: TestEnv = default_test_setup();
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let unauthorized_principal = nft_owner1;
-    let _ = delete_file(
-        pic,
-        unauthorized_principal,
-        collection_canister_id,
-        &(delete_file::Args {
-            file_path: "/test.png".to_string(),
-        }),
-    );
-}
-
-#[test]
 fn test_authorized_principals_workflow() {
     let mut test_env: TestEnv = default_test_setup();
     let TestEnv {
@@ -1355,6 +1242,20 @@ fn test_mint_unauthorized() {
         nft_owner2,
     } = test_env;
 
+    let metadata_json = json!({
+        "description": "Unauthorized mint test",
+        "name": "unauthorized_mint",
+        "attributes": [
+            {
+                "trait_type": "unauthorized_mint",
+                "value": "should_fail"
+            }
+        ]
+    });
+
+    let metadata_url =
+        upload_metadata(pic, controller, collection_canister_id, metadata_json).unwrap();
+
     let unauthorized_principal = nft_owner1;
     let result = mint(
         pic,
@@ -1362,14 +1263,12 @@ fn test_mint_unauthorized() {
         collection_canister_id,
         &(mint::Args {
             token_name: "test".to_string(),
-            token_description: None,
-            token_logo: None,
+            token_metadata_url: metadata_url.to_string(),
             token_owner: Account {
                 owner: nft_owner1,
                 subaccount: None,
             },
             memo: None,
-            token_metadata: None,
         }),
     );
     assert!(matches!(result, Err((_, _))), "mint should panic");
@@ -1396,23 +1295,61 @@ fn test_mint_authorized() {
     );
     assert!(result.is_ok(), "Should succeed with authorized principal");
 
+    let metadata_json = json!({
+        "description": "Test NFT for authorized mint",
+        "name": "test",
+        "attributes": [
+            {
+                "trait_type": "authorized_test",
+                "value": "success"
+            }
+        ]
+    });
+
+    let metadata_url =
+        upload_metadata(pic, controller, collection_canister_id, metadata_json).unwrap();
+
     let result = mint(
         pic,
         nft_owner1,
         collection_canister_id,
         &(mint::Args {
             token_name: "test".to_string(),
-            token_description: None,
-            token_logo: None,
+            token_metadata_url: metadata_url.to_string(),
             token_owner: Account {
                 owner: nft_owner1,
                 subaccount: None,
             },
             memo: None,
-            token_metadata: None,
         }),
     );
     assert!(result.is_ok(), "Should succeed with authorized principal");
+
+    let (rt, http_gateway) = setup_http_client(pic);
+    let metadata_file_path = extract_metadata_file_path(&metadata_url);
+    let parsed_metadata = fetch_metadata_json(
+        &rt,
+        &http_gateway,
+        collection_canister_id,
+        &metadata_file_path,
+    );
+
+    assert_eq!(
+        parsed_metadata.get("name").unwrap().as_str().unwrap(),
+        "test"
+    );
+    assert_eq!(
+        parsed_metadata
+            .get("attributes")
+            .unwrap()
+            .get(0)
+            .unwrap()
+            .get("trait_type")
+            .unwrap()
+            .as_str()
+            .unwrap(),
+        "authorized_test"
+    );
 }
 
 #[test]
@@ -1446,20 +1383,33 @@ fn test_add_then_remove_minting_authorities_unauthorized() {
         }),
     );
     assert!(result.is_ok(), "Should succeed with authorized principal");
+
+    let metadata_json = json!({
+        "description": "Removed minting authority test",
+        "name": "removed_authority_test",
+        "attributes": [
+            {
+                "trait_type": "removed_authority",
+                "value": "should_fail"
+            }
+        ]
+    });
+
+    let metadata_url =
+        upload_metadata(pic, controller, collection_canister_id, metadata_json).unwrap();
+
     let result = mint(
         pic,
         nft_owner1,
         collection_canister_id,
         &(mint::Args {
             token_name: "test".to_string(),
-            token_description: None,
-            token_logo: None,
+            token_metadata_url: metadata_url.to_string(),
             token_owner: Account {
                 owner: nft_owner1,
                 subaccount: None,
             },
             memo: None,
-            token_metadata: None,
         }),
     );
     assert!(matches!(result, Err((_, _))), "mint should panic");
@@ -1476,9 +1426,28 @@ fn test_mint_with_metadata() {
         nft_owner2,
     } = test_env;
 
-    let mut metadata = HashMap::new();
-    metadata.insert("test".to_string(), Value::Text("test".to_string()));
-    metadata.insert("test2".to_string(), Value::Nat(Nat::from(1u64)));
+    let metadata_json = json!({
+        "description": "test",
+        "name": "test",
+        "attributes": [
+            {
+                "trait_type": "test1",
+                "value": "test1"
+            },
+            {
+                "trait_type": "test2",
+                "value": "test2"
+            },
+            {
+                "display_type": "number",
+                "trait_type": "test4",
+                "value": 2
+            }
+        ]
+    });
+
+    let metadata_url =
+        upload_metadata(pic, controller, collection_canister_id, metadata_json).unwrap();
 
     let result = mint(
         pic,
@@ -1486,30 +1455,83 @@ fn test_mint_with_metadata() {
         collection_canister_id,
         &(mint::Args {
             token_name: "test".to_string(),
-            token_description: None,
-            token_logo: None,
+            token_metadata_url: metadata_url.to_string(),
             token_owner: Account {
                 owner: nft_owner1,
                 subaccount: None,
             },
             memo: None,
-            token_metadata: Some(metadata),
         }),
     );
     assert!(result.is_ok(), "Should succeed with authorized principal");
 
-    let token_id = result.unwrap();
-    let token_metadata: Vec<Option<Vec<(String, Value)>>> =
-        icrc7_token_metadata(pic, controller, collection_canister_id, &vec![token_id]);
-    assert_eq!(
-        token_metadata,
-        vec![Some(vec![
-            ("icrc7:name".to_string(), Value::Text("test".to_string())),
-            ("icrc7:symbol".to_string(), Value::Text("test".to_string())),
-            ("icrc7:test".to_string(), Value::Text("test".to_string())),
-            ("icrc7:test2".to_string(), Value::Nat(Nat::from(1u64)))
-        ])]
+    let (rt, http_gateway) = setup_http_client(pic);
+    let metadata_file_path = extract_metadata_file_path(&metadata_url);
+
+    let parsed_metadata = fetch_metadata_json(
+        &rt,
+        &http_gateway,
+        collection_canister_id,
+        &metadata_file_path,
     );
+
+    println!("parsed_metadata: {:?}", parsed_metadata);
+
+    assert!(
+        parsed_metadata
+            .get("attributes")
+            .unwrap()
+            .get(0)
+            .unwrap()
+            .get("trait_type")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .eq("test1"),
+        "The metadata 'test1' should be present"
+    );
+    assert_eq!(
+        parsed_metadata
+            .get("attributes")
+            .unwrap()
+            .get(0)
+            .unwrap()
+            .get("value")
+            .unwrap()
+            .as_str()
+            .unwrap(),
+        "test1",
+        "The value of 'test1' should be 'test1'"
+    );
+
+    assert!(
+        parsed_metadata
+            .get("attributes")
+            .unwrap()
+            .get(1)
+            .unwrap()
+            .get("trait_type")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .eq("test2"),
+        "The metadata 'test2' should be present"
+    );
+    assert_eq!(
+        parsed_metadata
+            .get("attributes")
+            .unwrap()
+            .get(1)
+            .unwrap()
+            .get("value")
+            .unwrap()
+            .as_str()
+            .unwrap(),
+        "test2",
+        "The value of 'test2' should be 'test2'"
+    );
+
+    println!("Verification of the JSON file metadata successful!");
 }
 
 #[test]

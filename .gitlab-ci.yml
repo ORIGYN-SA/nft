@@ -88,7 +88,9 @@ deploy:
         -d "{
           \"tag_name\": \"$RELEASE_TAG\",
           \"name\": \"$RELEASE_NAME\",
-          \"body\": \"Release automatique depuis GitLab CI\"
+          \"body\": \"Release automatique depuis GitLab CI\",
+          \"draft\": false,
+          \"prerelease\": false
         }")
       
       UPLOAD_URL=$(echo $RELEASE_RESPONSE | jq -r '.upload_url' | sed 's/{?name,label}//')
