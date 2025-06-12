@@ -92,88 +92,216 @@ dfx deploy --network ic nft --mode reinstall --argument '(
 - Replace `YOUR_PRINCIPAL_ID` with your actual principal ID
 - The `test_mode` parameter is set to `true` for testing purposes
 
-## Step 4: Upload Files on the collection
+## Step 4: Build the CLI Tool
 
-1. First, compile the command-line tools:
+First, compile the ICRC7 NFT command-line tool:
+
 ```bash
 cd ../cmdline
 cargo build --release
 ```
 
-2. Upload files using the compiled tool:
-```bash
-../target/release/origyn_icrc7_cmdlinetools upload-file \
-  $NFT_CANISTER_ID \
-  <FILE_PATH> \
-  <STORAGE_PATH> \
-  $IDENTITY_FILE
-```
+The tool will be available at `../target/release/icrc7-nft-tool`.
 
-Example:
-```bash
-../target/release/origyn_icrc7_cmdlinetools upload-file \
-  $NFT_CANISTER_ID \
-  ./origynlogo.png \
-  origynlogo.png \
-  $IDENTITY_FILE
-```
+## Step 5: Upload Files to the Collection
 
-identity.pem is the .pem file of the identity who as the right to manage/upload media on the collection. IE : it as to be in `authorized_principals`, and you can export it with `dfx identity export identity_name > identity.pem`
-
-## Step 5: Minting NFTs
-
-Go back to your example directory : `cd ../example`
-To mint an NFT, you need to be an authorized minting authority. Here's how to mint an NFT with metadata:
+Upload files using the CLI tool. The identity file should be the .pem file of an identity that has the right to manage/upload media on the collection (must be in `authorized_principals`). You can export it with `dfx identity export identity_name > identity.pem`.
 
 ```bash
-dfx canister call nft mint --network ic '(
-  record {
-    token_name = "My NFT";
-    token_description = opt "Description of my NFT";
-    token_logo = opt "https://example.com/logo.png";
-    token_owner = record {
-      owner = principal "$YOUR_PRINCIPAL_ID";
-      subaccount = null;
-    };
-    memo = null;
-    token_metadata = opt vec {
-      record { "key1"; variant { Text = "value1" } };
-      record { "key2"; variant { Nat = 42 } };
-    };
-  }
-)'
+../target/release/icrc7-nft-tool \
+  --network ic \
+  --identity $IDENTITY_FILE \
+  --canister $NFT_CANISTER_ID \
+  upload-file ./origynlogo.png /images/origynlogo.png
 ```
 
-### Metadata Structure
-The `token_metadata` field accepts a vector of key-value pairs where values can be of different types:
-- Text: `variant { Text = "string value" }`
-- Number: `variant { Nat = 42 }`
-- Boolean: `variant { Bool = true }`
-- Array: `variant { Array = vec { variant { Text = "item1" } } }`
-- Map: `variant { Map = vec { record { "key"; variant { Text = "value" } } } }`
+### Upload Options:
+- `--chunk_size`: Specify chunk size in bytes (default: 1MB)
+- The tool shows upload progress with a progress bar
 
-### Important Notes:
-- Only authorized minting authorities can mint NFTs
-- The token owner must be a valid principal ID
-- Metadata is optional but recommended for better NFT discoverability
-- The token name is required
-- The token description and logo are optional. You can use the url you get from uploading file in the nft, or use any others url.
+## Step 6: Create and Validate Metadata
 
-### Verifying Minted NFT
-After minting, you can verify the NFT metadata using:
+### Interactive Metadata Creation
 
+Create ICRC97-compliant metadata interactively:
+
+```bash
+../target/release/icrc7-nft-tool \
+  --network ic \
+  --identity $IDENTITY_FILE \
+  --canister $NFT_CANISTER_ID \
+  create-metadata --output metadata.json --interactive
+```
+
+### CLI Metadata Creation
+
+Create metadata using command-line parameters:
+
+```bash
+../target/release/icrc7-nft-tool \
+  --network ic \
+  --identity $IDENTITY_FILE \
+  --canister $NFT_CANISTER_ID \
+  create-metadata \
+  --output metadata.json \
+  --name "My NFT" \
+  --description "A beautiful NFT" \
+  --image "https://$NFT_CANISTER_ID.raw.icp0.io/images/origynlogo.png" \
+  --attribute "Rarity:Legendary:boost_number" \
+  --attribute "Power:95:number" \
+  --attribute "Element:Fire"
+```
+
+### Validate Existing Metadata
+
+Validate an existing JSON metadata file:
+
+```bash
+../target/release/icrc7-nft-tool \
+  --network ic \
+  --identity $IDENTITY_FILE \
+  --canister $NFT_CANISTER_ID \
+  validate-metadata metadata.json
+```
+
+## Step 7: Upload Metadata
+
+Upload your metadata file to the collection:
+
+```bash
+../target/release/icrc7-nft-tool \
+  --network ic \
+  --identity $IDENTITY_FILE \
+  --canister $NFT_CANISTER_ID \
+  upload-metadata metadata.json
+```
+
+This will return a metadata URL that you can use for minting.
+
+## Step 8: Mint NFTs
+
+### Method 1: Mint with Existing Metadata URL
+
+```bash
+../target/release/icrc7-nft-tool \
+  --network ic \
+  --identity $IDENTITY_FILE \
+  --canister $NFT_CANISTER_ID \
+  mint \
+  --owner $YOUR_PRINCIPAL_ID \
+  --name "My NFT" \
+  --metadata_url "https://$NFT_CANISTER_ID.raw.icp0.io/abc123.json" \
+  --memo "First NFT"
+```
+
+### Method 2: Create Metadata and Mint in One Step
+
+#### Interactive Mode:
+```bash
+../target/release/icrc7-nft-tool \
+  --network ic \
+  --identity $IDENTITY_FILE \
+  --canister $NFT_CANISTER_ID \
+  mint-with-metadata \
+  --owner $YOUR_PRINCIPAL_ID \
+  --name "My Interactive NFT" \
+  --interactive
+```
+
+#### CLI Mode:
+```bash
+../target/release/icrc7-nft-tool \
+  --network ic \
+  --identity $IDENTITY_FILE \
+  --canister $NFT_CANISTER_ID \
+  mint-with-metadata \
+  --owner $YOUR_PRINCIPAL_ID \
+  --name "My CLI NFT" \
+  --description "Created via CLI" \
+  --image "https://$NFT_CANISTER_ID.raw.icp0.io/images/origynlogo.png" \
+  --attribute "Type:Legendary" \
+  --attribute "Level:100:number" \
+  --memo "CLI created NFT"
+```
+
+#### From File:
+```bash
+../target/release/icrc7-nft-tool \
+  --network ic \
+  --identity $IDENTITY_FILE \
+  --canister $NFT_CANISTER_ID \
+  mint-with-metadata \
+  --owner $YOUR_PRINCIPAL_ID \
+  --name "My File NFT" \
+  --file metadata.json
+```
+
+## ICRC97 Metadata Format
+
+The tool creates and validates metadata according to the ICRC97 standard:
+
+```json
+{
+  "name": "NFT Name",
+  "description": "NFT Description",
+  "image": "https://example.com/image.png",
+  "external_url": "https://example.com",
+  "attributes": [
+    {
+      "trait_type": "Rarity",
+      "value": "Legendary",
+      "display_type": "boost_number"
+    },
+    {
+      "trait_type": "Power",
+      "value": 95,
+      "display_type": "number"
+    }
+  ]
+}
+```
+
+### Supported Display Types:
+- `number`: Regular number display
+- `boost_number`: Number with + prefix
+- `boost_percentage`: Percentage with + prefix  
+- `date`: Unix timestamp as date
+- Custom display types are also supported
+
+## Verifying Your NFTs
+
+### Check Token Metadata
 ```bash
 dfx canister call nft --network ic icrc7_token_metadata '(vec { 1 })'
 ```
-This will return the metadata for the NFT with ID 1, including both the standard metadata (Name, Symbol) and any custom metadata you provided during minting.
 
-and check who's the owner of the nft with :
+### Check Token Owner
 ```bash
 dfx canister call nft --network ic icrc7_owner_of '(vec { 1 })'
 ```
 
+### Check Total Supply
+```bash
+dfx canister call nft --network ic icrc7_total_supply '()'
+```
+
+## Troubleshooting
+
+### Common Issues:
+
+1. **Permission Denied**: Ensure your identity is in the `authorized_principals` list
+2. **Invalid Metadata**: Use the `validate-metadata` command to check your JSON
+3. **Upload Failures**: Check network connectivity and canister cycles
+4. **Minting Failures**: Verify you're in the `minting_authorities` list
+
+### Getting Help:
+```bash
+../target/release/icrc7-nft-tool --help
+../target/release/icrc7-nft-tool <subcommand> --help
+```
 
 ## Additional Resources
 
 - [Internet Computer Documentation](https://internetcomputer.org/docs/current/developer-docs/)
 - [ICRC-7 Standard](https://github.com/dfinity/ICRC-7)
+- [ICRC97 Metadata Standard](https://github.com/dfinity/ICRC/blob/main/ICRCs/ICRC-97/ICRC-97.md)

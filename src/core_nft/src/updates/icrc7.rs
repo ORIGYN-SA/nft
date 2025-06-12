@@ -114,7 +114,6 @@ pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_t
 
     let max_batch_size = usize::try_from(max_update_batch_size.0).unwrap();
 
-    // If atomic_batch_transfers is true, reject the entire batch if it exceeds the limit
     if atomic_batch_transfers && args.len() > max_batch_size {
         return vec![Some(Err(
             icrc7::icrc7_transfer::TransferError::GenericError {

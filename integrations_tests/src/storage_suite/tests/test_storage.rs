@@ -1,13 +1,10 @@
-use crate::client::storage::{
-    cancel_upload, delete_file, finalize_upload, init_upload, store_chunk,
-};
+use crate::client::storage::{cancel_upload, finalize_upload, init_upload, store_chunk};
 use candid::Nat;
 
 use http::StatusCode;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
 use sha2::{Digest, Sha256};
 use storage_api_canister::cancel_upload;
-use storage_api_canister::delete_file;
 use storage_api_canister::finalize_upload;
 use storage_api_canister::init_upload;
 use storage_api_canister::store_chunk;
@@ -600,106 +597,6 @@ fn test_cancel_upload() {
 }
 
 #[test]
-fn test_delete_file() {
-    let mut test_env: TestEnv = default_test_setup();
-    println!("test_env: {:?}", test_env);
-
-    let TestEnv {
-        ref mut pic,
-        storage_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let file_path = "./src/storage_suite/assets/test.png";
-    let upload_path = "/test_delete.png";
-
-    let buffer = upload_file(pic, controller, storage_canister_id, file_path, upload_path)
-        .expect("Upload failed");
-
-    let rt = tokio::runtime::Runtime::new().unwrap();
-    let url = pic.auto_progress();
-    println!("url: {:?}", url);
-
-    let agent = Agent::builder().with_url(url).build().unwrap();
-    rt.block_on(async {
-        agent.fetch_root_key().await.unwrap();
-    });
-    let http_gateway = HttpGatewayClient::builder()
-        .with_agent(agent)
-        .build()
-        .unwrap();
-
-    // Initial request to get the file
-    let response = rt.block_on(async {
-        http_gateway
-            .request(HttpGatewayRequestArgs {
-                canister_id: storage_canister_id.clone(),
-                canister_request: Request::builder()
-                    .uri(format!("/test_delete.png").as_str())
-                    .body(Bytes::new())
-                    .unwrap(),
-            })
-            .send()
-            .await
-    });
-
-    println!("response: {:?}", response.canister_response.status());
-
-    match response.canister_response.status() {
-        StatusCode::OK | StatusCode::TEMPORARY_REDIRECT => {
-            println!("File is accessible");
-        }
-        _ => {
-            panic!("File should be accessible");
-        }
-    }
-
-    let delete_file_resp = delete_file(
-        pic,
-        controller,
-        storage_canister_id,
-        &(delete_file::Args {
-            file_path: "/test_delete.png".to_string(),
-        }),
-    );
-
-    match delete_file_resp {
-        Ok(resp) => {
-            println!("delete_file_resp: {:?}", resp);
-        }
-        Err(e) => {
-            println!("delete_file_resp error: {:?}", e);
-            assert!(false);
-        }
-    }
-
-    // Attempt to get the deleted file
-    let response = rt.block_on(async {
-        http_gateway
-            .request(HttpGatewayRequestArgs {
-                canister_id: storage_canister_id.clone(),
-                canister_request: Request::builder()
-                    .uri(format!("/test_delete.png").as_str())
-                    .body(Bytes::new())
-                    .unwrap(),
-            })
-            .send()
-            .await
-    });
-
-    match response.canister_response.status() {
-        StatusCode::OK | StatusCode::TEMPORARY_REDIRECT => {
-            panic!("File should not be found after deletion");
-        }
-        _ => {
-            println!("File not found or server error");
-        }
-    }
-}
-
-#[test]
 fn test_non_governance_principal_rejection() {
     let mut test_env: TestEnv = default_test_setup();
     println!("test_env: {:?}", test_env);
@@ -730,22 +627,6 @@ fn test_non_governance_principal_rejection() {
                     non_governance_principal,
                     storage_canister_id,
                     &(cancel_upload::Args {
-                        file_path: file_path.clone(),
-                    }),
-                )
-                .map(|_| ())
-                .map_err(|e| format!("{:?}", e))
-            }))
-            .unwrap_or_else(|_| Err("panic occurred".to_string())),
-        ),
-        (
-            "delete_file",
-            std::panic::catch_unwind(AssertUnwindSafe(|| {
-                delete_file(
-                    pic,
-                    non_governance_principal,
-                    storage_canister_id,
-                    &(delete_file::Args {
                         file_path: file_path.clone(),
                     }),
                 )

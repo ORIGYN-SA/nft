@@ -2074,6 +2074,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "storage_api_canister",
+ "tempfile",
  "tokio",
  "url",
 ]
@@ -2440,12 +2441,16 @@ dependencies = [
  "candid",
  "clap",
  "core_nft",
+ "hex",
  "ic-agent 0.40.0",
  "icrc-ledger-types 0.1.8",
  "serde",
  "serde_bytes",
+ "serde_json",
  "sha2 0.10.9",
+ "tempfile",
  "tokio",
+ "url",
 ]
 
 [[package]]

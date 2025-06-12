@@ -1,6 +1,5 @@
 use ic_asset_certification::Asset;
 use storage_api_canister::cancel_upload;
-use storage_api_canister::delete_file;
 use storage_api_canister::finalize_upload;
 use storage_api_canister::init_upload;
 use storage_api_canister::store_chunk;
@@ -278,31 +277,6 @@ impl StorageData {
         }
 
         Ok(cancel_upload::CancelUploadResp {})
-    }
-
-    pub fn delete_file(
-        &mut self,
-        file_path: String,
-    ) -> Result<delete_file::DeleteFileResp, String> {
-        let path = if file_path.starts_with('/') {
-            file_path[1..].to_string()
-        } else {
-            file_path
-        };
-
-        let metadata = self
-            .storage_raw_internal_metadata
-            .remove(&path)
-            .ok_or("File not found".to_string())?;
-
-        if metadata.state != UploadState::Finalized {
-            trap("Cannot delete a file that is not finalized");
-        }
-
-        self.storage_raw.remove(&path);
-        uncertify_asset(vec![Asset::new(metadata.file_path, vec![])]);
-
-        Ok(delete_file::DeleteFileResp {})
     }
 
     pub fn cache_miss(&self, path: String) -> Result<(), String> {

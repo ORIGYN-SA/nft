@@ -1,21 +1,32 @@
 use crate::client::core_nft::{
-    icrc7_atomic_batch_transfers, icrc7_balance_of, icrc7_collection_metadata,
+    icrc3_get_blocks, icrc7_atomic_batch_transfers, icrc7_balance_of, icrc7_collection_metadata,
     icrc7_default_take_value, icrc7_description, icrc7_logo, icrc7_max_memo_size,
     icrc7_max_query_batch_size, icrc7_max_take_value, icrc7_max_update_batch_size, icrc7_name,
     icrc7_owner_of, icrc7_permitted_drift, icrc7_supply_cap, icrc7_symbol, icrc7_token_metadata,
     icrc7_total_supply, icrc7_transfer, icrc7_tx_window, update_nft_metadata,
 };
 use crate::core_suite::setup::setup::TestEnv;
-use crate::utils::mint_nft;
-use crate::utils::random_principal;
+use crate::utils::{
+    extract_metadata_file_path, fetch_metadata_json, mint_nft, random_principal, setup_http_client,
+    upload_metadata,
+};
+use bytes::Bytes;
 use candid::{Encode, Nat, Principal};
 use core_nft::types::icrc7;
 use core_nft::types::update_nft_metadata;
+use http::Request;
+use http_body_util::BodyExt;
+use ic_agent::Agent;
+use ic_http_gateway::{HttpGatewayClient, HttpGatewayRequestArgs};
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
 use icrc_ledger_types::icrc1::account::Account;
+use icrc_ledger_types::icrc3::blocks::GetBlocksRequest;
 use serde_bytes::ByteBuf;
+use serde_json::json;
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::time::{Duration, UNIX_EPOCH};
+use url::Url;
 
 use crate::{
     core_suite::setup::{default_test_setup, test_setup_atomic_batch_transfers},
@@ -73,6 +84,8 @@ fn test_icrc7_total_supply() {
 
     let total_supply = icrc7_total_supply(pic, controller, collection_canister_id, &());
 
+    tick_n_blocks(pic, 10);
+
     println!("total_supply: {:?}", total_supply);
     assert!(total_supply == Nat::from(0 as u64));
 
@@ -87,7 +100,11 @@ fn test_icrc7_total_supply() {
         collection_canister_id,
     );
 
+    tick_n_blocks(pic, 10);
+
     let total_supply_2: Nat = icrc7_total_supply(pic, controller, collection_canister_id, &());
+
+    tick_n_blocks(pic, 10);
 
     println!("total_supply_2: {:?}", total_supply_2);
     assert!(total_supply_2 == Nat::from(1 as u64));
@@ -102,6 +119,8 @@ fn test_icrc7_total_supply() {
         controller,
         collection_canister_id,
     );
+
+    tick_n_blocks(pic, 10);
 
     let total_supply_3: Nat = icrc7_total_supply(pic, controller, collection_canister_id, &());
 
@@ -135,21 +154,34 @@ fn test_icrc7_token_metadata_simple() {
 
     match mint_return {
         Ok(token_id) => {
-            let mut new_metadata: HashMap<String, Value> = HashMap::new();
-            new_metadata.insert("test1".to_string(), Value::Text("test1".to_string()));
-            new_metadata.insert("test2".to_string(), Value::Nat(Nat::from(1 as u64)));
-            let logo_data = include_bytes!("../assets/logo2.min-3f9527e7.svg").to_vec();
-            new_metadata.insert(
-                "test3".to_string(),
-                Value::Blob(ByteBuf::from(logo_data.clone())),
-            );
+            let metadata_json = json!({
+                "description": "Test NFT description",
+                "name": "Test NFT",
+                "attributes": [
+                    {
+                        "trait_type": "test1",
+                        "value": "test11"
+                    },
+                    {
+                        "trait_type": "test2",
+                        "value": "test22"
+                    },
+                    {
+                        "trait_type": "test3",
+                        "value": 2
+                    }
+                ]
+            });
+
+            let metadata_url =
+                upload_metadata(pic, controller, collection_canister_id, metadata_json).unwrap();
+
+            tick_n_blocks(pic, 10);
 
             let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),
                 token_name: Some("test1".to_string()),
-                token_description: Some("description".to_string()),
-                token_logo: Some("logo".to_string()),
-                token_metadata: Some(new_metadata),
+                token_metadata_url: metadata_url.to_string(),
             };
 
             let _ = update_nft_metadata(
@@ -159,7 +191,7 @@ fn test_icrc7_token_metadata_simple() {
                 &update_nft_metadata_args,
             );
 
-            pic.tick();
+            tick_n_blocks(pic, 10);
 
             let metadata = icrc7_token_metadata(
                 pic,
@@ -168,48 +200,53 @@ fn test_icrc7_token_metadata_simple() {
                 &vec![token_id.clone()],
             );
 
+            println!("metadata: {:?}", metadata);
+
             assert_eq!(
                 metadata[0].clone().unwrap()[0].0,
-                "icrc7:description".to_string()
+                "icrc97:metadata".to_string()
             );
             assert_eq!(
                 metadata[0].clone().unwrap()[0].1,
-                Value::Text("description".to_string())
+                Value::Array(vec![Value::Text(metadata_url.to_string()),])
             );
-            assert_eq!(metadata[0].clone().unwrap()[1].0, "icrc7:logo".to_string());
-            assert_eq!(
-                metadata[0].clone().unwrap()[1].1,
-                Value::Text("logo".to_string())
-            );
-            assert_eq!(metadata[0].clone().unwrap()[2].0, "icrc7:name".to_string());
-            assert_eq!(
-                metadata[0].clone().unwrap()[2].1,
-                Value::Text("test1".to_string())
-            );
-            assert_eq!(
-                metadata[0].clone().unwrap()[3].0,
-                "icrc7:symbol".to_string()
+
+            let (rt, http_gateway) = setup_http_client(pic);
+            let metadata_file_path = extract_metadata_file_path(&metadata_url);
+            let parsed_metadata = fetch_metadata_json(
+                &rt,
+                &http_gateway,
+                collection_canister_id,
+                &metadata_file_path,
             );
             assert_eq!(
-                metadata[0].clone().unwrap()[3].1,
-                Value::Text("test1".to_string())
+                parsed_metadata
+                    .get("description")
+                    .unwrap()
+                    .as_str()
+                    .unwrap(),
+                "Test NFT description"
             );
-            assert_eq!(metadata[0].clone().unwrap()[4].0, "icrc7:test1".to_string());
             assert_eq!(
-                metadata[0].clone().unwrap()[4].1,
-                Value::Text("test1".to_string())
+                parsed_metadata.get("name").unwrap().as_str().unwrap(),
+                "Test NFT"
             );
-            assert_eq!(metadata[0].clone().unwrap()[5].0, "icrc7:test2".to_string());
+
+            let attributes = parsed_metadata
+                .get("attributes")
+                .unwrap()
+                .as_array()
+                .unwrap();
             assert_eq!(
-                metadata[0].clone().unwrap()[5].1,
-                Value::Nat(Nat::from(1 as u64))
+                attributes[0].get("trait_type").unwrap().as_str().unwrap(),
+                "test1"
             );
-            assert_eq!(metadata[0].clone().unwrap()[6].0, "icrc7:test3".to_string());
             assert_eq!(
-                metadata[0].clone().unwrap()[6].1,
-                Value::Blob(ByteBuf::from(logo_data))
+                attributes[0].get("value").unwrap().as_str().unwrap(),
+                "test11"
             );
-            assert_eq!(metadata[0].clone().unwrap().len(), 7);
+
+            println!("Verification of the JSON file metadata successful!");
         }
         Err(e) => {
             println!("Error minting NFT: {:?}", e);
@@ -244,21 +281,34 @@ fn test_icrc7_token_metadata_multiple_insert() {
 
     match mint_return {
         Ok(token_id) => {
-            let mut new_metadata: HashMap<String, Value> = HashMap::new();
-            new_metadata.insert("test1".to_string(), Value::Text("test1".to_string()));
-            new_metadata.insert("test2".to_string(), Value::Nat(Nat::from(1 as u64)));
-            let logo_data = include_bytes!("../assets/logo2.min-3f9527e7.svg").to_vec();
-            new_metadata.insert(
-                "test3".to_string(),
-                Value::Blob(ByteBuf::from(logo_data.clone())),
-            );
+            let metadata_json_1 = json!({
+                "description": "First metadata description",
+                "name": "First NFT",
+                "attributes": [
+                    {
+                        "trait_type": "test1",
+                        "value": "test1"
+                    },
+                    {
+                        "trait_type": "test2",
+                        "value": 1
+                    },
+                    {
+                        "trait_type": "test3",
+                        "value": "blob_data"
+                    }
+                ]
+            });
+
+            let metadata_url_1 =
+                upload_metadata(pic, controller, collection_canister_id, metadata_json_1).unwrap();
+
+            tick_n_blocks(pic, 10);
 
             let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),
                 token_name: Some("test1".to_string()),
-                token_description: Some("description".to_string()),
-                token_logo: Some("logo".to_string()),
-                token_metadata: Some(new_metadata),
+                token_metadata_url: metadata_url_1.to_string(),
             };
 
             let ret = update_nft_metadata(
@@ -283,53 +333,37 @@ fn test_icrc7_token_metadata_multiple_insert() {
 
             println!("metadata: {:?}", metadata);
 
-            assert_eq!(metadata[0].clone().unwrap()[0].0, "Description".to_string());
+            assert_eq!(
+                metadata[0].clone().unwrap()[0].0,
+                "icrc97:metadata".to_string()
+            );
             assert_eq!(
                 metadata[0].clone().unwrap()[0].1,
-                Value::Text("description".to_string())
+                Value::Array(vec![Value::Text(metadata_url_1.to_string())])
             );
-            assert_eq!(metadata[0].clone().unwrap()[1].0, "Logo".to_string());
-            assert_eq!(
-                metadata[0].clone().unwrap()[1].1,
-                Value::Text("logo".to_string())
-            );
-            assert_eq!(metadata[0].clone().unwrap()[2].0, "Name".to_string());
-            assert_eq!(
-                metadata[0].clone().unwrap()[2].1,
-                Value::Text("test1".to_string())
-            );
-            assert_eq!(metadata[0].clone().unwrap()[3].0, "Symbol".to_string());
-            assert_eq!(
-                metadata[0].clone().unwrap()[3].1,
-                Value::Text("test1".to_string())
-            );
-            assert_eq!(metadata[0].clone().unwrap()[4].0, "test1".to_string());
-            assert_eq!(
-                metadata[0].clone().unwrap()[4].1,
-                Value::Text("test1".to_string())
-            );
-            assert_eq!(metadata[0].clone().unwrap()[5].0, "test2".to_string());
-            assert_eq!(
-                metadata[0].clone().unwrap()[5].1,
-                Value::Nat(Nat::from(1 as u64))
-            );
-            assert_eq!(metadata[0].clone().unwrap()[6].0, "test3".to_string());
-            assert_eq!(
-                metadata[0].clone().unwrap()[6].1,
-                Value::Blob(ByteBuf::from(logo_data.clone()))
-            );
-            assert_eq!(metadata[0].clone().unwrap().len(), 7);
 
-            let mut new_metadata_2: HashMap<String, Value> = HashMap::new();
-            new_metadata_2.insert("test4".to_string(), Value::Text("test4".to_string()));
-            new_metadata_2.insert("test5".to_string(), Value::Nat(Nat::from(2 as u64)));
+            let metadata_json_2 = json!({
+                "description": "Second metadata description",
+                "name": "Second NFT",
+                "attributes": [
+                    {
+                        "trait_type": "test4",
+                        "value": "test4"
+                    },
+                    {
+                        "trait_type": "test5",
+                        "value": 2
+                    }
+                ]
+            });
+
+            let metadata_url_2 =
+                upload_metadata(pic, controller, collection_canister_id, metadata_json_2).unwrap();
 
             let update_nft_metadata_args_2 = update_nft_metadata::Args {
                 token_id: token_id.clone(),
                 token_name: None,
-                token_description: None,
-                token_logo: None,
-                token_metadata: Some(new_metadata_2),
+                token_metadata_url: metadata_url_2.to_string(),
             };
 
             println!("update_nft_metadata_args_2");
@@ -341,6 +375,8 @@ fn test_icrc7_token_metadata_multiple_insert() {
                 &update_nft_metadata_args_2,
             );
 
+            tick_n_blocks(pic, 10);
+
             let metadata_2 = icrc7_token_metadata(
                 pic,
                 controller,
@@ -350,52 +386,37 @@ fn test_icrc7_token_metadata_multiple_insert() {
 
             println!("metadata_2: {:?}", metadata_2);
 
-            assert_eq!(metadata[0].clone().unwrap()[0].0, "Description".to_string());
             assert_eq!(
-                metadata[0].clone().unwrap()[0].1,
-                Value::Text("description".to_string())
+                metadata_2[0].clone().unwrap()[0].0,
+                "icrc97:metadata".to_string()
             );
-            assert_eq!(metadata[0].clone().unwrap()[1].0, "Logo".to_string());
             assert_eq!(
-                metadata[0].clone().unwrap()[1].1,
-                Value::Text("logo".to_string())
+                metadata_2[0].clone().unwrap()[0].1,
+                Value::Array(vec![Value::Text(metadata_url_2.to_string())])
             );
-            assert_eq!(metadata[0].clone().unwrap()[2].0, "Name".to_string());
+
+            let (rt, http_gateway) = setup_http_client(pic);
+            let metadata_file_path = extract_metadata_file_path(&metadata_url_2);
+            let parsed_metadata = fetch_metadata_json(
+                &rt,
+                &http_gateway,
+                collection_canister_id,
+                &metadata_file_path,
+            );
             assert_eq!(
-                metadata[0].clone().unwrap()[2].1,
-                Value::Text("test1".to_string())
+                parsed_metadata
+                    .get("description")
+                    .unwrap()
+                    .as_str()
+                    .unwrap(),
+                "Second metadata description"
             );
-            assert_eq!(metadata[0].clone().unwrap()[3].0, "Symbol".to_string());
             assert_eq!(
-                metadata[0].clone().unwrap()[3].1,
-                Value::Text("test1".to_string())
+                parsed_metadata.get("name").unwrap().as_str().unwrap(),
+                "Second NFT"
             );
-            assert_eq!(metadata[0].clone().unwrap()[4].0, "test1".to_string());
-            assert_eq!(
-                metadata[0].clone().unwrap()[4].1,
-                Value::Text("test1".to_string())
-            );
-            assert_eq!(metadata[0].clone().unwrap()[5].0, "test2".to_string());
-            assert_eq!(
-                metadata[0].clone().unwrap()[5].1,
-                Value::Nat(Nat::from(1 as u64))
-            );
-            assert_eq!(metadata[0].clone().unwrap()[6].0, "test3".to_string());
-            assert_eq!(
-                metadata[0].clone().unwrap()[6].1,
-                Value::Blob(ByteBuf::from(logo_data.clone()))
-            );
-            assert_eq!(metadata_2[0].clone().unwrap()[7].0, "test4".to_string());
-            assert_eq!(
-                metadata_2[0].clone().unwrap()[7].1,
-                Value::Text("test4".to_string())
-            );
-            assert_eq!(metadata_2[0].clone().unwrap()[8].0, "test5".to_string());
-            assert_eq!(
-                metadata_2[0].clone().unwrap()[8].1,
-                Value::Nat(Nat::from(2 as u64))
-            );
-            assert_eq!(metadata_2[0].clone().unwrap().len(), 9);
+
+            println!("Verification of multiple insert metadata successful!");
         }
         Err(e) => {
             println!("Error minting NFT: {:?}", e);
@@ -432,16 +453,28 @@ fn test_icrc7_token_metadata_multiple_insert_dup_name() {
 
     match mint_return {
         Ok(token_id) => {
-            let mut new_metadata: HashMap<String, Value> = HashMap::new();
-            new_metadata.insert("test1".to_string(), Value::Text("test1".to_string()));
-            new_metadata.insert("test2".to_string(), Value::Nat(Nat::from(1 as u64)));
+            let metadata_json_1 = json!({
+                "description": "Initial metadata",
+                "name": "test1",
+                "attributes": [
+                    {
+                        "trait_type": "test1",
+                        "value": "test1"
+                    },
+                    {
+                        "trait_type": "test2",
+                        "value": 1
+                    }
+                ]
+            });
+
+            let metadata_url_1 =
+                upload_metadata(pic, controller, collection_canister_id, metadata_json_1).unwrap();
 
             let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),
                 token_name: Some("test1".to_string()),
-                token_description: Some("description".to_string()),
-                token_logo: Some("logo".to_string()),
-                token_metadata: Some(new_metadata),
+                token_metadata_url: metadata_url_1.to_string(),
             };
 
             let _ = update_nft_metadata(
@@ -463,52 +496,35 @@ fn test_icrc7_token_metadata_multiple_insert_dup_name() {
             println!("metadata: {:?}", metadata);
             assert_eq!(
                 metadata[0].clone().unwrap()[0].0,
-                "icrc7:description".to_string()
+                "icrc97:metadata".to_string()
             );
             assert_eq!(
                 metadata[0].clone().unwrap()[0].1,
-                Value::Text("description".to_string())
+                Value::Array(vec![Value::Text(metadata_url_1.to_string())])
             );
-            assert_eq!(metadata[0].clone().unwrap()[1].0, "icrc7:logo".to_string());
-            assert_eq!(
-                metadata[0].clone().unwrap()[1].1,
-                Value::Text("logo".to_string())
-            );
-            assert_eq!(metadata[0].clone().unwrap()[2].0, "icrc7:name".to_string());
-            assert_eq!(
-                metadata[0].clone().unwrap()[2].1,
-                Value::Text("test1".to_string())
-            );
-            assert_eq!(
-                metadata[0].clone().unwrap()[3].0,
-                "icrc7:symbol".to_string()
-            );
-            assert_eq!(
-                metadata[0].clone().unwrap()[3].1,
-                Value::Text("test1".to_string())
-            );
-            assert_eq!(metadata[0].clone().unwrap()[4].0, "icrc7:test1".to_string());
-            assert_eq!(
-                metadata[0].clone().unwrap()[4].1,
-                Value::Text("test1".to_string())
-            );
-            assert_eq!(metadata[0].clone().unwrap()[5].0, "icrc7:test2".to_string());
-            assert_eq!(
-                metadata[0].clone().unwrap()[5].1,
-                Value::Nat(Nat::from(1 as u64))
-            );
-            assert_eq!(metadata[0].clone().unwrap().len(), 6);
 
-            let mut new_metadata_2: HashMap<String, Value> = HashMap::new();
-            new_metadata_2.insert("test1".to_string(), Value::Text("test4".to_string()));
-            new_metadata_2.insert("test2".to_string(), Value::Nat(Nat::from(2 as u64)));
+            let metadata_json_2 = json!({
+                "description": "Updated metadata with duplicated traits",
+                "name": "test1",
+                "attributes": [
+                    {
+                        "trait_type": "test1",
+                        "value": "test4"
+                    },
+                    {
+                        "trait_type": "test2",
+                        "value": 2
+                    }
+                ]
+            });
+
+            let metadata_url_2 =
+                upload_metadata(pic, controller, collection_canister_id, metadata_json_2).unwrap();
 
             let update_nft_metadata_args_2 = update_nft_metadata::Args {
                 token_id: token_id.clone(),
                 token_name: None,
-                token_description: None,
-                token_logo: None,
-                token_metadata: Some(new_metadata_2),
+                token_metadata_url: metadata_url_2.to_string(),
             };
 
             let _ = update_nft_metadata(
@@ -530,53 +546,56 @@ fn test_icrc7_token_metadata_multiple_insert_dup_name() {
 
             assert_eq!(
                 metadata_2[0].clone().unwrap()[0].0,
-                "icrc7:description".to_string()
+                "icrc97:metadata".to_string()
             );
             assert_eq!(
                 metadata_2[0].clone().unwrap()[0].1,
-                Value::Text("description".to_string())
+                Value::Array(vec![Value::Text(metadata_url_2.to_string())])
+            );
+
+            let (rt, http_gateway) = setup_http_client(pic);
+            let metadata_file_path = extract_metadata_file_path(&metadata_url_2);
+            let parsed_metadata = fetch_metadata_json(
+                &rt,
+                &http_gateway,
+                collection_canister_id,
+                &metadata_file_path,
+            );
+
+            assert_eq!(
+                parsed_metadata
+                    .get("description")
+                    .unwrap()
+                    .as_str()
+                    .unwrap(),
+                "Updated metadata with duplicated traits"
             );
             assert_eq!(
-                metadata_2[0].clone().unwrap()[1].0,
-                "icrc7:logo".to_string()
+                parsed_metadata.get("name").unwrap().as_str().unwrap(),
+                "test1"
+            );
+
+            let attributes = parsed_metadata
+                .get("attributes")
+                .unwrap()
+                .as_array()
+                .unwrap();
+            assert_eq!(
+                attributes[0].get("trait_type").unwrap().as_str().unwrap(),
+                "test1"
             );
             assert_eq!(
-                metadata_2[0].clone().unwrap()[1].1,
-                Value::Text("logo".to_string())
+                attributes[0].get("value").unwrap().as_str().unwrap(),
+                "test4"
             );
+
             assert_eq!(
-                metadata_2[0].clone().unwrap()[2].0,
-                "icrc7:name".to_string()
+                attributes[1].get("trait_type").unwrap().as_str().unwrap(),
+                "test2"
             );
-            assert_eq!(
-                metadata_2[0].clone().unwrap()[2].1,
-                Value::Text("test1".to_string())
-            );
-            assert_eq!(
-                metadata_2[0].clone().unwrap()[3].0,
-                "icrc7:symbol".to_string()
-            );
-            assert_eq!(
-                metadata_2[0].clone().unwrap()[3].1,
-                Value::Text("test1".to_string())
-            );
-            assert_eq!(
-                metadata_2[0].clone().unwrap()[4].0,
-                "icrc7:test1".to_string()
-            );
-            assert_eq!(
-                metadata_2[0].clone().unwrap()[4].1,
-                Value::Text("test4".to_string())
-            );
-            assert_eq!(
-                metadata_2[0].clone().unwrap()[5].0,
-                "icrc7:test2".to_string()
-            );
-            assert_eq!(
-                metadata_2[0].clone().unwrap()[5].1,
-                Value::Nat(Nat::from(2 as u64))
-            );
-            assert_eq!(metadata_2[0].clone().unwrap().len(), 6);
+            assert_eq!(attributes[1].get("value").unwrap().as_i64().unwrap(), 2);
+
+            println!("Verification of duplicate name metadata successful!");
         }
         Err(e) => {
             println!("Error minting NFT: {:?}", e);
@@ -604,7 +623,6 @@ fn test_icrc7_supply_cap() {
         .try_into()
         .unwrap_or(100u64);
 
-    // Mint tokens up to supply cap
     for i in 0..supply_cap {
         println!("Minting token: {}", i);
         let mint_return = mint_nft(
@@ -622,7 +640,6 @@ fn test_icrc7_supply_cap() {
         assert!(mint_return.is_ok());
     }
 
-    // Try to mint one more token, which should fail
     let mint_return = mint_nft(
         pic,
         "test_overflow".to_string(),
@@ -635,9 +652,199 @@ fn test_icrc7_supply_cap() {
     );
     assert!(mint_return.is_err());
 
-    // Verify total supply is at cap
     let total_supply = icrc7_total_supply(pic, controller, collection_canister_id, &());
     assert_eq!(total_supply, Nat::from(supply_cap));
+}
+
+#[test]
+fn test_icrc7_transfer_with_metadata_updates() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let mint_return = mint_nft(
+        pic,
+        "test1".to_string(),
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+    );
+    tick_n_blocks(pic, 5);
+
+    match mint_return {
+        Ok(token_id) => {
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
+
+            let metadata_json_1 = json!({
+                "description": "Pretransfer metadata",
+                "name": "test1",
+                "attributes": [
+                    {
+                        "trait_type": "test1",
+                        "value": "test1"
+                    },
+                    {
+                        "trait_type": "test2",
+                        "value": 1
+                    }
+                ]
+            });
+
+            let metadata_url_1 =
+                upload_metadata(pic, controller, collection_canister_id, metadata_json_1).unwrap();
+
+            let update_nft_metadata_args = update_nft_metadata::Args {
+                token_id: token_id.clone(),
+                token_name: Some("test1".to_string()),
+                token_metadata_url: metadata_url_1.to_string(),
+            };
+
+            let _ = update_nft_metadata(
+                pic,
+                controller,
+                collection_canister_id,
+                &update_nft_metadata_args,
+            );
+            tick_n_blocks(pic, 5);
+
+            let transfer_args = vec![icrc7::TransferArg {
+                to: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                token_id: token_id.clone(),
+                memo: None,
+                from_subaccount: None,
+                created_at_time: Some(current_time),
+            }];
+
+            let transfer_response =
+                icrc7_transfer(pic, nft_owner1, collection_canister_id, &transfer_args);
+            assert!(
+                transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_ok()
+            );
+            tick_n_blocks(pic, 5);
+
+            let metadata_json_2 = json!({
+                "description": "Posttransfer metadata",
+                "name": "test2",
+                "attributes": [
+                    {
+                        "trait_type": "test3",
+                        "value": "test3"
+                    },
+                    {
+                        "trait_type": "test4",
+                        "value": 2
+                    }
+                ]
+            });
+
+            let metadata_url_2 =
+                upload_metadata(pic, controller, collection_canister_id, metadata_json_2).unwrap();
+
+            let update_nft_metadata_args_2 = update_nft_metadata::Args {
+                token_id: token_id.clone(),
+                token_name: Some("test2".to_string()),
+                token_metadata_url: metadata_url_2.to_string(),
+            };
+
+            let _ = update_nft_metadata(
+                pic,
+                controller,
+                collection_canister_id,
+                &update_nft_metadata_args_2,
+            );
+            tick_n_blocks(pic, 5);
+
+            let owner_of = icrc7_owner_of(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![token_id.clone()],
+            );
+            assert_eq!(
+                owner_of[0],
+                Some(Account {
+                    owner: nft_owner2,
+                    subaccount: None
+                })
+            );
+            tick_n_blocks(pic, 5);
+
+            let metadata = icrc7_token_metadata(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![token_id.clone()],
+            );
+            assert_eq!(
+                metadata[0].clone().unwrap()[0].0,
+                "icrc97:metadata".to_string()
+            );
+            assert_eq!(
+                metadata[0].clone().unwrap()[0].1,
+                Value::Array(vec![Value::Text(metadata_url_2.to_string())])
+            );
+            tick_n_blocks(pic, 5);
+
+            let (rt, http_gateway) = setup_http_client(pic);
+            let metadata_file_path = extract_metadata_file_path(&metadata_url_2);
+            let parsed_metadata = fetch_metadata_json(
+                &rt,
+                &http_gateway,
+                collection_canister_id,
+                &metadata_file_path,
+            );
+
+            assert_eq!(
+                parsed_metadata
+                    .get("description")
+                    .unwrap()
+                    .as_str()
+                    .unwrap(),
+                "Posttransfer metadata"
+            );
+            assert_eq!(
+                parsed_metadata.get("name").unwrap().as_str().unwrap(),
+                "test2"
+            );
+
+            let attributes = parsed_metadata
+                .get("attributes")
+                .unwrap()
+                .as_array()
+                .unwrap();
+            assert_eq!(
+                attributes[0].get("trait_type").unwrap().as_str().unwrap(),
+                "test3"
+            );
+            assert_eq!(
+                attributes[0].get("value").unwrap().as_str().unwrap(),
+                "test3"
+            );
+
+            assert_eq!(
+                attributes[1].get("trait_type").unwrap().as_str().unwrap(),
+                "test4"
+            );
+            assert_eq!(attributes[1].get("value").unwrap().as_i64().unwrap(), 2);
+
+            println!("Verification of metadata updates with transfer successful!");
+        }
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
+    }
 }
 
 #[test]
@@ -788,7 +995,7 @@ fn test_icrc7_transfer() {
 }
 
 #[test]
-fn test_icrc7_transfer_no_argument() {
+fn test_icrc7_collection_metadata() {
     let mut test_env: TestEnv = default_test_setup();
     println!("test_env: {:?}", test_env);
 
@@ -800,183 +1007,58 @@ fn test_icrc7_transfer_no_argument() {
         nft_owner2,
     } = test_env;
 
-    let transfer_response = icrc7_transfer(pic, controller, collection_canister_id, &vec![]);
+    let metadata = icrc7_collection_metadata(pic, controller, collection_canister_id, &());
+    println!("metadata: {:?}", metadata);
 
-    println!("transfer_response: {:?}", transfer_response);
-    assert!(transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err());
-    assert_eq!(
-        transfer_response[0].clone().unwrap().err().unwrap(),
-        icrc7::icrc7_transfer::TransferError::GenericError {
-            error_code: Nat::from(0u64),
-            message: "No argument provided".to_string(),
-        }
-    );
-}
+    assert!(metadata
+        .iter()
+        .any(|(key, value)| { key == "icrc7:symbol" && matches!(value, Value::Text(_)) }));
+    assert!(metadata
+        .iter()
+        .any(|(key, value)| { key == "icrc7:name" && matches!(value, Value::Text(_)) }));
+    assert!(metadata
+        .iter()
+        .any(|(key, value)| { key == "icrc7:total_supply" && matches!(value, Value::Nat(_)) }));
 
-#[test]
-fn test_icrc7_transfer_exceed_max_batch_size() {
-    let mut test_env: TestEnv = default_test_setup();
-    println!("test_env: {:?}", test_env);
+    let total_supply = metadata
+        .iter()
+        .find(|(key, _)| key == "icrc7:total_supply")
+        .map(|(_, value)| match value {
+            Value::Nat(n) => n.clone(),
+            _ => Nat::from(0u64),
+        })
+        .unwrap_or(Nat::from(0u64));
+    assert_eq!(total_supply, Nat::from(0u64));
 
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let max_update_batch_size =
-        icrc7_max_update_batch_size(pic, controller, collection_canister_id, &())
-            .unwrap_or(Nat::from(icrc7::DEFAULT_MAX_UPDATE_BATCH_SIZE));
-
-    let transfer_args: Vec<icrc7::TransferArg> =
-        (0..u64::try_from(max_update_batch_size.0.clone()).unwrap() + 1)
-            .map(|_| icrc7::TransferArg {
-                to: Account {
-                    owner: nft_owner2,
-                    subaccount: None,
-                },
-                token_id: Nat::from(1 as u64),
-                memo: None,
-                from_subaccount: None,
-                created_at_time: None,
-            })
-            .collect();
-
-    let transfer_response = icrc7_transfer(pic, controller, collection_canister_id, &transfer_args);
-
-    println!("transfer_response: {:?}", transfer_response);
-    assert!(transfer_response.len() == usize::try_from(max_update_batch_size.0).unwrap());
-}
-
-#[test]
-fn test_icrc7_transfer_atomic_batch_transfers() {
-    let mut test_env: TestEnv = test_setup_atomic_batch_transfers();
-    println!("test_env: {:?}", test_env);
-
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let max_update_batch_size =
-        icrc7_max_update_batch_size(pic, controller, collection_canister_id, &())
-            .unwrap_or(Nat::from(icrc7::DEFAULT_MAX_UPDATE_BATCH_SIZE));
-
-    let transfer_args: Vec<icrc7::TransferArg> =
-        (0..u64::try_from(max_update_batch_size.0.clone()).unwrap() + 1)
-            .map(|_| icrc7::TransferArg {
-                to: Account {
-                    owner: nft_owner2,
-                    subaccount: None,
-                },
-                token_id: Nat::from(1 as u64),
-                memo: None,
-                from_subaccount: None,
-                created_at_time: None,
-            })
-            .collect();
-
-    let transfer_response = icrc7_transfer(pic, controller, collection_canister_id, &transfer_args);
-
-    println!("transfer_response: {:?}", transfer_response);
-    assert!(transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err());
-    assert_eq!(
-        transfer_response[0].clone().unwrap().err().unwrap(),
-        icrc7::icrc7_transfer::TransferError::GenericError {
-            error_code: Nat::from(0u64),
-            message: "Exceed Max allowed Update Batch Size".to_string(),
-        }
-    );
-}
-
-#[test]
-fn test_icrc7_transfer_anonymous_identity() {
-    let mut test_env: TestEnv = default_test_setup();
-    println!("test_env: {:?}", test_env);
-
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let transfer_args = icrc7::TransferArg {
-        to: Account {
-            owner: nft_owner2,
+    let _ = mint_nft(
+        pic,
+        "test1".to_string(),
+        Account {
+            owner: nft_owner1,
             subaccount: None,
         },
-        token_id: Nat::from(1 as u64),
-        memo: None,
-        from_subaccount: None,
-        created_at_time: None,
-    };
-
-    let transfer_response = icrc7_transfer(
-        pic,
-        Principal::anonymous(),
+        controller,
         collection_canister_id,
-        &vec![transfer_args],
     );
 
-    println!("transfer_response: {:?}", transfer_response);
-    assert!(transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err());
-    assert_eq!(
-        transfer_response[0].clone().unwrap().err().unwrap(),
-        icrc7::icrc7_transfer::TransferError::GenericError {
-            error_code: Nat::from(0u64),
-            message: "Anonymous caller not allowed to transfer".to_string(),
-        }
-    );
+    let updated_metadata = icrc7_collection_metadata(pic, controller, collection_canister_id, &());
+    let updated_total_supply = updated_metadata
+        .iter()
+        .find(|(key, _)| key == "icrc7:total_supply")
+        .map(|(_, value)| match value {
+            Value::Nat(n) => n.clone(),
+            _ => Nat::from(0u64),
+        })
+        .unwrap_or(Nat::from(0u64));
+    assert_eq!(updated_total_supply, Nat::from(1u64));
+
+    let mut sorted_metadata = metadata.clone();
+    sorted_metadata.sort_by(|a, b| a.0.cmp(&b.0));
+    assert_eq!(metadata, sorted_metadata);
 }
 
 #[test]
-fn test_icrc7_transfer_non_existing_token() {
-    let mut test_env: TestEnv = default_test_setup();
-    println!("test_env: {:?}", test_env);
-
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let transfer_args = icrc7::TransferArg {
-        to: Account {
-            owner: nft_owner2,
-            subaccount: None,
-        },
-        token_id: Nat::from(9999 as u64),
-        memo: None,
-        from_subaccount: None,
-        created_at_time: None,
-    };
-
-    let transfer_response = icrc7_transfer(
-        pic,
-        controller,
-        collection_canister_id,
-        &vec![transfer_args],
-    );
-
-    println!("transfer_response: {:?}", transfer_response);
-    assert!(transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err());
-    assert_eq!(
-        transfer_response[0].clone().unwrap().err().unwrap(),
-        icrc7::icrc7_transfer::TransferError::NonExistingTokenId
-    );
-}
-
-#[test]
-fn test_icrc7_transfer_invalid_memo() {
+fn test_icrc3_logs_metadata_updates() {
     let mut test_env: TestEnv = default_test_setup();
     println!("test_env: {:?}", test_env);
 
@@ -990,7 +1072,7 @@ fn test_icrc7_transfer_invalid_memo() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
+        "test_metadata_logs".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
@@ -999,99 +1081,176 @@ fn test_icrc7_transfer_invalid_memo() {
         collection_canister_id,
     );
 
+    tick_n_blocks(pic, 5);
+
     match mint_return {
         Ok(token_id) => {
-            let transfer_args = icrc7::TransferArg {
-                to: Account {
-                    owner: nft_owner2,
-                    subaccount: None,
-                },
+            let blocks_before = icrc3_get_blocks(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![GetBlocksRequest {
+                    start: Nat::from(0u64),
+                    length: Nat::from(10u64),
+                }],
+            );
+
+            println!("blocks_before: {:?}", blocks_before);
+            let initial_log_length = blocks_before.log_length.clone();
+
+            let metadata_json = json!({
+                "description": "Updated NFT description for ICRC3 test",
+                "name": "Updated NFT",
+                "attributes": [
+                    {
+                        "trait_type": "icrc3_test",
+                        "value": "updated_value"
+                    },
+                    {
+                        "trait_type": "version",
+                        "value": 2
+                    }
+                ]
+            });
+
+            let metadata_url =
+                upload_metadata(pic, controller, collection_canister_id, metadata_json).unwrap();
+
+            tick_n_blocks(pic, 10);
+
+            let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),
-                memo: Some(ByteBuf::from(vec![
-                    0;
-                    icrc7::DEFAULT_MAX_MEMO_SIZE as usize + 1
-                ])),
-                from_subaccount: None,
-                created_at_time: None,
+                token_name: Some("updated_test".to_string()),
+                token_metadata_url: metadata_url.to_string(),
             };
 
-            let transfer_response = icrc7_transfer(
+            let update_result = update_nft_metadata(
                 pic,
-                nft_owner1,
+                controller,
                 collection_canister_id,
-                &vec![transfer_args],
+                &update_nft_metadata_args,
             );
 
-            println!("transfer_response: {:?}", transfer_response);
             assert!(
-                transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err()
+                update_result.is_ok(),
+                "Failed to update NFT metadata: {:?}",
+                update_result
             );
-            assert_eq!(
-                transfer_response[0].clone().unwrap().err().unwrap(),
-                icrc7::icrc7_transfer::TransferError::GenericError {
-                    error_code: Nat::from(0u64),
-                    message: "Exceeds Max Memo Size".to_string(),
+
+            tick_n_blocks(pic, 10);
+
+            let blocks_after = icrc3_get_blocks(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![GetBlocksRequest {
+                    start: Nat::from(0u64),
+                    length: Nat::from(20u64),
+                }],
+            );
+
+            println!("blocks_after: {:?}", blocks_after);
+            println!("initial_log_length: {:?}", initial_log_length);
+            println!("final_log_length: {:?}", blocks_after.log_length);
+
+            assert!(
+                blocks_after.log_length > initial_log_length,
+                "Log length should increase after metadata update"
+            );
+
+            let mut found_update_block = false;
+
+            for block in &blocks_after.blocks {
+                match &block.block {
+                    Value::Map(map) => {
+                        if let Some(Value::Text(btype)) = map.get("btype") {
+                            println!("Found block type: {}", btype);
+                            if btype == "7update_token" {
+                                found_update_block = true;
+
+                                if let Some(Value::Map(tx_map)) = map.get("tx") {
+                                    assert!(
+                                        tx_map.contains_key("token_id"),
+                                        "Update transaction should contain token_id"
+                                    );
+
+                                    if let Some(Value::Nat(tx_token_id)) = tx_map.get("token_id") {
+                                        assert_eq!(
+                                            *tx_token_id, token_id,
+                                            "Token ID in transaction should match updated token"
+                                        );
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    _ => {}
                 }
-            );
-        }
-        Err(e) => {
-            println!("Error minting NFT: {:?}", e);
-            assert!(false);
-        }
-    }
-}
+            }
 
-#[test]
-fn test_icrc7_transfer_unauthorized() {
-    let mut test_env: TestEnv = default_test_setup();
-    println!("test_env: {:?}", test_env);
+            if !found_update_block {
+                for archived_block_info in &blocks_after.archived_blocks {
+                    let archived_blocks = icrc3_get_blocks(
+                        pic,
+                        controller,
+                        archived_block_info.callback.canister_id,
+                        &archived_block_info.args,
+                    );
 
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
+                    for block in &archived_blocks.blocks {
+                        match &block.block {
+                            Value::Map(map) => {
+                                if let Some(Value::Text(btype)) = map.get("btype") {
+                                    println!("Found archived block type: {}", btype);
+                                    if btype == "7update_token" {
+                                        found_update_block = true;
 
-    let mint_return = mint_nft(
-        pic,
-        "test1".to_string(),
-        Account {
-            owner: nft_owner1,
-            subaccount: None,
-        },
-        controller,
-        collection_canister_id,
-    );
+                                        if let Some(Value::Map(tx_map)) = map.get("tx") {
+                                            if let Some(Value::Nat(tx_token_id)) =
+                                                tx_map.get("token_id")
+                                            {
+                                                assert_eq!(
+                                                    *tx_token_id, token_id,
+                                                    "Token ID in archived transaction should match updated token"
+                                                );
+                                            }
+                                        }
 
-    match mint_return {
-        Ok(token_id) => {
-            let transfer_args = icrc7::TransferArg {
-                to: Account {
-                    owner: nft_owner2,
-                    subaccount: None,
-                },
-                token_id: token_id.clone(),
-                memo: None,
-                from_subaccount: None,
-                created_at_time: None,
-            };
+                                        println!("Found valid metadata update transaction in archived ICRC3 logs");
+                                        break;
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
 
-            let transfer_response = icrc7_transfer(
-                pic,
-                nft_owner2,
-                collection_canister_id,
-                &vec![transfer_args],
-            );
+                    if found_update_block {
+                        break;
+                    }
+                }
+            }
 
-            println!("transfer_response: {:?}", transfer_response);
             assert!(
-                transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err()
+                found_update_block,
+                "Should find a 7update_token block in ICRC3 logs after metadata update"
+            );
+
+            let final_metadata = icrc7_token_metadata(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![token_id.clone()],
+            );
+
+            assert_eq!(
+                final_metadata[0].clone().unwrap()[0].0,
+                "icrc97:metadata".to_string()
             );
             assert_eq!(
-                transfer_response[0].clone().unwrap().err().unwrap(),
-                icrc7::icrc7_transfer::TransferError::InvalidRecipient
+                final_metadata[0].clone().unwrap()[0].1,
+                Value::Array(vec![Value::Text(metadata_url.to_string())])
             );
         }
         Err(e) => {
@@ -1099,105 +1258,6 @@ fn test_icrc7_transfer_unauthorized() {
             assert!(false);
         }
     }
-}
-
-#[test]
-fn test_icrc7_transfer_to_same_owner() {
-    let mut test_env: TestEnv = default_test_setup();
-    println!("test_env: {:?}", test_env);
-
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let mint_return = mint_nft(
-        pic,
-        "test1".to_string(),
-        Account {
-            owner: nft_owner1,
-            subaccount: None,
-        },
-        controller,
-        collection_canister_id,
-    );
-
-    match mint_return {
-        Ok(token_id) => {
-            let transfer_args = icrc7::TransferArg {
-                to: Account {
-                    owner: nft_owner1,
-                    subaccount: None,
-                },
-                token_id: token_id.clone(),
-                memo: None,
-                from_subaccount: None,
-                created_at_time: None,
-            };
-
-            let transfer_response = icrc7_transfer(
-                pic,
-                nft_owner1,
-                collection_canister_id,
-                &vec![transfer_args],
-            );
-
-            println!("transfer_response: {:?}", transfer_response);
-            assert!(
-                transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_err()
-            );
-            assert_eq!(
-                transfer_response[0].clone().unwrap().err().unwrap(),
-                icrc7::icrc7_transfer::TransferError::InvalidRecipient
-            );
-        }
-        Err(e) => {
-            println!("Error minting NFT: {:?}", e);
-            assert!(false);
-        }
-    }
-}
-
-#[test]
-fn test_icrc7_max_query_batch_size() {
-    let mut test_env: TestEnv = default_test_setup();
-    println!("test_env: {:?}", test_env);
-
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let max_query_batch_size =
-        icrc7_max_query_batch_size(pic, controller, collection_canister_id, &());
-
-    println!("max_query_batch_size: {:?}", max_query_batch_size);
-    assert!(max_query_batch_size == None);
-}
-
-#[test]
-fn test_icrc7_default_take_value() {
-    let mut test_env: TestEnv = default_test_setup();
-    println!("test_env: {:?}", test_env);
-
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let default_take_value = icrc7_default_take_value(pic, controller, collection_canister_id, &());
-
-    println!("default_take_value: {:?}", default_take_value);
-    assert!(default_take_value == None);
 }
 
 #[test]
@@ -1292,6 +1352,8 @@ fn test_icrc7_tokens() {
         collection_canister_id,
     );
 
+    tick_n_blocks(pic, 5);
+
     let tokens: core_nft::types::icrc7::icrc7_tokens::Response =
         crate::client::pocket::unwrap_response(pic.query_call(
             collection_canister_id,
@@ -1313,6 +1375,8 @@ fn test_icrc7_tokens() {
         controller,
         collection_canister_id,
     );
+
+    tick_n_blocks(pic, 5);
 
     let tokens: core_nft::types::icrc7::icrc7_tokens::Response =
         crate::client::pocket::unwrap_response(pic.query_call(
@@ -1370,6 +1434,8 @@ fn test_icrc7_tokens_of() {
         collection_canister_id,
     );
 
+    tick_n_blocks(pic, 5);
+
     let tokens_of_owner1: core_nft::types::icrc7::icrc7_tokens_of::Response =
         crate::client::pocket::unwrap_response(
             pic.query_call(
@@ -1401,6 +1467,8 @@ fn test_icrc7_tokens_of() {
         controller,
         collection_canister_id,
     );
+
+    tick_n_blocks(pic, 5);
 
     let tokens_of_owner2: core_nft::types::icrc7::icrc7_tokens_of::Response =
         crate::client::pocket::unwrap_response(
@@ -1460,6 +1528,8 @@ fn test_icrc7_balance_of() {
         collection_canister_id,
     );
 
+    tick_n_blocks(pic, 5);
+
     let balance_of_owner1 = icrc7_balance_of(
         pic,
         controller,
@@ -1482,6 +1552,7 @@ fn test_icrc7_balance_of() {
         controller,
         collection_canister_id,
     );
+    tick_n_blocks(pic, 5);
 
     let balance_of_owner2 = icrc7_balance_of(
         pic,
@@ -2331,122 +2402,6 @@ fn test_icrc7_transfer_chain() {
 }
 
 #[test]
-fn test_icrc7_transfer_with_metadata_updates() {
-    let mut test_env: TestEnv = default_test_setup();
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let mint_return = mint_nft(
-        pic,
-        "test1".to_string(),
-        Account {
-            owner: nft_owner1,
-            subaccount: None,
-        },
-        controller,
-        collection_canister_id,
-    );
-    tick_n_blocks(pic, 5);
-
-    match mint_return {
-        Ok(token_id) => {
-            let current_time = pic.get_time().as_nanos_since_unix_epoch();
-
-            let mut new_metadata: HashMap<String, Value> = HashMap::new();
-            new_metadata.insert("test1".to_string(), Value::Text("test1".to_string()));
-            new_metadata.insert("test2".to_string(), Value::Nat(Nat::from(1 as u64)));
-
-            let update_nft_metadata_args = update_nft_metadata::Args {
-                token_id: token_id.clone(),
-                token_name: Some("test1".to_string()),
-                token_description: Some("description".to_string()),
-                token_logo: Some("logo".to_string()),
-                token_metadata: Some(new_metadata),
-            };
-
-            let _ = update_nft_metadata(
-                pic,
-                controller,
-                collection_canister_id,
-                &update_nft_metadata_args,
-            );
-            tick_n_blocks(pic, 5);
-
-            let transfer_args = vec![icrc7::TransferArg {
-                to: Account {
-                    owner: nft_owner2,
-                    subaccount: None,
-                },
-                token_id: token_id.clone(),
-                memo: None,
-                from_subaccount: None,
-                created_at_time: Some(current_time),
-            }];
-
-            let transfer_response =
-                icrc7_transfer(pic, nft_owner1, collection_canister_id, &transfer_args);
-            assert!(
-                transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_ok()
-            );
-            tick_n_blocks(pic, 5);
-
-            let mut new_metadata_2: HashMap<String, Value> = HashMap::new();
-            new_metadata_2.insert("test3".to_string(), Value::Text("test3".to_string()));
-            new_metadata_2.insert("test4".to_string(), Value::Nat(Nat::from(2 as u64)));
-
-            let update_nft_metadata_args_2 = update_nft_metadata::Args {
-                token_id: token_id.clone(),
-                token_name: Some("test2".to_string()),
-                token_description: Some("description2".to_string()),
-                token_logo: Some("logo2".to_string()),
-                token_metadata: Some(new_metadata_2),
-            };
-
-            let _ = update_nft_metadata(
-                pic,
-                controller,
-                collection_canister_id,
-                &update_nft_metadata_args_2,
-            );
-            tick_n_blocks(pic, 5);
-
-            let owner_of = icrc7_owner_of(
-                pic,
-                controller,
-                collection_canister_id,
-                &vec![token_id.clone()],
-            );
-            assert_eq!(
-                owner_of[0],
-                Some(Account {
-                    owner: nft_owner2,
-                    subaccount: None
-                })
-            );
-            tick_n_blocks(pic, 5);
-
-            let metadata =
-                icrc7_token_metadata(pic, controller, collection_canister_id, &vec![token_id]);
-            assert_eq!(metadata[0].clone().unwrap()[2].0, "icrc7:name".to_string());
-            assert_eq!(
-                metadata[0].clone().unwrap()[2].1,
-                Value::Text("test2".to_string())
-            );
-            tick_n_blocks(pic, 5);
-        }
-        Err(e) => {
-            println!("Error minting NFT: {:?}", e);
-            assert!(false);
-        }
-    }
-}
-
-#[test]
 fn test_icrc7_transfer_after_fail() {
     let mut test_env: TestEnv = default_test_setup();
     let TestEnv {
@@ -2522,67 +2477,4 @@ fn test_icrc7_transfer_after_fail() {
             assert!(false);
         }
     }
-}
-
-#[test]
-fn test_icrc7_collection_metadata() {
-    let mut test_env: TestEnv = default_test_setup();
-    println!("test_env: {:?}", test_env);
-
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let metadata = icrc7_collection_metadata(pic, controller, collection_canister_id, &());
-    println!("metadata: {:?}", metadata);
-
-    assert!(metadata
-        .iter()
-        .any(|(key, value)| { key == "icrc7:symbol" && matches!(value, Value::Text(_)) }));
-    assert!(metadata
-        .iter()
-        .any(|(key, value)| { key == "icrc7:name" && matches!(value, Value::Text(_)) }));
-    assert!(metadata
-        .iter()
-        .any(|(key, value)| { key == "icrc7:total_supply" && matches!(value, Value::Nat(_)) }));
-
-    let total_supply = metadata
-        .iter()
-        .find(|(key, _)| key == "icrc7:total_supply")
-        .map(|(_, value)| match value {
-            Value::Nat(n) => n.clone(),
-            _ => Nat::from(0u64),
-        })
-        .unwrap_or(Nat::from(0u64));
-    assert_eq!(total_supply, Nat::from(0u64));
-
-    let _ = mint_nft(
-        pic,
-        "test1".to_string(),
-        Account {
-            owner: nft_owner1,
-            subaccount: None,
-        },
-        controller,
-        collection_canister_id,
-    );
-
-    let updated_metadata = icrc7_collection_metadata(pic, controller, collection_canister_id, &());
-    let updated_total_supply = updated_metadata
-        .iter()
-        .find(|(key, _)| key == "icrc7:total_supply")
-        .map(|(_, value)| match value {
-            Value::Nat(n) => n.clone(),
-            _ => Nat::from(0u64),
-        })
-        .unwrap_or(Nat::from(0u64));
-    assert_eq!(updated_total_supply, Nat::from(1u64));
-
-    let mut sorted_metadata = metadata.clone();
-    sorted_metadata.sort_by(|a, b| a.0.cmp(&b.0));
-    assert_eq!(metadata, sorted_metadata);
 }
