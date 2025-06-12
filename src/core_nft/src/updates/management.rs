@@ -490,13 +490,13 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
         }
     }
 
-    let redirection_url = format!("https://{}.raw.icp0.io/{}", canister_id, media_path.clone());
-
     let path = if media_path.starts_with('/') {
         media_path.clone()
     } else {
         format!("/{}", media_path)
     };
+
+    let redirection_url = format!("https://{}.raw.icp0.io{}", canister_id, path.clone());
 
     add_redirection(path.clone(), redirection_url.clone());
 
@@ -518,7 +518,7 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
     });
 
     let url = format!(
-        "https://{}.raw.icp0.io/{}",
+        "https://{}.raw.icp0.io{}",
         ic_cdk::id().to_string(),
         path.clone()
     );

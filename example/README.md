@@ -101,14 +101,14 @@ cd ../cmdline
 cargo build --release
 ```
 
-The tool will be available at `../target/release/icrc7-nft-tool`.
+The tool will be available at `../target/release/origyn_icrc7_cmdlinetools`.
 
 ## Step 5: Upload Files to the Collection
 
 Upload files using the CLI tool. The identity file should be the .pem file of an identity that has the right to manage/upload media on the collection (must be in `authorized_principals`). You can export it with `dfx identity export identity_name > identity.pem`.
 
 ```bash
-../target/release/icrc7-nft-tool \
+../target/release/origyn_icrc7_cmdlinetools \
   --network ic \
   --identity $IDENTITY_FILE \
   --canister $NFT_CANISTER_ID \
@@ -126,7 +126,7 @@ Upload files using the CLI tool. The identity file should be the .pem file of an
 Create ICRC97-compliant metadata interactively:
 
 ```bash
-../target/release/icrc7-nft-tool \
+../target/release/origyn_icrc7_cmdlinetools \
   --network ic \
   --identity $IDENTITY_FILE \
   --canister $NFT_CANISTER_ID \
@@ -138,7 +138,7 @@ Create ICRC97-compliant metadata interactively:
 Create metadata using command-line parameters:
 
 ```bash
-../target/release/icrc7-nft-tool \
+../target/release/origyn_icrc7_cmdlinetools \
   --network ic \
   --identity $IDENTITY_FILE \
   --canister $NFT_CANISTER_ID \
@@ -157,7 +157,7 @@ Create metadata using command-line parameters:
 Validate an existing JSON metadata file:
 
 ```bash
-../target/release/icrc7-nft-tool \
+../target/release/origyn_icrc7_cmdlinetools \
   --network ic \
   --identity $IDENTITY_FILE \
   --canister $NFT_CANISTER_ID \
@@ -169,7 +169,7 @@ Validate an existing JSON metadata file:
 Upload your metadata file to the collection:
 
 ```bash
-../target/release/icrc7-nft-tool \
+../target/release/origyn_icrc7_cmdlinetools \
   --network ic \
   --identity $IDENTITY_FILE \
   --canister $NFT_CANISTER_ID \
@@ -183,7 +183,7 @@ This will return a metadata URL that you can use for minting.
 ### Method 1: Mint with Existing Metadata URL
 
 ```bash
-../target/release/icrc7-nft-tool \
+../target/release/origyn_icrc7_cmdlinetools \
   --network ic \
   --identity $IDENTITY_FILE \
   --canister $NFT_CANISTER_ID \
@@ -198,7 +198,7 @@ This will return a metadata URL that you can use for minting.
 
 #### Interactive Mode:
 ```bash
-../target/release/icrc7-nft-tool \
+../target/release/origyn_icrc7_cmdlinetools \
   --network ic \
   --identity $IDENTITY_FILE \
   --canister $NFT_CANISTER_ID \
@@ -210,7 +210,7 @@ This will return a metadata URL that you can use for minting.
 
 #### CLI Mode:
 ```bash
-../target/release/icrc7-nft-tool \
+../target/release/origyn_icrc7_cmdlinetools \
   --network ic \
   --identity $IDENTITY_FILE \
   --canister $NFT_CANISTER_ID \
@@ -226,7 +226,7 @@ This will return a metadata URL that you can use for minting.
 
 #### From File:
 ```bash
-../target/release/icrc7-nft-tool \
+../target/release/origyn_icrc7_cmdlinetools \
   --network ic \
   --identity $IDENTITY_FILE \
   --canister $NFT_CANISTER_ID \
@@ -296,8 +296,8 @@ dfx canister call nft --network ic icrc7_total_supply '()'
 
 ### Getting Help:
 ```bash
-../target/release/icrc7-nft-tool --help
-../target/release/icrc7-nft-tool <subcommand> --help
+../target/release/origyn_icrc7_cmdlinetools --help
+../target/release/origyn_icrc7_cmdlinetools <subcommand> --help
 ```
 
 ## Additional Resources
