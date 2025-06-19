@@ -15,7 +15,7 @@ pub fn start_job() {
 }
 
 fn upload_garbage_collector_job() {
-    ic_cdk::spawn(upload_garbage_collector())
+    ic_cdk::futures::spawn(upload_garbage_collector());
 }
 
 async fn upload_garbage_collector() {

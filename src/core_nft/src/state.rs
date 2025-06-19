@@ -128,7 +128,7 @@ impl Data {
                 version,
                 commit_hash: commit_hash.clone(),
             }),
-            ic_cdk::api::id(),
+            ic_cdk::api::canister_self(),
             HashMap::new(),
             vec![],
             authorized_principals.clone(),

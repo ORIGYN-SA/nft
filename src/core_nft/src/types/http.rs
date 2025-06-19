@@ -1,5 +1,5 @@
 use ic_asset_certification::{AssetConfig, AssetRedirectKind, AssetRouter};
-use ic_cdk::api::set_certified_data;
+use ic_cdk::api::certified_data_set;
 use ic_http_certification::{
     HeaderField, HttpCertification, HttpCertificationPath, HttpCertificationTree,
     HttpCertificationTreeEntry,
@@ -51,7 +51,7 @@ pub fn add_redirection(from_url: String, to_url: String) -> Option<()> {
 
         trace(&format!("Certified assets: {:?}", asset_router.root_hash()));
 
-        set_certified_data(&asset_router.root_hash());
+        certified_data_set(&asset_router.root_hash());
     });
 
     Some(())
@@ -70,7 +70,7 @@ pub fn remove_redirection(from_url: String, to_url: String) -> Option<()> {
             ic_cdk::trap(&format!("Failed to certify assets: {}", err));
         }
 
-        set_certified_data(&asset_router.root_hash());
+        certified_data_set(&asset_router.root_hash());
     });
 
     Some(())
@@ -102,7 +102,7 @@ pub fn certify_all_assets() {
     });
 
     ASSET_ROUTER.with_borrow_mut(|asset_router| {
-        set_certified_data(&asset_router.root_hash());
+        certified_data_set(&asset_router.root_hash());
     });
 }
 

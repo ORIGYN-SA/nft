@@ -19,7 +19,7 @@ fn transfer_nft(arg: &icrc7::TransferArg) -> Result<Nat, icrc7::icrc7_transfer::
         }
     })?;
 
-    if nft.token_owner.owner != ic_cdk::caller()
+    if nft.token_owner.owner != ic_cdk::api::msg_caller()
         || arg.to.owner == Principal::anonymous()
         || nft.token_owner == arg.to
     {
@@ -121,7 +121,7 @@ pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_t
         ))];
     }
 
-    if ic_cdk::caller() == Principal::anonymous() {
+    if ic_cdk::api::msg_caller() == Principal::anonymous() {
         return vec![Some(Err(
             icrc7::icrc7_transfer::TransferError::GenericError {
                 error_code: Nat::from(0u64),

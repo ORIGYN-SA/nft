@@ -1,7 +1,5 @@
 use crate::{generate_pocket_query_call, generate_pocket_update_call};
 
-use bity_ic_storage_canister_api::{cancel_upload, finalize_upload, init_upload, store_chunk};
-
 use core_nft::types::icrc3::{
     icrc3_get_archives, icrc3_get_blocks, icrc3_get_properties, icrc3_get_tip_certificate,
     icrc3_supported_block_types,
@@ -20,9 +18,10 @@ use core_nft::types::icrc7::{
     icrc7_tokens, icrc7_tokens_of, icrc7_total_supply, icrc7_transfer, icrc7_tx_window,
 };
 use core_nft::types::management::{
-    get_all_uploads, get_upload_status, mint, remove_authorized_principals,
-    remove_minting_authorities, update_authorized_principals, update_collection_metadata,
-    update_minting_authorities, update_nft_metadata,
+    cancel_upload, finalize_upload, get_all_uploads, get_upload_status, init_upload, mint,
+    remove_authorized_principals, remove_minting_authorities, store_chunk,
+    update_authorized_principals, update_collection_metadata, update_minting_authorities,
+    update_nft_metadata,
 };
 
 generate_pocket_query_call!(icrc7_collection_metadata);

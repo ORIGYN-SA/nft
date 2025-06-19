@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
+use crate::types::management::{cancel_upload, finalize_upload, init_upload, store_chunk};
 use crate::utils::trace;
-use bity_ic_storage_canister_api::{cancel_upload, finalize_upload, init_upload, store_chunk};
 use bity_ic_storage_canister_c2c::{
     cancel_upload, finalize_upload, get_storage_size, init_upload, store_chunk,
 };
@@ -202,7 +202,7 @@ impl bity_ic_subcanister_manager::Canister for StorageCanister {
 
 impl StorageCanister {
     pub async fn get_storage_size(&self) -> Result<u128, String> {
-        let res = retry_async(|| get_storage_size(self.canister_id, &()), 3).await;
+        let res = retry_async(|| get_storage_size(self.canister_id, ()), 3).await;
 
         trace(&format!(
             "Checking storage : {:?}. storage size {res:?}.",
@@ -211,7 +211,7 @@ impl StorageCanister {
 
         match res {
             Ok(size) => Ok(size),
-            Err(err) => Err(err.1),
+            Err(err) => Err(err),
         }
     }
 
@@ -230,76 +230,110 @@ impl StorageCanister {
     pub async fn init_upload(
         &self,
         data: init_upload::Args,
-    ) -> Result<init_upload::InitUploadResp, String> {
+    ) -> crate::types::management::init_upload::Response {
         if self.state != bity_ic_subcanister_manager::CanisterState::Installed {
-            return Err("Canister is not installed".to_string());
+            return Err(
+                crate::types::management::init_upload::InitUploadError::StorageCanisterError(
+                    "Canister is not installed".to_string(),
+                ),
+            );
         }
 
         let res = retry_async(|| init_upload(self.canister_id, data.clone()), 3).await;
+        trace(&format!("init_upload response: {:?}", res));
 
         match res {
-            Ok(init_upload_response) => match init_upload_response {
-                Ok(data) => Ok(data),
-                Err(e) => Err(format!("{e:?}")),
-            },
-            Err(e) => Err(format!("{e:?}")),
+            Ok(init_upload_response) => {
+                crate::types::management::init_upload::from_storage_response(init_upload_response)
+            }
+            Err(e) => Err(
+                crate::types::management::init_upload::InitUploadError::StorageCanisterError(
+                    format!("{e:?}"),
+                ),
+            ),
         }
     }
 
     pub async fn store_chunk(
         &self,
         data: store_chunk::Args,
-    ) -> Result<store_chunk::StoreChunkResp, String> {
+    ) -> crate::types::management::store_chunk::Response {
         if self.state != bity_ic_subcanister_manager::CanisterState::Installed {
-            return Err("Canister is not installed".to_string());
+            return Err(
+                crate::types::management::store_chunk::StoreChunkError::StorageCanisterError(
+                    "Canister is not installed".to_string(),
+                ),
+            );
         }
 
         let res = retry_async(|| store_chunk(self.canister_id, data.clone()), 3).await;
+        trace(&format!("store_chunk response: {:?}", res));
 
         match res {
-            Ok(store_chunk_response) => match store_chunk_response {
-                Ok(data) => Ok(data),
-                Err(e) => Err(format!("{e:?}")),
-            },
-            Err(e) => Err(format!("{e:?}")),
+            Ok(store_chunk_response) => {
+                crate::types::management::store_chunk::from_storage_response(store_chunk_response)
+            }
+            Err(e) => Err(
+                crate::types::management::store_chunk::StoreChunkError::StorageCanisterError(
+                    format!("{e:?}"),
+                ),
+            ),
         }
     }
 
     pub async fn finalize_upload(
         &self,
         data: finalize_upload::Args,
-    ) -> Result<finalize_upload::FinalizeUploadResp, String> {
+    ) -> crate::types::management::finalize_upload::Response {
         if self.state != bity_ic_subcanister_manager::CanisterState::Installed {
-            return Err("Canister is not installed".to_string());
+            return Err(
+                crate::types::management::finalize_upload::FinalizeUploadError::StorageCanisterError(
+                    "Canister is not installed".to_string(),
+                ),
+            );
         }
 
         let res = retry_async(|| finalize_upload(self.canister_id, data.clone()), 3).await;
 
         match res {
-            Ok(finalize_upload_response) => match finalize_upload_response {
-                Ok(data) => Ok(data),
-                Err(e) => Err(format!("{e:?}")),
-            },
-            Err(e) => Err(format!("{e:?}")),
+            Ok(finalize_upload_response) => {
+                crate::types::management::finalize_upload::from_storage_response(
+                    finalize_upload_response,
+                )
+            }
+            Err(e) => Err(
+                crate::types::management::finalize_upload::FinalizeUploadError::StorageCanisterError(
+                    format!("{e:?}"),
+                ),
+            ),
         }
     }
 
     pub async fn cancel_upload(
         &self,
         data: cancel_upload::Args,
-    ) -> Result<cancel_upload::CancelUploadResp, String> {
+    ) -> crate::types::management::cancel_upload::Response {
         if self.state != bity_ic_subcanister_manager::CanisterState::Installed {
-            return Err("Canister is not installed".to_string());
+            return Err(
+                crate::types::management::cancel_upload::CancelUploadError::StorageCanisterError(
+                    "Canister is not installed".to_string(),
+                ),
+            );
         }
 
         let res = retry_async(|| cancel_upload(self.canister_id, data.clone()), 3).await;
 
         match res {
-            Ok(cancel_upload_response) => match cancel_upload_response {
-                Ok(data) => Ok(data),
-                Err(e) => Err(format!("{e:?}")),
-            },
-            Err(e) => Err(format!("{e:?}")),
+            Ok(cancel_upload_response) => {
+                crate::types::management::cancel_upload::from_storage_response(
+                    cancel_upload_response,
+                )
+            }
+            Err(e) => Err(
+                crate::types::management::cancel_upload::CancelUploadError::StorageCanisterError(
+                    format!("{e:?}"),
+                ),
+            ),
         }
     }
 

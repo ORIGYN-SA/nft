@@ -5,14 +5,11 @@ use crate::types::sub_canister::StorageCanister;
 use crate::types::{icrc7, management, nft};
 use crate::utils::{check_memo, trace};
 
+pub use crate::types::management::{cancel_upload, finalize_upload, init_upload, store_chunk};
 use bity_ic_icrc3::transaction::{ICRC7Transaction, ICRC7TransactionData};
-pub use bity_ic_storage_canister_api::cancel_upload;
-pub use bity_ic_storage_canister_api::finalize_upload;
-pub use bity_ic_storage_canister_api::init_upload;
-pub use bity_ic_storage_canister_api::store_chunk;
 use bity_ic_storage_canister_api::types::storage::UploadState;
 pub use candid::Nat;
-pub use ic_cdk::api::call::RejectionCode;
+pub use ic_cdk::call::RejectCode;
 use ic_cdk_macros::{query, update};
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
 use icrc_ledger_types::icrc1::account::Account;
@@ -23,10 +20,10 @@ use url::Url;
 #[update(guard = "caller_is_governance_principal")]
 pub async fn update_collection_metadata(
     req: management::update_collection_metadata::Args,
-) -> Result<(), (RejectionCode, String)> {
-    let caller = ic_cdk::caller();
-    let _guard_principal =
-        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
+) -> management::update_collection_metadata::Response {
+    let caller = ic_cdk::api::msg_caller();
+    let _guard_principal = GuardManagement::new(caller)
+        .map_err(|_| management::update_collection_metadata::UpdateCollectionMetadataError::ConcurrentManagementCall)?;
 
     if let Some(description) = req.description {
         mutate_state(|state| {
@@ -119,9 +116,9 @@ pub async fn update_collection_metadata(
 pub fn mint(req: management::mint::Args) -> management::mint::Response {
     trace("Minting NFT");
     trace(&format!("timestamp: {:?}", ic_cdk::api::time()));
-    let caller = ic_cdk::caller();
-    let _guard_principal =
-        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
+    let caller = ic_cdk::api::msg_caller();
+    let _guard_principal = GuardManagement::new(caller)
+        .map_err(|_| management::mint::MintError::ConcurrentManagementCall)?;
 
     let token_id = read_state(|state| state.data.last_token_id.clone());
 
@@ -135,25 +132,19 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
     });
 
     if token_list.len() >= supply_cap {
-        return Err((
-            RejectionCode::CanisterError,
-            "Exceed Max allowed Supply Cap".to_string(),
-        ));
+        return Err(management::mint::MintError::ExceedMaxAllowedSupplyCap);
     }
 
     match check_memo(req.memo.clone()) {
         Ok(_) => {}
-        Err(e) => {
-            return Err((RejectionCode::CanisterError, e));
+        Err(_) => {
+            return Err(management::mint::MintError::InvalidMemo);
         }
     }
 
     match token_list.contains_key(&token_id.clone()) {
         true => {
-            return Err((
-                RejectionCode::CanisterError,
-                "Token already exists".to_string(),
-            ));
+            return Err(management::mint::MintError::TokenAlreadyExists);
         }
         false => {
             let new_token = nft::Icrc7Token::new(
@@ -179,9 +170,8 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
             match icrc3_add_transaction(transaction) {
                 Ok(_) => {}
                 Err(e) => {
-                    return Err((
-                        RejectionCode::CanisterError,
-                        format!("Failed to log transaction: {}", e),
+                    return Err(management::mint::MintError::StorageCanisterError(
+                        e.to_string(),
                     ));
                 }
             }
@@ -201,9 +191,10 @@ pub fn update_nft_metadata(
     req: management::update_nft_metadata::Args,
 ) -> management::update_nft_metadata::Response {
     trace("Updating NFT metadata");
-    let caller = ic_cdk::caller();
-    let _guard_principal =
-        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
+    let caller = ic_cdk::api::msg_caller();
+    let _guard_principal = GuardManagement::new(caller).map_err(|_| {
+        management::update_nft_metadata::UpdateNftMetadataError::ConcurrentManagementCall
+    })?;
 
     let token_name_hash = req.token_id;
 
@@ -235,7 +226,7 @@ pub fn update_nft_metadata(
                 ICRC7TransactionData {
                     tid: Some(token_name_hash.clone()),
                     from: Some(Account {
-                        owner: ic_cdk::caller(),
+                        owner: ic_cdk::api::msg_caller(),
                         subaccount: None,
                     }),
                     to: None,
@@ -248,9 +239,8 @@ pub fn update_nft_metadata(
             match icrc3_add_transaction(transaction) {
                 Ok(_) => {}
                 Err(e) => {
-                    return Err((
-                        RejectionCode::CanisterError,
-                        format!("Failed to log transaction: {}", e),
+                    return Err(management::update_nft_metadata::UpdateNftMetadataError::StorageCanisterError(
+                        e.to_string(),
                     ));
                 }
             };
@@ -267,10 +257,7 @@ pub fn update_nft_metadata(
             ));
         }
         false => {
-            return Err((
-                RejectionCode::CanisterError,
-                "Token does not exist".to_string(),
-            ));
+            return Err(management::update_nft_metadata::UpdateNftMetadataError::TokenDoesNotExist);
         }
     }
 
@@ -278,18 +265,15 @@ pub fn update_nft_metadata(
 }
 
 #[update(guard = "caller_is_governance_principal")]
-pub fn burn_nft(token_id: Nat) -> Result<(), (RejectionCode, String)> {
-    let caller = ic_cdk::caller();
-    let _guard_principal =
-        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
+pub fn burn_nft(token_id: Nat) -> management::burn_nft::Response {
+    let caller = ic_cdk::api::msg_caller();
+    let _guard_principal = GuardManagement::new(caller)
+        .map_err(|_| management::burn_nft::BurnNftError::ConcurrentManagementCall)?;
 
     let token = match read_state(|state| state.data.tokens_list.get(&token_id).cloned()) {
         Some(token) => token,
         None => {
-            return Err((
-                RejectionCode::CanisterError,
-                "Token does not exist".to_string(),
-            ));
+            return Err(management::burn_nft::BurnNftError::TokenDoesNotExist);
         }
     };
 
@@ -309,9 +293,8 @@ pub fn burn_nft(token_id: Nat) -> Result<(), (RejectionCode, String)> {
     match icrc3_add_transaction(transaction) {
         Ok(_) => {}
         Err(e) => {
-            return Err((
-                RejectionCode::CanisterError,
-                format!("Failed to log transaction: {}", e),
+            return Err(management::burn_nft::BurnNftError::StorageCanisterError(
+                e.to_string(),
             ));
         }
     }
@@ -325,12 +308,12 @@ pub fn burn_nft(token_id: Nat) -> Result<(), (RejectionCode, String)> {
 
 #[update(guard = "caller_is_governance_principal")]
 pub async fn init_upload(data: init_upload::Args) -> init_upload::Response {
-    let caller = ic_cdk::caller();
-    let _guard_principal =
-        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
+    let caller = ic_cdk::api::msg_caller();
+    let _guard_principal = GuardManagement::new(caller)
+        .map_err(|_| init_upload::InitUploadError::ConcurrentManagementCall)?;
 
     if read_state(|state| state.internal_filestorage.contains_path(&data.file_path)) {
-        return Err((RejectionCode::CanisterError, "File exists.".to_string()));
+        return Err(init_upload::InitUploadError::FileAlreadyExists);
     }
 
     let mut sub_canister_manager = read_state(|state| state.data.sub_canister_manager.clone());
@@ -339,7 +322,7 @@ pub async fn init_upload(data: init_upload::Args) -> init_upload::Response {
         Ok((_, canister)) => canister,
         Err(e) => {
             trace(&format!("Error inserting data: {:?}", e));
-            return Err((RejectionCode::CanisterError, e));
+            return Err(init_upload::InitUploadError::StorageCanisterError(e));
         }
     };
 
@@ -361,9 +344,9 @@ pub async fn init_upload(data: init_upload::Args) -> init_upload::Response {
 
 #[update(guard = "caller_is_governance_principal")]
 pub async fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
-    let caller = ic_cdk::caller();
-    let _guard_principal =
-        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
+    let caller = ic_cdk::api::msg_caller();
+    let _guard_principal = GuardManagement::new(caller)
+        .map_err(|_| store_chunk::StoreChunkError::ConcurrentManagementCall)?;
 
     let (init_timestamp, canister_id, file_path) =
         match read_state(|state| state.internal_filestorage.get(&data.file_path).cloned()) {
@@ -371,17 +354,11 @@ pub async fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
                 UploadState::Init => (data.init_timestamp, data.canister, data.path),
                 UploadState::InProgress => (data.init_timestamp, data.canister, data.path),
                 UploadState::Finalized => {
-                    return Err((
-                        RejectionCode::CanisterError,
-                        "Core - store_chunk - Upload already finalized".to_string(),
-                    ));
+                    return Err(store_chunk::StoreChunkError::UploadAlreadyFinalized);
                 }
             },
             None => {
-                return Err((
-                    RejectionCode::CanisterError,
-                    "Upload not initiated".to_string(),
-                ));
+                return Err(store_chunk::StoreChunkError::UploadNotInitialized);
             }
         };
 
@@ -396,8 +373,7 @@ pub async fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
             mutate_state(|state| {
                 state.internal_filestorage.remove(&data.file_path);
             });
-            return Err((
-                RejectionCode::CanisterError,
+            return Err(store_chunk::StoreChunkError::StorageCanisterError(
                 "Storage canister not found. Cancelling the upload.".to_string(),
             ));
         }
@@ -407,7 +383,7 @@ pub async fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
         Ok(_) => {}
         Err(e) => {
             trace(&format!("Error storing chunk: {:?}", e));
-            return Err((RejectionCode::CanisterError, e));
+            return Err(e);
         }
     }
     mutate_state(|state| {
@@ -428,32 +404,23 @@ pub async fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
 #[update(guard = "caller_is_governance_principal")]
 pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Response {
     trace(&format!("Finalizing upload: {:?}", data));
-    let caller = ic_cdk::caller();
-    let _guard_principal =
-        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
+    let caller = ic_cdk::api::msg_caller();
+    let _guard_principal = GuardManagement::new(caller)
+        .map_err(|_| finalize_upload::FinalizeUploadError::ConcurrentManagementCall)?;
 
     let (init_timestamp, media_path, canister_id) =
         match read_state(|state| state.internal_filestorage.get(&data.file_path).cloned()) {
             Some(data) => match data.state {
                 UploadState::Init => {
-                    return Err((
-                        RejectionCode::CanisterError,
-                        "Upload didnt started".to_string(),
-                    ));
+                    return Err(finalize_upload::FinalizeUploadError::UploadNotStarted);
                 }
                 UploadState::InProgress => (data.init_timestamp, data.path, data.canister),
                 UploadState::Finalized => {
-                    return Err((
-                        RejectionCode::CanisterError,
-                        "Core - finalize_upload - Upload already finalized".to_string(),
-                    ));
+                    return Err(finalize_upload::FinalizeUploadError::UploadAlreadyFinalized);
                 }
             },
             None => {
-                return Err((
-                    RejectionCode::CanisterError,
-                    "Upload not initiated".to_string(),
-                ));
+                return Err(finalize_upload::FinalizeUploadError::UploadNotStarted);
             }
         };
 
@@ -468,8 +435,7 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
             mutate_state(|state| {
                 state.internal_filestorage.remove(&data.file_path);
             });
-            return Err((
-                RejectionCode::CanisterError,
+            return Err(finalize_upload::FinalizeUploadError::StorageCanisterError(
                 "Storage canister not found. Cancelling the upload.".to_string(),
             ));
         }
@@ -480,7 +446,7 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
         Err(e) => {
             trace(&format!("Error storing chunk: {:?}", e));
             // TODO shall we automaticly cleanup or add a cleanup and let user retry?
-            return Err((RejectionCode::CanisterError, e));
+            return Err(e);
         }
     }
 
@@ -513,7 +479,7 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
 
     let url = format!(
         "https://{}.raw.icp0.io{}",
-        ic_cdk::id().to_string(),
+        ic_cdk::api::canister_self().to_string(),
         path.clone()
     );
 
@@ -525,7 +491,7 @@ pub fn get_upload_status(file_path: String) -> management::get_upload_status::Re
     let upload_status = read_state(|state| state.internal_filestorage.get(&file_path).cloned());
     match upload_status {
         Some(status) => Ok(status.state),
-        None => Err((RejectionCode::CanisterError, "Upload not found".to_string())),
+        None => Err(management::get_upload_status::GetUploadStatusError::UploadNotFound),
     }
 }
 
@@ -552,9 +518,9 @@ pub fn get_all_uploads(
 
 #[update(guard = "caller_is_governance_principal")]
 pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response {
-    let caller = ic_cdk::caller();
-    let _guard_principal =
-        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
+    let caller = ic_cdk::api::msg_caller();
+    let _guard_principal = GuardManagement::new(caller)
+        .map_err(|_| cancel_upload::CancelUploadError::ConcurrentManagementCall)?;
 
     let canister_id =
         match read_state(|state| state.internal_filestorage.get(&data.file_path).cloned()) {
@@ -562,17 +528,11 @@ pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response
                 UploadState::Init => data.canister,
                 UploadState::InProgress => data.canister,
                 UploadState::Finalized => {
-                    return Err((
-                        RejectionCode::CanisterError,
-                        "Core - cancel_upload - Upload already finalized".to_string(),
-                    ));
+                    return Err(cancel_upload::CancelUploadError::UploadAlreadyFinalized);
                 }
             },
             None => {
-                return Err((
-                    RejectionCode::CanisterError,
-                    "Upload not initiated".to_string(),
-                ));
+                return Err(cancel_upload::CancelUploadError::UploadNotInitialized);
             }
         };
 
@@ -587,8 +547,7 @@ pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response
             mutate_state(|state| {
                 state.internal_filestorage.remove(&data.file_path);
             });
-            return Err((
-                RejectionCode::CanisterError,
+            return Err(cancel_upload::CancelUploadError::StorageCanisterError(
                 "Storage canister not found. Cancelling the upload.".to_string(),
             ));
         }
@@ -598,7 +557,7 @@ pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response
         Ok(_) => {}
         Err(e) => {
             trace(&format!("Error storing chunk: {:?}", e));
-            return Err((RejectionCode::CanisterError, e));
+            return Err(e);
         }
     }
 
@@ -613,9 +572,9 @@ pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response
 pub fn update_minting_authorities(
     req: management::update_minting_authorities::Args,
 ) -> management::update_minting_authorities::Response {
-    let caller = ic_cdk::caller();
-    let _guard_principal =
-        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
+    let caller = ic_cdk::api::msg_caller();
+    let _guard_principal = GuardManagement::new(caller)
+        .map_err(|_| management::update_minting_authorities::UpdateMintingAuthoritiesError::ConcurrentManagementCall)?;
 
     let mut minting_authorities = req.minting_authorities.clone();
     let previous_minting_authorities = mutate_state(|state| state.data.minting_authorities.clone());
@@ -635,9 +594,9 @@ pub fn update_minting_authorities(
 pub fn remove_minting_authorities(
     req: management::remove_minting_authorities::Args,
 ) -> management::remove_minting_authorities::Response {
-    let caller = ic_cdk::caller();
-    let _guard_principal =
-        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
+    let caller = ic_cdk::api::msg_caller();
+    let _guard_principal = GuardManagement::new(caller)
+        .map_err(|_| management::remove_minting_authorities::RemoveMintingAuthoritiesError::ConcurrentManagementCall)?;
 
     let mut minting_authorities = req.minting_authorities.clone();
     let previous_minting_authorities = mutate_state(|state| state.data.minting_authorities.clone());
@@ -655,9 +614,9 @@ pub fn remove_minting_authorities(
 pub async fn update_authorized_principals(
     req: management::update_authorized_principals::Args,
 ) -> management::update_authorized_principals::Response {
-    let caller = ic_cdk::caller();
-    let _guard_principal =
-        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
+    let caller = ic_cdk::api::msg_caller();
+    let _guard_principal = GuardManagement::new(caller)
+        .map_err(|_| management::update_authorized_principals::UpdateAuthorizedPrincipalsError::ConcurrentManagementCall)?;
 
     let mut authorized_principals = req.authorized_principals.clone();
     let previous_authorized_principals =
@@ -678,9 +637,9 @@ pub async fn update_authorized_principals(
 pub async fn remove_authorized_principals(
     req: management::remove_authorized_principals::Args,
 ) -> management::remove_authorized_principals::Response {
-    let caller = ic_cdk::caller();
+    let caller = ic_cdk::api::msg_caller();
     let _guard_principal =
-        GuardManagement::new(caller).map_err(|e| (RejectionCode::CanisterError, e))?;
+        GuardManagement::new(caller).map_err(|_| management::remove_authorized_principals::RemoveAuthorizedPrincipalsError::ConcurrentManagementCall)?;
 
     let mut authorized_principals = req.authorized_principals.clone();
     let previous_authorized_principals =

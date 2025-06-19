@@ -46,7 +46,7 @@ fn verify_approval_timing(created_at_time: u64, current_time: u64) -> Result<(),
 
 #[update]
 fn icrc37_approve_tokens(args: icrc37_approve_tokens::Args) -> icrc37_approve_tokens::Response {
-    let caller = ic_cdk::caller();
+    let caller = ic_cdk::api::msg_caller();
 
     let mut results = Vec::with_capacity(args.len());
 
@@ -196,7 +196,7 @@ fn approve_token(
 fn icrc37_approve_collection(
     args: icrc37_approve_collection::Args,
 ) -> icrc37_approve_collection::Response {
-    let caller = ic_cdk::caller();
+    let caller = ic_cdk::api::msg_caller();
 
     let mut results = Vec::with_capacity(args.len());
 
@@ -339,7 +339,7 @@ fn approve_collection(
 fn icrc37_revoke_token_approvals(
     args: icrc37_revoke_token_approvals::Args,
 ) -> icrc37_revoke_token_approvals::Response {
-    let caller = ic_cdk::caller();
+    let caller = ic_cdk::api::msg_caller();
 
     // here we check the max revoke approvals,
     // not that if spender is not provided, we will revoke all approvals for the token
@@ -474,7 +474,7 @@ fn revoke_token_approvals(
 fn icrc37_revoke_collection_approvals(
     args: icrc37_revoke_collection_approvals::Args,
 ) -> icrc37_revoke_collection_approvals::Response {
-    let caller = ic_cdk::caller();
+    let caller = ic_cdk::api::msg_caller();
 
     // here we check the max revoke approvals,
     // not that if spender is not provided, we will revoke all approvals for the collection
@@ -591,7 +591,7 @@ fn revoke_collection_approvals(
 
 #[update]
 fn icrc37_transfer_from(args: icrc37_transfer_from::Args) -> icrc37_transfer_from::Response {
-    let caller = ic_cdk::caller();
+    let caller = ic_cdk::api::msg_caller();
 
     let mut results = Vec::with_capacity(args.len());
 

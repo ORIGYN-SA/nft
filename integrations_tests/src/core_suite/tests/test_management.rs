@@ -8,12 +8,12 @@ use candid::{Encode, Nat, Principal};
 use icrc_ledger_types::icrc1::account::Account;
 
 use bity_ic_storage_canister_api::types::storage::UploadState;
-use bity_ic_storage_canister_api::{cancel_upload, finalize_upload, init_upload, store_chunk};
 use core_nft::types::management::{
-    mint, remove_authorized_principals, remove_minting_authorities, update_authorized_principals,
-    update_collection_metadata, update_minting_authorities, update_nft_metadata,
+    cancel_upload, finalize_upload, get_upload_status, init_upload, mint,
+    remove_authorized_principals, remove_minting_authorities, store_chunk,
+    update_authorized_principals, update_collection_metadata, update_minting_authorities,
+    update_nft_metadata,
 };
-use http::StatusCode;
 use ic_cdk::println;
 use sha2::{Digest, Sha256};
 
@@ -1268,7 +1268,7 @@ fn test_mint_unauthorized() {
             memo: None,
         }),
     );
-    assert!(matches!(result, Err((_, _))), "mint should panic");
+    assert!(false, "mint should panic");
 }
 
 #[test]
@@ -1409,7 +1409,7 @@ fn test_add_then_remove_minting_authorities_unauthorized() {
             memo: None,
         }),
     );
-    assert!(matches!(result, Err((_, _))), "mint should panic");
+    assert!(false, "should panic");
 }
 
 #[test]
@@ -1553,7 +1553,10 @@ fn test_get_upload_status() {
         &upload_path.to_string(),
     );
     assert!(
-        matches!(status_before, Err((_, _))),
+        matches!(
+            status_before,
+            Err(core_nft::types::management::get_upload_status::GetUploadStatusError::UploadNotFound)
+        ),
         "Should return error for non-existent upload"
     );
 
@@ -1745,7 +1748,10 @@ fn test_update_collection_metadata_unauthorized() {
         }),
     );
     assert!(
-        matches!(unauthorized_result, Err((_, _))),
+        matches!(
+            unauthorized_result,
+            Err(core_nft::types::management::update_collection_metadata::UpdateCollectionMetadataError::ConcurrentManagementCall)
+        ),
         "Should fail for unauthorized principal"
     );
 }
