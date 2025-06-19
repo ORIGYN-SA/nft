@@ -4,10 +4,12 @@ pub use crate::types::icrc37::{
     icrc37_revoke_token_approvals, icrc37_transfer_from, Approval,
 };
 use crate::types::nft;
-use crate::types::Icrc3Transaction;
 
-use bity_ic_icrc3::types::Icrc3Error;
-use bity_ic_icrc3::utils::trace;
+use bity_ic_icrc3::{
+    transaction::{ICRC37Transaction, ICRC37TransactionData},
+    types::Icrc3Error,
+    utils::trace,
+};
 use candid::{Nat, Principal};
 use ic_cdk_macros::update;
 use icrc_ledger_types::icrc1::account::Account;
@@ -153,20 +155,19 @@ fn approve_token(
         });
     }
 
-    let transaction = Icrc3Transaction {
-        btype: "37approve".to_string(),
-        timestamp: current_time,
-        tx: crate::types::transaction::TransactionData {
+    let transaction = ICRC37Transaction::new(
+        "37approve".to_string(),
+        current_time,
+        ICRC37TransactionData {
             tid: Some(arg.token_id.clone()),
             from: Some(from_account.clone()),
             to: None,
-            meta: None,
             memo: memo_clone,
             created_at_time: Some(Nat::from(arg.approval_info.created_at_time)),
             spender: Some(arg.approval_info.spender.clone()),
-            exp: None,
+            exp: arg.approval_info.expires_at.map(|e| Nat::from(e)),
         },
-    };
+    );
 
     let index = match icrc3_add_transaction(transaction) {
         Ok(index) => index,
@@ -298,20 +299,19 @@ fn approve_collection(
         });
     }
 
-    let transaction = Icrc3Transaction {
-        btype: "37approve_coll".to_string(),
-        timestamp: current_time,
-        tx: crate::types::transaction::TransactionData {
+    let transaction = ICRC37Transaction::new(
+        "37approve_coll".to_string(),
+        current_time,
+        ICRC37TransactionData {
             tid: None,
             from: Some(from_account.clone()),
             to: None,
-            meta: None,
             memo: memo_clone,
             created_at_time: Some(Nat::from(arg.approval_info.created_at_time)),
             spender: Some(arg.approval_info.spender.clone()),
-            exp: None,
+            exp: arg.approval_info.expires_at.map(|e| Nat::from(e)),
         },
-    };
+    );
 
     let index = match icrc3_add_transaction(transaction) {
         Ok(index) => index,
@@ -436,20 +436,19 @@ fn revoke_token_approvals(
 
     let created_at_time = arg.created_at_time.map(|t| Nat::from(t));
 
-    let transaction = Icrc3Transaction {
-        btype: "37revoke".to_string(),
-        timestamp: current_time,
-        tx: crate::types::transaction::TransactionData {
+    let transaction = ICRC37Transaction::new(
+        "37revoke".to_string(),
+        current_time,
+        ICRC37TransactionData {
             tid: Some(arg.token_id.clone()),
             from: Some(from_account.clone()),
             to: None,
-            meta: None,
             memo: arg.memo,
             created_at_time: created_at_time,
             spender: arg.spender.clone(),
             exp: None,
         },
-    };
+    );
 
     let index = match icrc3_add_transaction(transaction) {
         Ok(index) => index,
@@ -557,20 +556,19 @@ fn revoke_collection_approvals(
 
     let created_at_time = arg.created_at_time.map(|t| Nat::from(t));
 
-    let transaction = Icrc3Transaction {
-        btype: "37revoke_coll".to_string(),
-        timestamp: current_time,
-        tx: crate::types::transaction::TransactionData {
+    let transaction = ICRC37Transaction::new(
+        "37revoke_coll".to_string(),
+        current_time,
+        ICRC37TransactionData {
             tid: None,
             from: Some(from_account.clone()),
             to: None,
-            meta: None,
             memo: arg.memo,
             created_at_time: created_at_time,
             spender: arg.spender.clone(),
             exp: None,
         },
-    };
+    );
 
     let index = match icrc3_add_transaction(transaction) {
         Ok(index) => index,
@@ -695,20 +693,19 @@ fn transfer_from(
         return TransferFromResult::Err(TransferFromError::Unauthorized);
     }
 
-    let transaction = Icrc3Transaction {
-        btype: "37xfer".to_string(),
-        timestamp: current_time,
-        tx: crate::types::transaction::TransactionData {
+    let transaction = ICRC37Transaction::new(
+        "37xfer".to_string(),
+        current_time,
+        ICRC37TransactionData {
             tid: Some(arg.token_id.clone()),
             from: Some(arg.from.clone()),
             to: Some(arg.to.clone()),
-            meta: None,
             memo: arg.memo,
             created_at_time: arg.created_at_time.map(Nat::from),
             spender: Some(spender_account),
             exp: None,
         },
-    };
+    );
 
     let index = match icrc3_add_transaction(transaction) {
         Ok(index) => index,

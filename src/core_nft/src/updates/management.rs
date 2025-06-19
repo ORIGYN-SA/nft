@@ -1,11 +1,16 @@
 use crate::guards::{caller_is_governance_principal, caller_is_minting_authority, GuardManagement};
 use crate::state::{icrc3_add_transaction, mutate_state, read_state, InternalFilestorageData};
-use crate::types::http::{add_redirection, remove_redirection};
+use crate::types::http::add_redirection;
 use crate::types::sub_canister::StorageCanister;
-use crate::types::transaction::{Icrc3Transaction, TransactionData};
 use crate::types::{icrc7, management, nft};
 use crate::utils::{check_memo, trace};
 
+use bity_ic_icrc3::transaction::{ICRC7Transaction, ICRC7TransactionData};
+pub use bity_ic_storage_canister_api::cancel_upload;
+pub use bity_ic_storage_canister_api::finalize_upload;
+pub use bity_ic_storage_canister_api::init_upload;
+pub use bity_ic_storage_canister_api::store_chunk;
+use bity_ic_storage_canister_api::types::storage::UploadState;
 pub use candid::Nat;
 pub use ic_cdk::api::call::RejectionCode;
 use ic_cdk_macros::{query, update};
@@ -13,11 +18,6 @@ use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
 use icrc_ledger_types::icrc1::account::Account;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-pub use storage_api_canister::cancel_upload;
-pub use storage_api_canister::finalize_upload;
-pub use storage_api_canister::init_upload;
-pub use storage_api_canister::store_chunk;
-use storage_api_canister::types::storage::UploadState;
 use url::Url;
 
 #[update(guard = "caller_is_governance_principal")]
@@ -163,20 +163,18 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
                 req.token_owner,
             );
 
-            let transaction = Icrc3Transaction {
-                btype: "7mint".to_string(),
-                timestamp: ic_cdk::api::time(),
-                tx: TransactionData {
+            let transaction = ICRC7Transaction::new(
+                "7mint".to_string(),
+                ic_cdk::api::time(),
+                ICRC7TransactionData {
                     tid: Some(token_id.clone()),
                     from: None,
                     to: Some(req.token_owner.clone()),
                     meta: None,
                     memo: req.memo.clone(),
                     created_at_time: Some(Nat::from(ic_cdk::api::time())),
-                    spender: None,
-                    exp: None,
                 },
-            };
+            );
 
             match icrc3_add_transaction(transaction) {
                 Ok(_) => {}
@@ -231,10 +229,10 @@ pub fn update_nft_metadata(
 
             token.token_metadata_url = req.token_metadata_url;
 
-            let transaction = Icrc3Transaction {
-                btype: "7update_token".to_string(),
-                timestamp: ic_cdk::api::time(),
-                tx: TransactionData {
+            let transaction = ICRC7Transaction::new(
+                "7update_token".to_string(),
+                ic_cdk::api::time(),
+                ICRC7TransactionData {
                     tid: Some(token_name_hash.clone()),
                     from: Some(Account {
                         owner: ic_cdk::caller(),
@@ -244,10 +242,8 @@ pub fn update_nft_metadata(
                     meta: Some(meta),
                     memo: None,
                     created_at_time: Some(Nat::from(ic_cdk::api::time())),
-                    spender: None,
-                    exp: None,
                 },
-            };
+            );
 
             match icrc3_add_transaction(transaction) {
                 Ok(_) => {}
@@ -297,20 +293,18 @@ pub fn burn_nft(token_id: Nat) -> Result<(), (RejectionCode, String)> {
         }
     };
 
-    let transaction = Icrc3Transaction {
-        btype: "7burn".to_string(),
-        timestamp: ic_cdk::api::time(),
-        tx: TransactionData {
+    let transaction = ICRC7Transaction::new(
+        "7burn".to_string(),
+        ic_cdk::api::time(),
+        ICRC7TransactionData {
             tid: Some(token_id.clone()),
             from: Some(token.token_owner.clone()),
             to: None,
             meta: None,
             memo: None,
             created_at_time: Some(Nat::from(ic_cdk::api::time())),
-            spender: None,
-            exp: None,
         },
-    };
+    );
 
     match icrc3_add_transaction(transaction) {
         Ok(_) => {}
@@ -490,13 +484,13 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
         }
     }
 
-    let redirection_url = format!("https://{}.raw.icp0.io/{}", canister_id, media_path.clone());
-
     let path = if media_path.starts_with('/') {
         media_path.clone()
     } else {
         format!("/{}", media_path)
     };
+
+    let redirection_url = format!("https://{}.raw.icp0.io{}", canister_id, path.clone());
 
     add_redirection(path.clone(), redirection_url.clone());
 
@@ -518,7 +512,7 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
     });
 
     let url = format!(
-        "https://{}.raw.icp0.io/{}",
+        "https://{}.raw.icp0.io{}",
         ic_cdk::id().to_string(),
         path.clone()
     );

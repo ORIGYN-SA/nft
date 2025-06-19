@@ -6,21 +6,20 @@ use crate::types::sub_canister::StorageSubCanisterManager;
 use bity_ic_canister_state_macros::canister_state;
 use bity_ic_icrc3::transaction::TransactionType;
 use bity_ic_icrc3_macros::icrc3_state;
+use bity_ic_storage_canister_api::types::storage::UploadState;
 use bity_ic_types::{BuildVersion, TimestampNanos};
 use bity_ic_types::{Cycles, TimestampMillis};
 use bity_ic_utils::env::{CanisterEnv, Environment};
 use bity_ic_utils::memory::MemorySize;
-use storage_api_canister::types::storage::UploadState;
 
 use candid::{CandidType, Nat, Principal};
 use icrc_ledger_types::icrc1::account::Account;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
 
-pub use storage_api_canister::lifecycle::{init::InitArgs, post_upgrade::UpgradeArgs};
+pub use bity_ic_storage_canister_api::lifecycle::{init::InitArgs, post_upgrade::UpgradeArgs};
 
-const STORAGE_WASM: &[u8] =
-    include_bytes!("../../storage_canister/wasm/storage_canister_canister.wasm.gz");
+const STORAGE_WASM: &[u8] = include_bytes!("../../../wasm/storage_canister.wasm.gz");
 
 icrc3_state!();
 canister_state!(RuntimeState);

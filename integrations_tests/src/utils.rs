@@ -1,6 +1,8 @@
 use crate::client::core_nft::mint;
 use crate::client::storage::{finalize_upload, init_upload, store_chunk};
 use crate::core_suite::setup::setup::{TestEnv, MINUTE_IN_MS};
+
+use bity_ic_storage_canister_api::{finalize_upload, init_upload, store_chunk};
 use bity_ic_types::Cycles;
 use bytes::Bytes;
 use candid::{Nat, Principal};
@@ -9,21 +11,16 @@ use http::Request;
 use http_body_util::BodyExt;
 use ic_agent::Agent;
 use ic_http_gateway::{HttpGatewayClient, HttpGatewayRequestArgs};
-use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
 use icrc_ledger_types::icrc1::account::Account;
 use pocket_ic::PocketIc;
 use rand::{rng, RngCore};
 use serde_json::json;
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::str::FromStr;
 use std::time::Duration;
-use storage_api_canister::finalize_upload;
-use storage_api_canister::init_upload;
-use storage_api_canister::store_chunk;
 use tempfile::NamedTempFile;
 use url::Url;
 

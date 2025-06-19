@@ -15,7 +15,6 @@ ic-cdk-macros = { workspace = true }
 ic-cdk-timers = { workspace = true }
 ic-ledger-types = { workspace = true }
 ic-stable-structures = { workspace = true }
-storage_canister_c2c_client = { path = "../external_canisters/storage_canister/c2c_client" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 serde_bytes = { workspace = true }
@@ -25,7 +24,6 @@ futures = { workspace = true }
 icrc-ledger-types = { workspace = true }
 async-trait = { workspace = true }
 enum_dispatch = { workspace = true }
-storage_api_canister = { path = "../storage_api_canister", features = []}
 ic0 = { workspace = true }
 canfund = {workspace = true }
 ic-asset-certification = { workspace = true}
@@ -46,3 +44,5 @@ bity-ic-utils = { workspace = true }
 bity-ic-subcanister-manager = { workspace = true }
 bity-ic-icrc3 = { workspace = true }
 bity-ic-icrc3-macros = { workspace = true }
+bity-ic-storage-canister-c2c = { workspace = true }
+bity-ic-storage-canister-api = { workspace = true }

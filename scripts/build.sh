@@ -1,7 +1,11 @@
 #!/bin/bash
 
-BASE_CANISTER_PATH=$1
-CANISTER=$2
+BASE_CANISTER_PATH="./src"
+CANISTER="core_nft"
+
+mkdir -p "./wasm"
+curl -L -o "./wasm/storage_canister.wasm" "https://github.com/BitySA/ic-storage-canister/releases/latest/download/storage_canister.wasm"
+curl -L -o "./wasm/storage_canister.wasm.gz" "https://github.com/BitySA/ic-storage-canister/releases/latest/download/storage_canister.wasm.gz"
 
 cargo rustc --crate-type=cdylib --target wasm32-unknown-unknown --target-dir "$BASE_CANISTER_PATH/$CANISTER/target" --release --locked -p $CANISTER &&
 ic-wasm "$BASE_CANISTER_PATH/$CANISTER/target/wasm32-unknown-unknown/release/$CANISTER.wasm" -o "$BASE_CANISTER_PATH/$CANISTER/target/wasm32-unknown-unknown/release/$CANISTER.wasm" shrink &&

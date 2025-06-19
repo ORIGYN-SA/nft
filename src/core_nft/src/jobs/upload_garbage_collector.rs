@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use bity_ic_canister_time::{run_interval, DAY_IN_MS};
-use storage_api_canister::cancel_upload;
-use storage_canister_c2c_client::cancel_upload;
+use bity_ic_storage_canister_api::cancel_upload;
+use bity_ic_storage_canister_c2c::cancel_upload;
 use tracing::{debug, info};
 
 use crate::state::read_state;

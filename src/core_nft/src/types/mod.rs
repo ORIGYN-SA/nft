@@ -8,7 +8,6 @@ pub mod icrc7;
 pub mod management;
 pub mod nft;
 pub mod sub_canister;
-pub mod transaction;
 pub mod value_custom;
 
 pub use fund_manager::*;
@@ -20,5 +19,4 @@ pub use icrc7::*;
 pub use management::*;
 pub use nft::*;
 pub use sub_canister::*;
-pub use transaction::*;
 pub use value_custom::*;

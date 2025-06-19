@@ -3,8 +3,8 @@ use crate::utils::trace;
 use crate::{
     state::{icrc3_add_transaction, mutate_state, read_state},
     types::icrc7,
-    types::transaction::Icrc3Transaction,
 };
+use bity_ic_icrc3::transaction::{ICRC7Transaction, ICRC7TransactionData};
 use candid::{Nat, Principal};
 use ic_cdk_macros::update;
 
@@ -55,20 +55,18 @@ fn transfer_nft(arg: &icrc7::TransferArg) -> Result<Nat, icrc7::icrc7_transfer::
         return Err(icrc7::icrc7_transfer::TransferError::TooOld);
     }
 
-    let transaction = Icrc3Transaction {
-        btype: "7xfer".to_string(),
-        timestamp: current_time,
-        tx: crate::types::transaction::TransactionData {
+    let transaction = ICRC7Transaction::new(
+        "7xfer".to_string(),
+        current_time,
+        ICRC7TransactionData {
             tid: Some(arg.token_id.clone()),
             from: Some(nft.token_owner.clone()),
             to: Some(arg.to.clone()),
             meta: None,
             memo: arg.memo.clone(),
             created_at_time: Some(Nat::from(time)),
-            spender: None,
-            exp: None,
         },
-    };
+    );
 
     match icrc3_add_transaction(transaction.clone()) {
         Ok(transaction_id) => {
