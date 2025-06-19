@@ -1,25 +1,22 @@
 use std::collections::HashMap;
 
 use crate::utils::trace;
+use bity_ic_storage_canister_api::{cancel_upload, finalize_upload, init_upload, store_chunk};
+use bity_ic_storage_canister_c2c::{
+    cancel_upload, finalize_upload, get_storage_size, init_upload, store_chunk,
+};
 use bity_ic_subcanister_manager;
 use bity_ic_subcanister_manager::Canister;
 use bity_ic_utils::retry_async::retry_async;
 use candid::{CandidType, Principal};
 use canfund::manager::options::{CyclesThreshold, FundManagerOptions, FundStrategy};
-use ic_cdk::api::management_canister::main::{canister_status, CanisterIdRecord};
+use ic_cdk::management_canister::{canister_status, CanisterStatusArgs};
 use serde::{Deserialize, Serialize};
-use storage_api_canister::cancel_upload;
-use storage_api_canister::finalize_upload;
-use storage_api_canister::init_upload;
-use storage_api_canister::store_chunk;
-use storage_canister_c2c_client::{
-    cancel_upload, finalize_upload, get_storage_size, init_upload, store_chunk,
-};
 
 const MAX_STORAGE_SIZE: u128 = 500 * 1024 * 1024 * 1024; // 500 GiB TODO maybe we should put a be less here ?
 const MAX_FILE_SIZE: u128 = 2 * 1024 * 1024 * 1024; // 2 GiB
 
-pub use storage_api_canister::lifecycle::Args as ArgsStorage;
+pub use bity_ic_storage_canister_api::lifecycle::Args as ArgsStorage;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct StorageSubCanisterManager {
@@ -220,17 +217,12 @@ impl StorageCanister {
 
     #[allow(dead_code)]
     async fn get_canister_controllers(&self) -> Result<Vec<Principal>, CanisterError> {
-        match retry_async(
-            || {
-                canister_status(CanisterIdRecord {
-                    canister_id: self.canister_id,
-                })
-            },
-            3,
-        )
-        .await
-        {
-            Ok(res) => Ok(res.0.settings.controllers),
+        let canister_status_args = CanisterStatusArgs {
+            canister_id: self.canister_id,
+        };
+
+        match retry_async(|| canister_status(&canister_status_args), 3).await {
+            Ok(res) => Ok(res.settings.controllers),
             Err(e) => Err(CanisterError::CantFindControllers(format!("{e:?}"))),
         }
     }

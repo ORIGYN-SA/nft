@@ -6,10 +6,7 @@ pub use crate::types::icrc21;
 pub use crate::types::icrc37;
 pub use crate::types::icrc7;
 pub use crate::types::management;
-use storage_api_canister::cancel_upload;
-// use storage_api_canister::finalize_upload;
-use storage_api_canister::init_upload;
-// use storage_api_canister::store_chunk;
+use bity_ic_storage_canister_api::{cancel_upload, init_upload};
 
 #[query]
 pub fn icrc21_canister_call_consent_message(

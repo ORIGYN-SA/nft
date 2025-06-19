@@ -4,10 +4,10 @@ pub use crate::types::icrc10;
 pub use crate::types::icrc21;
 pub use crate::types::icrc7;
 pub use crate::types::management;
-pub use storage_api_canister::updates::cancel_upload;
-pub use storage_api_canister::updates::finalize_upload;
-pub use storage_api_canister::updates::init_upload;
-pub use storage_api_canister::updates::store_chunk;
+pub use bity_ic_storage_canister_api::updates::cancel_upload;
+pub use bity_ic_storage_canister_api::updates::finalize_upload;
+pub use bity_ic_storage_canister_api::updates::init_upload;
+pub use bity_ic_storage_canister_api::updates::store_chunk;
 
 mod guards;
 mod jobs;

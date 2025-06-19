@@ -7,6 +7,8 @@ use crate::client::core_nft::{
 use candid::{Encode, Nat, Principal};
 use icrc_ledger_types::icrc1::account::Account;
 
+use bity_ic_storage_canister_api::types::storage::UploadState;
+use bity_ic_storage_canister_api::{cancel_upload, finalize_upload, init_upload, store_chunk};
 use core_nft::types::management::{
     mint, remove_authorized_principals, remove_minting_authorities, update_authorized_principals,
     update_collection_metadata, update_minting_authorities, update_nft_metadata,
@@ -14,11 +16,6 @@ use core_nft::types::management::{
 use http::StatusCode;
 use ic_cdk::println;
 use sha2::{Digest, Sha256};
-use storage_api_canister::cancel_upload;
-use storage_api_canister::finalize_upload;
-use storage_api_canister::init_upload;
-use storage_api_canister::store_chunk;
-use storage_api_canister::types::storage::UploadState;
 
 use crate::core_suite::setup::default_test_setup;
 use crate::core_suite::setup::setup::TestEnv;
@@ -52,7 +49,7 @@ fn test_storage_simple() {
         nft_owner2,
     } = test_env;
 
-    let file_path = "./src/storage_suite/assets/test.png";
+    let file_path = "./src/core_suite/assets/test.png";
     let upload_path = "/test.png";
 
     let buffer = upload_file(
@@ -235,7 +232,7 @@ fn test_duplicate_upload() {
         nft_owner2,
     } = test_env;
 
-    let file_path = "./src/storage_suite/assets/test.png";
+    let file_path = "./src/core_suite/assets/test.png";
     let upload_path = "/test.png";
 
     // First upload attempt
@@ -286,7 +283,7 @@ fn test_duplicate_chunk_upload() {
         nft_owner2,
     } = test_env;
 
-    let file_path = Path::new("./src/storage_suite/assets/test.png");
+    let file_path = Path::new("./src/core_suite/assets/test.png");
     let mut file = File::open(&file_path).expect("Failed to open file");
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).expect("Failed to read file");
@@ -390,7 +387,7 @@ fn test_finalize_upload_missing_chunk() {
         nft_owner2,
     } = test_env;
 
-    let file_path = Path::new("./src/storage_suite/assets/test.png");
+    let file_path = Path::new("./src/core_suite/assets/test.png");
     let mut file = File::open(&file_path).expect("Failed to open file");
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).expect("Failed to read file");
@@ -474,7 +471,7 @@ fn test_cancel_upload() {
         nft_owner2,
     } = test_env;
 
-    let file_path = Path::new("./src/storage_suite/assets/test.png");
+    let file_path = Path::new("./src/core_suite/assets/test.png");
     let mut file = File::open(&file_path).expect("Failed to open file");
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).expect("Failed to read file");
@@ -562,12 +559,12 @@ fn test_management_file_distribution() {
         nft_owner2,
     } = test_env;
 
-    let file_path = "./src/storage_suite/assets/test.png";
+    let file_path = "./src/core_suite/assets/test.png";
     let mut uploaded_files = Vec::new();
     let mut canister_distribution = std::collections::HashMap::new();
 
-    // Upload 4 files
-    for i in 0..4 {
+    // Upload 8 files
+    for i in 0..14 {
         let upload_path = format!("/test_distribution_{}.png", i);
         let result = upload_file(
             pic,
@@ -630,7 +627,7 @@ fn test_management_file_distribution() {
     for (canister_id, files) in &canister_distribution {
         assert_eq!(
             files.len(),
-            2,
+            7,
             "Canister {} should contain exactly 2 files, but has {}",
             canister_id,
             files.len()
@@ -657,7 +654,7 @@ fn test_management_upload_resilience() {
         nft_owner2,
     } = test_env;
 
-    let file_path = "./src/storage_suite/assets/test.png";
+    let file_path = "./src/core_suite/assets/test.png";
     let too_big = "./src/storage_suite/assets/sbl_hero_1080_1.mp4";
 
     // First upload to fill up first canister partially
@@ -784,7 +781,7 @@ fn test_management_cycles() {
         nft_owner2,
     } = test_env;
 
-    let file_path = "./src/storage_suite/assets/test.png";
+    let file_path = "./src/core_suite/assets/test.png";
     let mut canister_cycles = std::collections::HashMap::new();
 
     // Record initial cycles of the collection canister
@@ -1545,7 +1542,7 @@ fn test_get_upload_status() {
         nft_owner2,
     } = test_env;
 
-    let file_path = "./src/storage_suite/assets/test.png";
+    let file_path = "./src/core_suite/assets/test.png";
     let upload_path = "/test_status.png";
     let upload_path2 = "/test_status2.png";
 
@@ -1616,7 +1613,7 @@ fn test_get_all_uploads() {
         nft_owner2,
     } = test_env;
 
-    let file_path = "./src/storage_suite/assets/test.png";
+    let file_path = "./src/core_suite/assets/test.png";
     let mut upload_paths = Vec::new();
 
     for i in 0..3 {
