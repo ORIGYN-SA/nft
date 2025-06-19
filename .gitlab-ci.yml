@@ -47,7 +47,7 @@ build:
     - gunzip pocket-ic-x86_64-linux.gz
     - chmod +x pocket-ic-x86_64-linux
     - cp pocket-ic-x86_64-linux ./src/pocket-ic
-    - bash ./scripts/build_all.sh
+    - bash ./scripts/build.sh
   artifacts:
     paths:
       - src/storage_canister/wasm/storage_canister_canister.wasm.gz
