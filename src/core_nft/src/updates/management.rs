@@ -486,7 +486,13 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
     return Ok(finalize_upload::FinalizeUploadResp { url: url });
 }
 
-#[query]
+#[query(guard = "caller_is_governance_principal")]
+pub fn get_all_storage_subcanisters() -> Vec<candid::Principal> {
+    let sub_canister_manager = read_state(|state| state.data.sub_canister_manager.clone());
+    sub_canister_manager.list_canisters_ids()
+}
+
+#[query(guard = "caller_is_governance_principal")]
 pub fn get_upload_status(file_path: String) -> management::get_upload_status::Response {
     let upload_status = read_state(|state| state.internal_filestorage.get(&file_path).cloned());
     match upload_status {
@@ -495,7 +501,7 @@ pub fn get_upload_status(file_path: String) -> management::get_upload_status::Re
     }
 }
 
-#[query]
+#[query(guard = "caller_is_governance_principal")]
 pub fn get_all_uploads(
     prev: Option<Nat>,
     take: Option<Nat>,

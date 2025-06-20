@@ -122,7 +122,11 @@ impl Data {
                 test_mode: test_mode.clone(),
                 version,
                 commit_hash: commit_hash.clone(),
-                authorized_principals: authorized_principals.clone(),
+                authorized_principals: authorized_principals
+                    .clone()
+                    .into_iter()
+                    .chain(vec![ic_cdk::api::canister_self()].into_iter())
+                    .collect(),
             }),
             sub_canister::ArgsStorage::Upgrade(UpgradeArgs {
                 version,

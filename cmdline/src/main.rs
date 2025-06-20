@@ -287,18 +287,21 @@ async fn nft_finalize_upload(
     agent: &Agent,
     canister_id: &Principal,
     args: finalize_upload::Args,
-) -> Result<()> {
+) -> Result<Url> {
     println!("Finalizing upload...");
 
     let bytes = Encode!(&args)?;
-    let _ = agent
+    let response = agent
         .update(canister_id, "finalize_upload")
         .with_arg(bytes)
         .call_and_wait()
         .await?;
 
+    let url = candid::decode_one::<finalize_upload::Response>(&response)?
+        .map_err(|e| anyhow!("Finalize upload failed: {:?}", e))?;
+
     println!("Upload finalized successfully");
-    Ok(())
+    Ok(Url::parse(&url.url)?)
 }
 
 async fn upload_file_to_canister(
@@ -360,7 +363,7 @@ async fn upload_file_to_canister(
     }
     println!();
 
-    nft_finalize_upload(
+    let url = nft_finalize_upload(
         &agent,
         &canister_id,
         finalize_upload::Args {
@@ -369,10 +372,6 @@ async fn upload_file_to_canister(
     )
     .await?;
 
-    let url = Url::parse(&format!(
-        "https://{}.raw.icp0.io{}",
-        canister_id, destination_path
-    ))?;
     Ok(url)
 }
 
