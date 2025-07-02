@@ -59,6 +59,7 @@ fn transfer_nft(arg: &icrc7::TransferArg) -> Result<Nat, icrc7::icrc7_transfer::
         "7xfer".to_string(),
         current_time,
         ICRC7TransactionData {
+            op: "7xfer".to_string(),
             tid: Some(arg.token_id.clone()),
             from: Some(nft.token_owner.clone()),
             to: Some(arg.to.clone()),
@@ -68,17 +69,30 @@ fn transfer_nft(arg: &icrc7::TransferArg) -> Result<Nat, icrc7::icrc7_transfer::
         },
     );
 
+    // this is safe to do this as they is no await in the method, meaning state is committed at the end of the icrc7_transfer method.
     match icrc3_add_transaction(transaction.clone()) {
         Ok(transaction_id) => {
             nft.transfer(arg.to.clone());
-            mutate_state(|state| state.data.update_token_by_id(&nft.token_id, &nft));
+            mutate_state(|state| {
+                state.data.update_token_by_id(&nft.token_id, &nft);
+                state
+                    .data
+                    .tokens_list_by_owner
+                    .entry(arg.to.clone())
+                    .or_insert(vec![])
+                    .push(nft.token_id.clone());
+                state
+                    .data
+                    .tokens_list_by_owner
+                    .entry(nft.token_owner.clone())
+                    .or_insert(vec![])
+                    .retain(|id| *id != nft.token_id.clone());
+            });
             Ok(Nat::from(transaction_id))
         }
         Err(e) => {
             if let bity_ic_icrc3::types::Icrc3Error::DuplicateTransaction { duplicate_of } = e {
-                return Err(icrc7::icrc7_transfer::TransferError::Duplicate {
-                    duplicate_of: Nat::from(duplicate_of),
-                });
+                return Ok(Nat::from(duplicate_of));
             }
             Err(icrc7::icrc7_transfer::TransferError::GenericError {
                 error_code: Nat::from(2u64),
@@ -91,12 +105,7 @@ fn transfer_nft(arg: &icrc7::TransferArg) -> Result<Nat, icrc7::icrc7_transfer::
 #[update]
 pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_transfer::Response {
     if args.is_empty() {
-        return vec![Some(Err(
-            icrc7::icrc7_transfer::TransferError::GenericError {
-                error_code: Nat::from(0u64),
-                message: "No argument provided".to_string(),
-            },
-        ))];
+        return vec![];
     }
 
     let (max_update_batch_size, atomic_batch_transfers) = read_state(|state| {

@@ -1167,10 +1167,11 @@ fn test_icrc3_logs_metadata_updates() {
                             println!("Found block type: {}", btype);
                             if btype == "7update_token" {
                                 found_update_block = true;
+                                println!("Found update block: {:?}", map);
 
                                 if let Some(Value::Map(tx_map)) = map.get("tx") {
                                     assert!(
-                                        tx_map.contains_key("token_id"),
+                                        tx_map.contains_key("tid"),
                                         "Update transaction should contain token_id"
                                     );
 

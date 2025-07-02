@@ -86,7 +86,7 @@ fn init(args: Args) {
                 init_args.tx_window.clone(),
                 init_args.permitted_drift,
                 init_args.max_canister_storage_threshold,
-                init_args.approval_init,
+                init_args.approval_init.clone(),
             );
 
             if env.is_test_mode() {
@@ -97,6 +97,16 @@ fn init(args: Args) {
                 Some(tx_window) => Duration::from_millis(u64::try_from(tx_window.0).unwrap()),
                 None => Duration::from_secs(0),
             };
+
+            let approval_init = data.approval_init.clone();
+
+            if approval_init.max_revoke_approvals == Some(Nat::from(0u64)) {
+                ic_cdk::trap("max_revoke_approvals cannot be 0");
+            }
+
+            if approval_init.max_approvals_per_token_or_collection == Some(Nat::from(0u64)) {
+                ic_cdk::trap("max_approvals_per_token_or_collection cannot be 0");
+            }
 
             let icrc3_config = ICRC3Config {
                 supported_blocks: vec![SupportedBlockType {

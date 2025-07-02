@@ -15,7 +15,7 @@ lazy_static! {
 
     // Wasms in particular canister folder
     pub static ref CORE_WASM: CanisterWasm = get_canister_wasm_from_bin("core_nft");
-    pub static ref STORAGE_WASM: CanisterWasm = get_canister_wasm_from_bin("storage_canister");
+    // pub static ref STORAGE_WASM: CanisterWasm = get_canister_wasm_from_bin("storage_canister");
 }
 
 fn get_canister_wasm_from_bin(canister_name: &str) -> CanisterWasm {

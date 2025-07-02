@@ -3,12 +3,15 @@ pub use crate::types::icrc37::{
     icrc37_approve_collection, icrc37_approve_tokens, icrc37_revoke_collection_approvals,
     icrc37_revoke_token_approvals, icrc37_transfer_from, Approval,
 };
+use crate::types::icrc37::{WappedAccount, WappedNat, WrappedApprovalValue};
 use crate::types::nft;
+use crate::types::{__COLLECTION_APPROVALS, __TOKEN_APPROVALS};
+use serde_bytes::ByteBuf;
 
+use crate::utils::trace;
 use bity_ic_icrc3::{
-    transaction::{ICRC37Transaction, ICRC37TransactionData},
+    transaction::{ICRC37Transaction, ICRC37TransactionData, TransactionType},
     types::Icrc3Error,
-    utils::trace,
 };
 use candid::{Nat, Principal};
 use ic_cdk_macros::update;
@@ -46,6 +49,7 @@ fn verify_approval_timing(created_at_time: u64, current_time: u64) -> Result<(),
 
 #[update]
 fn icrc37_approve_tokens(args: icrc37_approve_tokens::Args) -> icrc37_approve_tokens::Response {
+    trace(&format!("icrc37_approve_tokens args: {:?}", args));
     let caller = ic_cdk::api::msg_caller();
 
     let mut results = Vec::with_capacity(args.len());
@@ -129,23 +133,23 @@ fn approve_token(
     let memo_clone = arg.approval_info.memo.clone();
 
     let approval = Approval {
-        spender: arg.approval_info.spender.clone(),
-        from: from_account.clone(),
+        spender: WappedAccount::from(arg.approval_info.spender.clone()),
+        from: WappedAccount::from(from_account.clone()),
         expires_at: arg.approval_info.expires_at,
         created_at: current_time,
-        memo: memo_clone.clone().map(|m| m.into_vec()),
+        memo: memo_clone.clone().map(|m| m.to_vec()),
     };
 
-    let would_exceed_max_approvals = read_state(|state| {
-        let token_approvals = state
-            .data
-            .token_approvals
-            .get(&arg.token_id)
-            .cloned()
-            .unwrap_or_default();
-
-        token_approvals.len() >= max_approvals_per_token
-            && !token_approvals.contains_key(&from_account)
+    let would_exceed_max_approvals = __TOKEN_APPROVALS.with_borrow(|token_approvals| {
+        token_approvals
+            .get(&WappedNat::from(arg.token_id.clone()))
+            .is_some()
+            && token_approvals
+                .get(&WappedNat::from(arg.token_id.clone()))
+                .unwrap()
+                .0
+                .len()
+                >= max_approvals_per_token
     });
 
     if would_exceed_max_approvals {
@@ -159,15 +163,21 @@ fn approve_token(
         "37approve".to_string(),
         current_time,
         ICRC37TransactionData {
+            op: "37approve".to_string(),
             tid: Some(arg.token_id.clone()),
             from: Some(from_account.clone()),
             to: None,
-            memo: memo_clone,
+            memo: memo_clone.clone(),
             created_at_time: Some(Nat::from(arg.approval_info.created_at_time)),
-            spender: Some(arg.approval_info.spender.clone()),
+            spender: Some(arg.approval_info.spender),
             exp: arg.approval_info.expires_at.map(|e| Nat::from(e)),
         },
     );
+
+    trace(&format!(
+        "approve_token transaction hash : {:?}",
+        transaction.tx().hash()
+    ));
 
     let index = match icrc3_add_transaction(transaction) {
         Ok(index) => index,
@@ -179,14 +189,24 @@ fn approve_token(
         }
     };
 
-    mutate_state(|state| {
-        let token_approvals = state
-            .data
-            .token_approvals
-            .entry(arg.token_id.clone())
-            .or_insert_with(HashMap::new);
+    __TOKEN_APPROVALS.with_borrow_mut(|s| {
+        let token_approvals = s.get(&WappedNat::from(arg.token_id.clone()));
 
-        token_approvals.insert(arg.approval_info.spender.clone(), approval);
+        let mut approval_map = if token_approvals.is_none() {
+            HashMap::new()
+        } else {
+            token_approvals.unwrap().0
+        };
+
+        approval_map.insert(
+            WappedAccount::from(arg.approval_info.spender.clone()),
+            approval,
+        );
+
+        s.insert(
+            WappedNat::from(arg.token_id.clone()),
+            WrappedApprovalValue(approval_map),
+        );
     });
 
     ApproveTokenResult::Ok(Nat::from(index))
@@ -260,11 +280,11 @@ fn approve_collection(
     let memo_clone = arg.approval_info.memo.clone();
 
     let approval = Approval {
-        spender: arg.approval_info.spender.clone(),
-        from: from_account.clone(),
+        spender: WappedAccount::from(arg.approval_info.spender.clone()),
+        from: WappedAccount::from(from_account.clone()),
         expires_at: arg.approval_info.expires_at,
         created_at: current_time,
-        memo: memo_clone.clone().map(|m| m.into_vec()),
+        memo: memo_clone.clone().map(|m| m.to_vec()),
     };
 
     let max_approvals_per_collection = usize::try_from(
@@ -282,14 +302,16 @@ fn approve_collection(
     )
     .unwrap_or(crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION);
 
-    let would_exceed_max_approvals = read_state(|state| {
-        state
-            .data
-            .collection_approvals
-            .get(&from_account)
-            .unwrap_or(&HashMap::new())
-            .len()
-            >= max_approvals_per_collection
+    let would_exceed_max_approvals = __COLLECTION_APPROVALS.with_borrow(|collection_approvals| {
+        collection_approvals
+            .get(&WappedAccount::from(from_account.clone()))
+            .is_some()
+            && collection_approvals
+                .get(&WappedAccount::from(from_account.clone()))
+                .unwrap()
+                .0
+                .len()
+                >= max_approvals_per_collection
     });
 
     if would_exceed_max_approvals {
@@ -303,12 +325,13 @@ fn approve_collection(
         "37approve_coll".to_string(),
         current_time,
         ICRC37TransactionData {
+            op: "37approve_coll".to_string(),
             tid: None,
             from: Some(from_account.clone()),
             to: None,
-            memo: memo_clone,
+            memo: memo_clone.clone(),
             created_at_time: Some(Nat::from(arg.approval_info.created_at_time)),
-            spender: Some(arg.approval_info.spender.clone()),
+            spender: Some(arg.approval_info.spender),
             exp: arg.approval_info.expires_at.map(|e| Nat::from(e)),
         },
     );
@@ -323,13 +346,21 @@ fn approve_collection(
         }
     };
 
-    mutate_state(|state| {
-        state
-            .data
-            .collection_approvals
-            .entry(from_account.clone())
-            .or_insert_with(HashMap::new)
-            .insert(arg.approval_info.spender.clone(), approval);
+    __COLLECTION_APPROVALS.with_borrow_mut(|collection_approvals| {
+        let op_approval_map = collection_approvals.get(&WappedAccount::from(from_account.clone()));
+
+        let mut approval_map = if op_approval_map.is_none() {
+            WrappedApprovalValue(HashMap::new())
+        } else {
+            op_approval_map.unwrap()
+        };
+
+        approval_map.0.insert(
+            WappedAccount::from(arg.approval_info.spender.clone()),
+            approval,
+        );
+
+        collection_approvals.insert(WappedAccount::from(from_account.clone()), approval_map);
     });
 
     ApproveCollectionResult::Ok(Nat::from(index))
@@ -339,10 +370,11 @@ fn approve_collection(
 fn icrc37_revoke_token_approvals(
     args: icrc37_revoke_token_approvals::Args,
 ) -> icrc37_revoke_token_approvals::Response {
+    trace(&format!("icrc37_revoke_token_approvals args: {:?}", args));
     let caller = ic_cdk::api::msg_caller();
 
     // here we check the max revoke approvals,
-    // not that if spender is not provided, we will revoke all approvals for the token
+    // note that if spender is not provided, we will revoke all approvals for the token
     // even if the max revoke approvals is 0.
     // this is implementation choice, and is not a bug.
     // look more logical that way.
@@ -356,25 +388,14 @@ fn icrc37_revoke_token_approvals(
     )
     .unwrap_or(crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION);
 
-    if args.len() > max_revoke_approvals {
-        return Err(
-            icrc37_revoke_token_approvals::RevokeTokenApprovalError::GenericError {
-                error_code: Nat::from(1u64),
-                message: "Maximum revoke approvals exceeded".to_string(),
-            },
-        );
-    }
-
-    let mut results = Vec::with_capacity(args.len());
-
-    for arg in args {
-        let current_time = ic_cdk::api::time();
-
-        let result = revoke_token_approvals(arg, caller, current_time);
-        results.push(Some(result));
-    }
-
-    Ok(results)
+    Ok(args
+        .into_iter()
+        .take(max_revoke_approvals)
+        .map(|arg| {
+            let current_time = ic_cdk::api::time();
+            Some(revoke_token_approvals(arg, caller, current_time))
+        })
+        .collect())
 }
 
 fn revoke_token_approvals(
@@ -419,19 +440,19 @@ fn revoke_token_approvals(
         return RevokeTokenApprovalResponse::Err(RevokeTokenApprovalError::Unauthorized);
     }
 
-    let mut token_approvals = read_state(|state| {
-        state
-            .data
-            .token_approvals
-            .get(&arg.token_id)
-            .cloned()
-            .unwrap_or_default()
-    });
+    let mut token_approvals = __TOKEN_APPROVALS
+        .with_borrow(|token_approvals| token_approvals.get(&WappedNat::from(arg.token_id.clone())));
+
+    if token_approvals.is_none() {
+        return RevokeTokenApprovalResponse::Err(RevokeTokenApprovalError::ApprovalDoesNotExist);
+    }
+
+    let mut approval_map = token_approvals.unwrap().0;
 
     if let Some(spender) = &arg.spender {
-        token_approvals.remove(spender);
+        approval_map.remove(&WappedAccount::from(spender.clone()));
     } else {
-        token_approvals.clear();
+        approval_map.clear();
     };
 
     let created_at_time = arg.created_at_time.map(|t| Nat::from(t));
@@ -440,15 +461,21 @@ fn revoke_token_approvals(
         "37revoke".to_string(),
         current_time,
         ICRC37TransactionData {
+            op: "37revoke".to_string(),
             tid: Some(arg.token_id.clone()),
             from: Some(from_account.clone()),
             to: None,
             memo: arg.memo,
             created_at_time: created_at_time,
-            spender: arg.spender.clone(),
+            spender: arg.spender,
             exp: None,
         },
     );
+
+    trace(&format!(
+        "revoke_token_approvals transaction hash : {:?}",
+        transaction.tx().hash()
+    ));
 
     let index = match icrc3_add_transaction(transaction) {
         Ok(index) => index,
@@ -460,11 +487,11 @@ fn revoke_token_approvals(
         }
     };
 
-    mutate_state(|state| {
-        state
-            .data
-            .token_approvals
-            .insert(arg.token_id.clone(), token_approvals);
+    __TOKEN_APPROVALS.with_borrow_mut(|token_approvals| {
+        token_approvals.insert(
+            WappedNat::from(arg.token_id.clone()),
+            WrappedApprovalValue(approval_map),
+        );
     });
 
     RevokeTokenApprovalResponse::Ok(Nat::from(index))
@@ -491,24 +518,14 @@ fn icrc37_revoke_collection_approvals(
     )
     .unwrap_or(crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION);
 
-    if args.len() > max_revoke_approvals {
-        return Err(
-            icrc37_revoke_collection_approvals::RevokeCollectionApprovalError::GenericError {
-                error_code: Nat::from(1u64),
-                message: "Maximum revoke approvals exceeded".to_string(),
-            },
-        );
-    }
-
-    let mut results = Vec::with_capacity(args.len());
-
-    for arg in args {
-        let current_time = ic_cdk::api::time();
-        let result = revoke_collection_approvals(arg, caller, current_time);
-        results.push(Some(result));
-    }
-
-    Ok(results)
+    Ok(args
+        .into_iter()
+        .take(max_revoke_approvals)
+        .map(|arg| {
+            let current_time = ic_cdk::api::time();
+            Some(revoke_collection_approvals(arg, caller, current_time))
+        })
+        .collect())
 }
 
 fn revoke_collection_approvals(
@@ -539,19 +556,22 @@ fn revoke_collection_approvals(
         subaccount: None,
     };
 
-    let mut collection_approvals = read_state(|state| state.data.collection_approvals.clone());
+    let mut collection_approvals = __COLLECTION_APPROVALS.with_borrow(|collection_approvals| {
+        collection_approvals.get(&WappedAccount::from(from_account.clone()))
+    });
 
-    if let Some(approvals) = collection_approvals.get_mut(&from_account) {
-        if let Some(spender) = &arg.spender {
-            approvals.remove(spender);
-        } else {
-            collection_approvals.remove(&from_account);
-        }
+    if collection_approvals.is_none() {
+        return RevokeCollectionApprovalResult::Err(
+            RevokeCollectionApprovalError::ApprovalDoesNotExist,
+        );
+    }
+
+    let mut approval_map = collection_approvals.unwrap().0;
+
+    if let Some(spender) = &arg.spender {
+        approval_map.remove(&WappedAccount::from(spender.clone()));
     } else {
-        return RevokeCollectionApprovalResult::Err(RevokeCollectionApprovalError::GenericError {
-            error_code: Nat::from(1u64),
-            message: "No approvals found for the collection".to_string(),
-        });
+        approval_map.clear();
     }
 
     let created_at_time = arg.created_at_time.map(|t| Nat::from(t));
@@ -560,6 +580,7 @@ fn revoke_collection_approvals(
         "37revoke_coll".to_string(),
         current_time,
         ICRC37TransactionData {
+            op: "37revoke_coll".to_string(),
             tid: None,
             from: Some(from_account.clone()),
             to: None,
@@ -582,8 +603,11 @@ fn revoke_collection_approvals(
         }
     };
 
-    mutate_state(|state| {
-        state.data.collection_approvals = collection_approvals;
+    __COLLECTION_APPROVALS.with_borrow_mut(|collection_approvals| {
+        collection_approvals.insert(
+            WappedAccount::from(from_account.clone()),
+            WrappedApprovalValue(approval_map),
+        );
     });
 
     RevokeCollectionApprovalResult::Ok(Nat::from(index))
@@ -610,6 +634,8 @@ fn transfer_from(
     current_time: u64,
 ) -> icrc37_transfer_from::TransferFromResult {
     use icrc37_transfer_from::{TransferFromError, TransferFromResult};
+
+    trace(&format!("args: {:?}", arg));
 
     if let Some(created_at_time) = arg.created_at_time {
         match verify_approval_timing(created_at_time, current_time) {
@@ -651,12 +677,21 @@ fn transfer_from(
 
     let is_owner = nft.token_owner == arg.from;
 
-    let has_token_approval = mutate_state(|state| {
-        if let Some(token_approvals) = state.data.token_approvals.get(&arg.token_id) {
-            if let Some(approval) = token_approvals.get(&spender_account) {
+    let has_token_approval = __TOKEN_APPROVALS.with_borrow_mut(|token_approvals| {
+        if let Some(token_approval) = token_approvals.get(&WappedNat::from(arg.token_id.clone())) {
+            let mut approval_map = token_approval.0;
+
+            if let Some(approval) = approval_map.get(&WappedAccount::from(spender_account)) {
                 if let Some(expires_at) = approval.expires_at {
-                    state.data.token_approvals.remove(&arg.token_id);
-                    return expires_at > current_time;
+                    if expires_at <= current_time {
+                        approval_map.remove(&WappedAccount::from(spender_account));
+                        token_approvals.insert(
+                            WappedNat::from(arg.token_id.clone()),
+                            WrappedApprovalValue(approval_map),
+                        );
+                        return false;
+                    }
+                    return true;
                 }
                 return true;
             }
@@ -664,19 +699,26 @@ fn transfer_from(
         false
     });
 
-    let has_collection_approval = mutate_state(|state| {
+    let has_collection_approval = __COLLECTION_APPROVALS.with_borrow_mut(|collection_approvals| {
         if let Some(token_owner_approvals) =
-            state.data.collection_approvals.get_mut(&nft.token_owner)
+            collection_approvals.get(&WappedAccount::from(nft.token_owner.clone()))
         {
-            if let Some(approval) = token_owner_approvals.get_mut(&spender_account) {
+            let mut approval_map = token_owner_approvals.0;
+
+            if let Some(approval) = approval_map.get(&WappedAccount::from(spender_account.clone()))
+            {
                 if let Some(expires_at) = approval.expires_at {
                     // remove the approval if it has expired
                     if expires_at <= current_time {
-                        token_owner_approvals.remove(&spender_account);
-                        // remove the collection approval if it is empty
-                        if token_owner_approvals.is_empty() {
-                            state.data.collection_approvals.remove(&nft.token_owner);
+                        approval_map.remove(&WappedAccount::from(spender_account));
+                        if approval_map.is_empty() {
+                            collection_approvals.remove(&WappedAccount::from(nft.token_owner));
                         }
+
+                        collection_approvals.insert(
+                            WappedAccount::from(nft.token_owner.clone()),
+                            WrappedApprovalValue(approval_map),
+                        );
                         return false;
                     }
                     return true;
@@ -697,6 +739,7 @@ fn transfer_from(
         "37xfer".to_string(),
         current_time,
         ICRC37TransactionData {
+            op: "37xfer".to_string(),
             tid: Some(arg.token_id.clone()),
             from: Some(arg.from.clone()),
             to: Some(arg.to.clone()),
@@ -706,6 +749,11 @@ fn transfer_from(
             exp: None,
         },
     );
+
+    trace(&format!(
+        "transfer_from transaction hash : {:?}",
+        transaction.tx().hash()
+    ));
 
     let index = match icrc3_add_transaction(transaction) {
         Ok(index) => index,
@@ -730,24 +778,29 @@ fn transfer_from(
         },
     };
 
+    trace(&format!("transfer_from index: {:?}", index));
+
     nft.transfer(arg.to.clone());
+
+    trace(&format!("transfer done to : {:?}", nft.token_owner));
 
     mutate_state(|state| {
         state.data.update_token_by_id(&nft.token_id, &nft);
-        state.data.token_approvals.remove(&arg.token_id);
     });
 
-    let has_nfts = read_state(|state| {
-        state
-            .data
-            .tokens_list
-            .iter()
-            .any(|(_, token)| token.token_owner.owner == caller)
+    __TOKEN_APPROVALS.with_borrow_mut(|token_approvals| {
+        token_approvals.remove(&WappedNat::from(arg.token_id.clone()));
+    });
+
+    let has_nfts = __TOKEN_APPROVALS.with_borrow(|token_approvals| {
+        token_approvals
+            .get(&WappedNat::from(arg.token_id.clone()))
+            .is_some()
     });
 
     if !has_nfts {
-        mutate_state(|state| {
-            state.data.collection_approvals.remove(&arg.from);
+        __COLLECTION_APPROVALS.with_borrow_mut(|collection_approvals| {
+            collection_approvals.remove(&WappedAccount::from(arg.from.clone()));
         });
     }
 

@@ -11,6 +11,8 @@ pub const DEFAULT_TAKE_VALUE: usize = 100;
 pub const DEFAULT_MAX_UPDATE_BATCH_SIZE: u128 = 100;
 pub const DEFAULT_MAX_SUPPLY_CAP: u128 = 10_000;
 pub const DEFAULT_MAX_MEMO_SIZE: u128 = 1_000_000;
+pub const DEFAULT_MAX_QUERY_BATCH_SIZE: u128 = 100;
+pub const DEFAULT_MAX_TAKE_VALUE: u128 = 100;
 
 #[derive(CandidType, Deserialize)]
 pub struct TransferArg {

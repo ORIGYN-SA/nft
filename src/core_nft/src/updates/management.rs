@@ -158,6 +158,7 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
                 "7mint".to_string(),
                 ic_cdk::api::time(),
                 ICRC7TransactionData {
+                    op: "7mint".to_string(),
                     tid: Some(token_id.clone()),
                     from: None,
                     to: Some(req.token_owner.clone()),
@@ -179,6 +180,12 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
             mutate_state(|state| {
                 state.data.last_token_id = token_id.clone() + Nat::from(1u64);
                 state.data.tokens_list.insert(token_id.clone(), new_token);
+                state
+                    .data
+                    .tokens_list_by_owner
+                    .entry(req.token_owner.clone())
+                    .or_insert(vec![])
+                    .push(token_id.clone());
             });
         }
     }
@@ -224,6 +231,7 @@ pub fn update_nft_metadata(
                 "7update_token".to_string(),
                 ic_cdk::api::time(),
                 ICRC7TransactionData {
+                    op: "7update_token".to_string(),
                     tid: Some(token_name_hash.clone()),
                     from: Some(Account {
                         owner: ic_cdk::api::msg_caller(),
@@ -281,6 +289,7 @@ pub fn burn_nft(token_id: Nat) -> management::burn_nft::Response {
         "7burn".to_string(),
         ic_cdk::api::time(),
         ICRC7TransactionData {
+            op: "7burn".to_string(),
             tid: Some(token_id.clone()),
             from: Some(token.token_owner.clone()),
             to: None,

@@ -17,6 +17,8 @@ use icrc_ledger_types::icrc1::account::Account;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
 
+use crate::types::icrc37::{init_collection_approvals, init_token_approvals};
+
 pub use bity_ic_storage_canister_api::lifecycle::{init::InitArgs, post_upgrade::UpgradeArgs};
 
 const STORAGE_WASM: &[u8] = include_bytes!("../../../wasm/storage_canister.wasm.gz");
@@ -84,10 +86,9 @@ pub struct Data {
     pub permitted_drift: Option<Nat>,
     pub max_canister_storage_threshold: Option<Nat>,
     pub tokens_list: HashMap<Nat, Icrc7Token>,
+    pub tokens_list_by_owner: HashMap<Account, Vec<Nat>>,
     pub approval_init: InitApprovalsArg,
     pub sub_canister_manager: StorageSubCanisterManager,
-    pub token_approvals: TokenApprovals,
-    pub collection_approvals: CollectionApprovals,
     pub last_token_id: Nat,
     pub media_redirections: HashMap<String, String>,
     // pub archive_init: Option<InitArchiveArg>,
@@ -161,10 +162,9 @@ impl Data {
             permitted_drift,
             max_canister_storage_threshold,
             tokens_list: HashMap::new(),
+            tokens_list_by_owner: HashMap::new(),
             approval_init,
             sub_canister_manager,
-            token_approvals: HashMap::new(),
-            collection_approvals: HashMap::new(),
             last_token_id: Nat::from(1u64), // 0 is the reserved value for the collection metadata
             media_redirections: HashMap::new(),
         }
@@ -190,21 +190,23 @@ impl Data {
     }
 
     pub fn tokens_balance_of(&self, owner: &Account) -> Nat {
-        let count = self
-            .tokens_list
-            .values()
-            .filter(|token| &token.token_owner == owner)
-            .count() as u64;
-
-        Nat::from(count)
+        Nat::from(
+            self.tokens_list_by_owner
+                .get(owner)
+                .map(|v| v.len() as u64)
+                .unwrap_or(0),
+        )
     }
 
     pub fn tokens_of_account(&self, owner: &Account) -> Vec<Icrc7Token> {
-        self.tokens_list
-            .values()
-            .filter(|token| &token.token_owner == owner)
-            .cloned()
-            .collect()
+        self.tokens_list_by_owner
+            .get(owner)
+            .map(|v| {
+                v.iter()
+                    .map(|id| self.tokens_list.get(id).unwrap().clone())
+                    .collect()
+            })
+            .unwrap_or(vec![])
     }
 
     pub fn tokens_ids_of_account(&self, owner: &Account) -> Vec<Nat> {
@@ -240,10 +242,9 @@ impl Clone for Data {
             permitted_drift: self.permitted_drift.clone(),
             max_canister_storage_threshold: self.max_canister_storage_threshold.clone(),
             tokens_list: self.tokens_list.clone(),
+            tokens_list_by_owner: self.tokens_list_by_owner.clone(),
             approval_init: self.approval_init.clone(),
             sub_canister_manager: self.sub_canister_manager.clone(),
-            token_approvals: self.token_approvals.clone(),
-            collection_approvals: self.collection_approvals.clone(),
             last_token_id: self.last_token_id.clone(),
             media_redirections: self.media_redirections.clone(),
         }

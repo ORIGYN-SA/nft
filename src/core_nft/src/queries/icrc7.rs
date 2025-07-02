@@ -177,6 +177,20 @@ pub fn icrc7_permitted_drift() -> icrc7::icrc7_permitted_drift::Response {
 pub fn icrc7_token_metadata(
     token_ids: icrc7::icrc7_token_metadata::Args,
 ) -> icrc7::icrc7_token_metadata::Response {
+    let icrc7_max_query_batch_size = read_state(|state| state.data.max_query_batch_size.clone());
+    let max_query_batch_size =
+        icrc7_max_query_batch_size.unwrap_or(Nat::from(icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE));
+
+    if token_ids.len()
+        > usize::try_from(max_query_batch_size.0.clone())
+            .unwrap_or(icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE as usize)
+    {
+        ic_cdk::trap(format!(
+            "max_query_batch_size exceeded. Limit is {}. Retry with a smaller batch size.",
+            max_query_batch_size.0
+        ));
+    }
+
     let mut ret = Vec::new();
     for token_id in token_ids {
         let token = read_state(|state| state.data.get_token_by_id(&token_id).cloned());
@@ -199,6 +213,20 @@ pub fn icrc7_token_metadata(
 
 #[query]
 pub fn icrc7_owner_of(token_ids: icrc7::icrc7_owner_of::Args) -> icrc7::icrc7_owner_of::Response {
+    let icrc7_max_query_batch_size = read_state(|state| state.data.max_query_batch_size.clone());
+    let max_query_batch_size =
+        icrc7_max_query_batch_size.unwrap_or(Nat::from(icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE));
+
+    if token_ids.len()
+        > usize::try_from(max_query_batch_size.0.clone())
+            .unwrap_or(icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE as usize)
+    {
+        ic_cdk::trap(format!(
+            "max_query_batch_size exceeded. Limit is {}. Retry with a smaller batch size.",
+            max_query_batch_size.0
+        ));
+    }
+
     read_state(|state| {
         token_ids
             .iter()
@@ -211,6 +239,20 @@ pub fn icrc7_owner_of(token_ids: icrc7::icrc7_owner_of::Args) -> icrc7::icrc7_ow
 pub fn icrc7_balance_of(
     accounts: icrc7::icrc7_balance_of::Args,
 ) -> icrc7::icrc7_balance_of::Response {
+    let icrc7_max_query_batch_size = read_state(|state| state.data.max_query_batch_size.clone());
+    let max_query_batch_size =
+        icrc7_max_query_batch_size.unwrap_or(Nat::from(icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE));
+
+    if accounts.len()
+        > usize::try_from(max_query_batch_size.0.clone())
+            .unwrap_or(icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE as usize)
+    {
+        ic_cdk::trap(format!(
+            "max_query_batch_size exceeded. Limit is {}. Retry with a smaller batch size.",
+            max_query_batch_size.0
+        ));
+    }
+
     read_state(|state| {
         accounts
             .iter()
@@ -224,6 +266,19 @@ pub fn icrc7_tokens(
     prev: icrc7::icrc7_tokens::Args0,
     take: icrc7::icrc7_tokens::Args1,
 ) -> icrc7::icrc7_tokens::Response {
+    if take.is_some() {
+        let icrc7_max_take_value = read_state(|state| state.data.max_take_value.clone());
+        let max_take_value =
+            icrc7_max_take_value.unwrap_or(Nat::from(icrc7::DEFAULT_MAX_TAKE_VALUE));
+
+        if take.clone().unwrap().0 > max_take_value.0 {
+            ic_cdk::trap(format!(
+                "max_take_value exceeded. Limit is {}. Retry with a smaller take value.",
+                max_take_value.0
+            ));
+        }
+    }
+
     read_state(|state| {
         let prev = prev.unwrap_or(Nat::from(0 as u64));
         let take: usize = usize::try_from(
@@ -254,6 +309,19 @@ pub fn icrc7_tokens_of(
     prev: icrc7::icrc7_tokens_of::Args1,
     take: icrc7::icrc7_tokens_of::Args2,
 ) -> icrc7::icrc7_tokens_of::Response {
+    if take.is_some() {
+        let icrc7_max_take_value = read_state(|state| state.data.max_take_value.clone());
+        let max_take_value =
+            icrc7_max_take_value.unwrap_or(Nat::from(icrc7::DEFAULT_MAX_TAKE_VALUE));
+
+        if take.clone().unwrap().0 > max_take_value.0 {
+            ic_cdk::trap(format!(
+                "max_take_value exceeded. Limit is {}. Retry with a smaller take value.",
+                max_take_value.0
+            ));
+        }
+    }
+
     read_state(|state| {
         let prev = prev.unwrap_or(Nat::from(0 as u64));
         let take: usize = usize::try_from(
