@@ -9,12 +9,14 @@ use crate::core_suite::setup::setup::{TestEnv, MINUTE_IN_MS};
 use crate::core_suite::setup::setup_core::upgrade_core_canister;
 use crate::utils::random_principal;
 use crate::utils::{mint_nft, tick_n_blocks};
+use crate::utils::{test_sliding_window_multiple_users, test_sliding_window_rate_limit};
 use bity_ic_types::BuildVersion;
-use candid::{Encode, Nat};
+use candid::{Encode, Nat, Principal};
 use core_nft::lifecycle::Args;
 use core_nft::post_upgrade::UpgradeArgs;
 use core_nft::types::icrc37;
 use icrc_ledger_types::icrc1::account::Account;
+use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
 use std::time::Duration;
 
@@ -2766,6 +2768,86 @@ fn test_icrc37_approvals_persistence_after_upgrade() {
                     subaccount: None
                 })
             );
+        }
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
+    }
+}
+
+#[test]
+fn test_icrc37_approve_tokens_sliding_window_rate_limit() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    // Mint a token for nft_owner1
+    let mint_return = mint_nft(
+        pic,
+        "test_rate_limit".to_string(),
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+    );
+
+    match mint_return {
+        Ok(token_id) => {
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
+
+            // Create an approval function for testing
+            let approve_fn = |pic: &mut PocketIc,
+                              caller: Principal,
+                              canister_id: Principal|
+             -> Result<Vec<u8>, RejectResponse> {
+                let approval_info = icrc37::ApprovalInfo {
+                    spender: Account {
+                        owner: nft_owner2,
+                        subaccount: None,
+                    },
+                    from_subaccount: None,
+                    expires_at: None,
+                    memo: None,
+                    created_at_time: current_time,
+                };
+
+                let approve_args = vec![icrc37::icrc37_approve_tokens::ApproveTokenArg {
+                    token_id: token_id.clone(),
+                    approval_info: approval_info.clone(),
+                }];
+
+                let result = pic.update_call(
+                    collection_canister_id,
+                    caller,
+                    "icrc37_approve_tokens",
+                    candid::encode_one(approve_args).unwrap(),
+                );
+
+                result
+            };
+
+            // Test rate limiting with 5 calls (the limit) + 1 that should fail
+            let results = test_sliding_window_rate_limit::<
+                Vec<Option<icrc37::icrc37_approve_tokens::ApproveTokenResult>>,
+                icrc37::icrc37_approve_tokens::ApproveTokenError,
+            >(
+                pic,
+                nft_owner1,
+                collection_canister_id,
+                approve_fn,
+                5,                                           // SLIDING_WINDOW_CALLS
+                Duration::from_millis(60).as_nanos() as u64, // SLIDING_WINDOW_DURATION_MS
+            );
+            println!("results: {:?}", results);
+            assert!(results.is_ok());
         }
         Err(e) => {
             println!("Error minting NFT: {:?}", e);

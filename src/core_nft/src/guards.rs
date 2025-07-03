@@ -1,9 +1,14 @@
 use crate::state::mutate_state;
 use crate::state::read_state;
+use crate::utils::trace;
+use bity_ic_types::TimestampNanos;
 use candid::Principal;
 use std::marker::PhantomData;
+use std::time::Duration;
 
 const MAX_CONCURRENT: usize = 1;
+const SLIDING_WINDOW_CALLS: usize = 5;
+const SLIDING_WINDOW_DURATION_NS: u64 = Duration::from_millis(60).as_nanos() as u64;
 
 /// Guards a block from executing twice when called by the same user and from being
 /// executed [MAX_CONCURRENT] or more times in parallel.
@@ -37,6 +42,59 @@ impl Drop for GuardManagement {
     fn drop(&mut self) {
         mutate_state(|s| s.principal_guards.remove(&self.principal));
     }
+}
+
+pub fn guard_sliding_window() -> Result<(), String> {
+    let principal = ic_cdk::api::msg_caller();
+    let current_time: TimestampNanos = ic_cdk::api::time();
+
+    trace(&format!("current_time: {:?}", current_time));
+    trace(&format!("principal: {:?}", principal));
+
+    mutate_state(|s| {
+        let call_history = s
+            .sliding_window_guards
+            .entry(principal)
+            .or_insert_with(Vec::new);
+
+        trace(&format!("call_history: {:?}", call_history));
+
+        call_history.retain(|&timestamp| {
+            trace(&format!("timestamp: {:?}", timestamp));
+            trace(&format!("current_time: {:?}", current_time));
+            trace(&format!(
+                "SLIDING_WINDOW_DURATION_NS: {:?}",
+                SLIDING_WINDOW_DURATION_NS
+            ));
+            trace(&format!(
+                "current_time.saturating_sub(timestamp): {:?}",
+                current_time.saturating_sub(timestamp)
+            ));
+            current_time.saturating_sub(timestamp) < SLIDING_WINDOW_DURATION_NS
+        });
+
+        trace(&format!("call_history: {:?}", call_history));
+
+        if call_history.len() >= SLIDING_WINDOW_CALLS {
+            trace(&format!("call_history.len() >= SLIDING_WINDOW_CALLS"));
+            let oldest_call = call_history.first().unwrap();
+            let time_until_next_allowed = SLIDING_WINDOW_DURATION_NS - (current_time - oldest_call);
+            trace(&format!(
+                "time_until_next_allowed: {:?}",
+                time_until_next_allowed
+            ));
+            return Err(format!(
+                "Rate limit exceeded. You can make another call in {} milliseconds",
+                time_until_next_allowed
+            ));
+        }
+
+        call_history.push(current_time);
+
+        trace(&format!("call_history: {:?}", call_history));
+
+        Ok(())
+    })
 }
 
 pub fn caller_is_governance_principal() -> Result<(), String> {

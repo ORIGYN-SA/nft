@@ -31,6 +31,7 @@ pub struct RuntimeState {
     pub env: CanisterEnv,
     pub data: Data,
     pub principal_guards: BTreeSet<Principal>,
+    pub sliding_window_guards: HashMap<Principal, Vec<TimestampNanos>>,
     pub internal_filestorage: InternalFilestorage,
 }
 
@@ -40,6 +41,7 @@ impl RuntimeState {
             env,
             data,
             principal_guards: BTreeSet::new(),
+            sliding_window_guards: HashMap::new(),
             internal_filestorage: InternalFilestorage::new(),
         }
     }

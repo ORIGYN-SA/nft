@@ -18,6 +18,8 @@ use ic_cdk_macros::update;
 use icrc_ledger_types::icrc1::account::Account;
 use std::collections::HashMap;
 
+use crate::guards::guard_sliding_window;
+
 fn verify_approval_timing(created_at_time: u64, current_time: u64) -> Result<(), (bool, u64)> {
     let permited_drift = read_state(|state| state.data.permitted_drift.clone())
         .unwrap_or(Nat::from(crate::types::icrc7::DEFAULT_PERMITTED_DRIFT));
@@ -47,7 +49,7 @@ fn verify_approval_timing(created_at_time: u64, current_time: u64) -> Result<(),
     Ok(())
 }
 
-#[update]
+#[update(guard = "guard_sliding_window")]
 fn icrc37_approve_tokens(args: icrc37_approve_tokens::Args) -> icrc37_approve_tokens::Response {
     trace(&format!("icrc37_approve_tokens args: {:?}", args));
     let caller = ic_cdk::api::msg_caller();
@@ -174,11 +176,6 @@ fn approve_token(
         },
     );
 
-    trace(&format!(
-        "approve_token transaction hash : {:?}",
-        transaction.tx().hash()
-    ));
-
     let index = match icrc3_add_transaction(transaction) {
         Ok(index) => index,
         Err(e) => {
@@ -212,7 +209,7 @@ fn approve_token(
     ApproveTokenResult::Ok(Nat::from(index))
 }
 
-#[update]
+#[update(guard = "guard_sliding_window")]
 fn icrc37_approve_collection(
     args: icrc37_approve_collection::Args,
 ) -> icrc37_approve_collection::Response {
@@ -366,7 +363,7 @@ fn approve_collection(
     ApproveCollectionResult::Ok(Nat::from(index))
 }
 
-#[update]
+#[update(guard = "guard_sliding_window")]
 fn icrc37_revoke_token_approvals(
     args: icrc37_revoke_token_approvals::Args,
 ) -> icrc37_revoke_token_approvals::Response {
@@ -497,7 +494,7 @@ fn revoke_token_approvals(
     RevokeTokenApprovalResponse::Ok(Nat::from(index))
 }
 
-#[update]
+#[update(guard = "guard_sliding_window")]
 fn icrc37_revoke_collection_approvals(
     args: icrc37_revoke_collection_approvals::Args,
 ) -> icrc37_revoke_collection_approvals::Response {
@@ -613,7 +610,7 @@ fn revoke_collection_approvals(
     RevokeCollectionApprovalResult::Ok(Nat::from(index))
 }
 
-#[update]
+#[update(guard = "guard_sliding_window")]
 fn icrc37_transfer_from(args: icrc37_transfer_from::Args) -> icrc37_transfer_from::Response {
     let caller = ic_cdk::api::msg_caller();
 

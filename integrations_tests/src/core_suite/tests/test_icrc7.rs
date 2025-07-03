@@ -8,30 +8,20 @@ use crate::client::core_nft::{
 use crate::core_suite::setup::setup::TestEnv;
 use crate::utils::{
     extract_metadata_file_path, fetch_metadata_json, mint_nft, random_principal, setup_http_client,
-    upload_metadata,
+    test_sliding_window_multiple_users, test_sliding_window_rate_limit, upload_metadata,
 };
-use bytes::Bytes;
 use candid::{Encode, Nat, Principal};
 use core_nft::types::icrc7;
 use core_nft::types::update_nft_metadata;
-use http::Request;
-use http_body_util::BodyExt;
-use ic_agent::Agent;
-use ic_http_gateway::{HttpGatewayClient, HttpGatewayRequestArgs};
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
 use icrc_ledger_types::icrc1::account::Account;
 use icrc_ledger_types::icrc3::blocks::GetBlocksRequest;
+use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
 use serde_json::json;
-use std::collections::HashMap;
-use std::str::FromStr;
-use std::time::{Duration, UNIX_EPOCH};
-use url::Url;
+use std::time::Duration;
 
-use crate::{
-    core_suite::setup::{default_test_setup, test_setup_atomic_batch_transfers},
-    utils::tick_n_blocks,
-};
+use crate::{core_suite::setup::default_test_setup, utils::tick_n_blocks};
 
 #[test]
 fn test_icrc7_name() {
@@ -415,6 +405,26 @@ fn test_icrc7_token_metadata_multiple_insert() {
                 parsed_metadata.get("name").unwrap().as_str().unwrap(),
                 "Second NFT"
             );
+
+            let attributes = parsed_metadata
+                .get("attributes")
+                .unwrap()
+                .as_array()
+                .unwrap();
+            assert_eq!(
+                attributes[0].get("trait_type").unwrap().as_str().unwrap(),
+                "test4"
+            );
+            assert_eq!(
+                attributes[0].get("value").unwrap().as_str().unwrap(),
+                "test4"
+            );
+
+            assert_eq!(
+                attributes[1].get("trait_type").unwrap().as_str().unwrap(),
+                "test5"
+            );
+            assert_eq!(attributes[1].get("value").unwrap().as_i64().unwrap(), 2);
 
             println!("Verification of multiple insert metadata successful!");
         }
