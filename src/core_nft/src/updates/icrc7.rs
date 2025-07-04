@@ -11,6 +11,13 @@ use ic_cdk_macros::update;
 use crate::guards::guard_sliding_window;
 
 fn transfer_nft(arg: &icrc7::TransferArg) -> Result<Nat, icrc7::icrc7_transfer::TransferError> {
+    guard_sliding_window(arg.token_id.clone()).map_err(|e| {
+        icrc7::icrc7_transfer::TransferError::GenericError {
+            error_code: Nat::from(0u64),
+            message: e,
+        }
+    })?;
+
     let mut nft = mutate_state(|state| state.data.tokens_list.get(&arg.token_id).cloned())
         .ok_or(icrc7::icrc7_transfer::TransferError::NonExistingTokenId)?;
 
@@ -104,7 +111,7 @@ fn transfer_nft(arg: &icrc7::TransferArg) -> Result<Nat, icrc7::icrc7_transfer::
     }
 }
 
-#[update(guard = "guard_sliding_window")]
+#[update]
 pub async fn icrc7_transfer(args: icrc7::icrc7_transfer::Args) -> icrc7::icrc7_transfer::Response {
     if args.is_empty() {
         return vec![];

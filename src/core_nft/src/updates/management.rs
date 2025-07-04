@@ -1,7 +1,4 @@
-use crate::guards::{
-    caller_is_governance_principal, caller_is_minting_authority, guard_sliding_window,
-    GuardManagement,
-};
+use crate::guards::{caller_is_governance_principal, caller_is_minting_authority, GuardManagement};
 use crate::state::{icrc3_add_transaction, mutate_state, read_state, InternalFilestorageData};
 use crate::types::http::add_redirection;
 use crate::types::sub_canister::StorageCanister;

@@ -31,7 +31,7 @@ pub struct RuntimeState {
     pub env: CanisterEnv,
     pub data: Data,
     pub principal_guards: BTreeSet<Principal>,
-    pub sliding_window_guards: HashMap<Principal, Vec<TimestampNanos>>,
+    pub sliding_window_guards: HashMap<candid::Nat, Vec<TimestampNanos>>, // per token id
     pub internal_filestorage: InternalFilestorage,
 }
 

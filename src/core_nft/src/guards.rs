@@ -44,45 +44,22 @@ impl Drop for GuardManagement {
     }
 }
 
-pub fn guard_sliding_window() -> Result<(), String> {
-    let principal = ic_cdk::api::msg_caller();
+pub fn guard_sliding_window(token_id: candid::Nat) -> Result<(), String> {
     let current_time: TimestampNanos = ic_cdk::api::time();
-
-    trace(&format!("current_time: {:?}", current_time));
-    trace(&format!("principal: {:?}", principal));
 
     mutate_state(|s| {
         let call_history = s
             .sliding_window_guards
-            .entry(principal)
+            .entry(token_id)
             .or_insert_with(Vec::new);
 
-        trace(&format!("call_history: {:?}", call_history));
-
         call_history.retain(|&timestamp| {
-            trace(&format!("timestamp: {:?}", timestamp));
-            trace(&format!("current_time: {:?}", current_time));
-            trace(&format!(
-                "SLIDING_WINDOW_DURATION_NS: {:?}",
-                SLIDING_WINDOW_DURATION_NS
-            ));
-            trace(&format!(
-                "current_time.saturating_sub(timestamp): {:?}",
-                current_time.saturating_sub(timestamp)
-            ));
             current_time.saturating_sub(timestamp) < SLIDING_WINDOW_DURATION_NS
         });
 
-        trace(&format!("call_history: {:?}", call_history));
-
         if call_history.len() >= SLIDING_WINDOW_CALLS {
-            trace(&format!("call_history.len() >= SLIDING_WINDOW_CALLS"));
             let oldest_call = call_history.first().unwrap();
             let time_until_next_allowed = SLIDING_WINDOW_DURATION_NS - (current_time - oldest_call);
-            trace(&format!(
-                "time_until_next_allowed: {:?}",
-                time_until_next_allowed
-            ));
             return Err(format!(
                 "Rate limit exceeded. You can make another call in {} milliseconds",
                 time_until_next_allowed
@@ -90,8 +67,6 @@ pub fn guard_sliding_window() -> Result<(), String> {
         }
 
         call_history.push(current_time);
-
-        trace(&format!("call_history: {:?}", call_history));
 
         Ok(())
     })

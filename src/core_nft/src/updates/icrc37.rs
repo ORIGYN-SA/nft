@@ -6,11 +6,9 @@ pub use crate::types::icrc37::{
 use crate::types::icrc37::{WappedAccount, WappedNat, WrappedApprovalValue};
 use crate::types::nft;
 use crate::types::{__COLLECTION_APPROVALS, __TOKEN_APPROVALS};
-use serde_bytes::ByteBuf;
 
-use crate::utils::trace;
 use bity_ic_icrc3::{
-    transaction::{ICRC37Transaction, ICRC37TransactionData, TransactionType},
+    transaction::{ICRC37Transaction, ICRC37TransactionData},
     types::Icrc3Error,
 };
 use candid::{Nat, Principal};
@@ -49,9 +47,8 @@ fn verify_approval_timing(created_at_time: u64, current_time: u64) -> Result<(),
     Ok(())
 }
 
-#[update(guard = "guard_sliding_window")]
+#[update]
 fn icrc37_approve_tokens(args: icrc37_approve_tokens::Args) -> icrc37_approve_tokens::Response {
-    trace(&format!("icrc37_approve_tokens args: {:?}", args));
     let caller = ic_cdk::api::msg_caller();
 
     let mut results = Vec::with_capacity(args.len());
@@ -71,6 +68,16 @@ fn approve_token(
     current_time: u64,
 ) -> icrc37_approve_tokens::ApproveTokenResult {
     use icrc37_approve_tokens::{ApproveTokenError, ApproveTokenResult};
+
+    match guard_sliding_window(arg.token_id.clone()) {
+        Ok(()) => {}
+        Err(e) => {
+            return ApproveTokenResult::Err(ApproveTokenError::GenericError {
+                error_code: Nat::from(0u64),
+                message: e,
+            });
+        }
+    }
 
     match verify_approval_timing(arg.approval_info.created_at_time, current_time) {
         Err((true, ledger_time)) => {
@@ -126,11 +133,6 @@ fn approve_token(
         .0,
     )
     .unwrap_or(crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION);
-
-    trace(&format!(
-        "max_approvals_per_token: {:?}",
-        max_approvals_per_token
-    ));
 
     let memo_clone = arg.approval_info.memo.clone();
 
@@ -209,7 +211,7 @@ fn approve_token(
     ApproveTokenResult::Ok(Nat::from(index))
 }
 
-#[update(guard = "guard_sliding_window")]
+#[update]
 fn icrc37_approve_collection(
     args: icrc37_approve_collection::Args,
 ) -> icrc37_approve_collection::Response {
@@ -232,6 +234,17 @@ fn approve_collection(
     current_time: u64,
 ) -> icrc37_approve_collection::ApproveCollectionResult {
     use icrc37_approve_collection::{ApproveCollectionError, ApproveCollectionResult};
+
+    match guard_sliding_window(candid::Nat::from(0u64)) {
+        // we consider the collection as a token with id 0
+        Ok(()) => {}
+        Err(e) => {
+            return ApproveCollectionResult::Err(ApproveCollectionError::GenericError {
+                error_code: Nat::from(0u64),
+                message: e,
+            });
+        }
+    }
 
     match verify_approval_timing(arg.approval_info.created_at_time, current_time) {
         Err((true, ledger_time)) => {
@@ -363,12 +376,23 @@ fn approve_collection(
     ApproveCollectionResult::Ok(Nat::from(index))
 }
 
-#[update(guard = "guard_sliding_window")]
+#[update]
 fn icrc37_revoke_token_approvals(
     args: icrc37_revoke_token_approvals::Args,
 ) -> icrc37_revoke_token_approvals::Response {
-    trace(&format!("icrc37_revoke_token_approvals args: {:?}", args));
     let caller = ic_cdk::api::msg_caller();
+
+    match guard_sliding_window(args[0].token_id.clone()) {
+        Err(e) => {
+            return icrc37_revoke_token_approvals::Response::Err(
+                icrc37_revoke_token_approvals::RevokeTokenApprovalError::GenericError {
+                    error_code: Nat::from(0u64),
+                    message: e,
+                },
+            );
+        }
+        Ok(()) => {}
+    }
 
     // here we check the max revoke approvals,
     // note that if spender is not provided, we will revoke all approvals for the token
@@ -437,7 +461,7 @@ fn revoke_token_approvals(
         return RevokeTokenApprovalResponse::Err(RevokeTokenApprovalError::Unauthorized);
     }
 
-    let mut token_approvals = __TOKEN_APPROVALS
+    let token_approvals = __TOKEN_APPROVALS
         .with_borrow(|token_approvals| token_approvals.get(&WappedNat::from(arg.token_id.clone())));
 
     if token_approvals.is_none() {
@@ -469,11 +493,6 @@ fn revoke_token_approvals(
         },
     );
 
-    trace(&format!(
-        "revoke_token_approvals transaction hash : {:?}",
-        transaction.tx().hash()
-    ));
-
     let index = match icrc3_add_transaction(transaction) {
         Ok(index) => index,
         Err(e) => {
@@ -494,7 +513,7 @@ fn revoke_token_approvals(
     RevokeTokenApprovalResponse::Ok(Nat::from(index))
 }
 
-#[update(guard = "guard_sliding_window")]
+#[update]
 fn icrc37_revoke_collection_approvals(
     args: icrc37_revoke_collection_approvals::Args,
 ) -> icrc37_revoke_collection_approvals::Response {
@@ -534,6 +553,19 @@ fn revoke_collection_approvals(
         RevokeCollectionApprovalError, RevokeCollectionApprovalResult,
     };
 
+    match guard_sliding_window(candid::Nat::from(0u64)) {
+        // we consider the collection as a token with id 0
+        Ok(()) => {}
+        Err(e) => {
+            return RevokeCollectionApprovalResult::Err(
+                RevokeCollectionApprovalError::GenericError {
+                    error_code: Nat::from(0u64),
+                    message: e,
+                },
+            );
+        }
+    }
+
     if let Some(created_at_time) = arg.created_at_time {
         match verify_approval_timing(created_at_time, current_time) {
             Err((true, ledger_time)) => {
@@ -553,7 +585,7 @@ fn revoke_collection_approvals(
         subaccount: None,
     };
 
-    let mut collection_approvals = __COLLECTION_APPROVALS.with_borrow(|collection_approvals| {
+    let collection_approvals = __COLLECTION_APPROVALS.with_borrow(|collection_approvals| {
         collection_approvals.get(&WappedAccount::from(from_account.clone()))
     });
 
@@ -610,7 +642,7 @@ fn revoke_collection_approvals(
     RevokeCollectionApprovalResult::Ok(Nat::from(index))
 }
 
-#[update(guard = "guard_sliding_window")]
+#[update]
 fn icrc37_transfer_from(args: icrc37_transfer_from::Args) -> icrc37_transfer_from::Response {
     let caller = ic_cdk::api::msg_caller();
 
@@ -632,7 +664,15 @@ fn transfer_from(
 ) -> icrc37_transfer_from::TransferFromResult {
     use icrc37_transfer_from::{TransferFromError, TransferFromResult};
 
-    trace(&format!("args: {:?}", arg));
+    match guard_sliding_window(arg.token_id.clone()) {
+        Ok(()) => {}
+        Err(e) => {
+            return TransferFromResult::Err(TransferFromError::GenericError {
+                error_code: Nat::from(0u64),
+                message: e,
+            });
+        }
+    }
 
     if let Some(created_at_time) = arg.created_at_time {
         match verify_approval_timing(created_at_time, current_time) {
@@ -747,11 +787,6 @@ fn transfer_from(
         },
     );
 
-    trace(&format!(
-        "transfer_from transaction hash : {:?}",
-        transaction.tx().hash()
-    ));
-
     let index = match icrc3_add_transaction(transaction) {
         Ok(index) => index,
         Err(e) => match e {
@@ -775,11 +810,7 @@ fn transfer_from(
         },
     };
 
-    trace(&format!("transfer_from index: {:?}", index));
-
     nft.transfer(arg.to.clone());
-
-    trace(&format!("transfer done to : {:?}", nft.token_owner));
 
     mutate_state(|state| {
         state.data.update_token_by_id(&nft.token_id, &nft);

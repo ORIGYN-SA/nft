@@ -96,9 +96,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.95"
+version = "1.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34ac096ce696dc2fcabef30516bb13c0a68a11d30131d3df6f04711467681b04"
+checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 
 [[package]]
 name = "arc-swap"
@@ -253,13 +253,15 @@ checksum = "8f68f53c83ab957f72c32642f3868eec03eb974d1fb82e453128456482613d36"
 
 [[package]]
 name = "bity-ic-canister-client"
-version = "0.2.0"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ee034b78c9fa7a1170d5d6e8f64eee89961509d93ca65af0eafd9d1ee620d8f"
+checksum = "763d692d3bf3a7d90906714d4b7a622937b1c44967d3d5e9178ddc89685975bb"
 dependencies = [
+ "anyhow",
  "bity-ic-types",
  "candid",
  "ic-cdk",
+ "serde",
  "tracing",
 ]
 
@@ -307,10 +309,11 @@ dependencies = [
 
 [[package]]
 name = "bity-ic-icrc3"
-version = "0.4.2"
+version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9987e1463ce97a6327c48d9e6442e5bda259ca722aaf8d56646e48b854af8a0"
+checksum = "572418b02553e90041c1d5b8743559cb97ed387dace90b246d572256e11760fa"
 dependencies = [
+ "anyhow",
  "bity-ic-canister-time",
  "bity-ic-icrc3-archive-api",
  "bity-ic-icrc3-archive-c2c-client",
@@ -356,15 +359,16 @@ dependencies = [
 
 [[package]]
 name = "bity-ic-icrc3-archive-c2c-client"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a47c4884b0ee99b2f5b79a40452f1b05c585c5845c6d260562da502581dd9be7"
+checksum = "97d9f6a15cc2537f1c4224de83dfa69d4c1e8e9ef49baeeca0fa14a11ea049df"
 dependencies = [
  "bity-ic-canister-client",
  "bity-ic-icrc3-archive-api",
  "bity-ic-types",
  "candid",
  "ic-cdk",
+ "serde",
 ]
 
 [[package]]

@@ -8,7 +8,7 @@ use crate::client::core_nft::{
 use crate::core_suite::setup::setup::TestEnv;
 use crate::utils::{
     extract_metadata_file_path, fetch_metadata_json, mint_nft, random_principal, setup_http_client,
-    test_sliding_window_multiple_users, test_sliding_window_rate_limit, upload_metadata,
+    upload_metadata,
 };
 use candid::{Encode, Nat, Principal};
 use core_nft::types::icrc7;

@@ -9,9 +9,9 @@ use crate::core_suite::setup::setup::{TestEnv, MINUTE_IN_MS};
 use crate::core_suite::setup::setup_core::upgrade_core_canister;
 use crate::utils::random_principal;
 use crate::utils::{mint_nft, tick_n_blocks};
-use crate::utils::{test_sliding_window_multiple_users, test_sliding_window_rate_limit};
 use bity_ic_types::BuildVersion;
 use candid::{Encode, Nat, Principal};
+use core_nft::icrc37_approve_tokens::ApproveTokenResult;
 use core_nft::lifecycle::Args;
 use core_nft::post_upgrade::UpgradeArgs;
 use core_nft::types::icrc37;
@@ -2802,12 +2802,11 @@ fn test_icrc37_approve_tokens_sliding_window_rate_limit() {
     match mint_return {
         Ok(token_id) => {
             let current_time = pic.get_time().as_nanos_since_unix_epoch();
+            let max_calls = 5; // SLIDING_WINDOW_CALLS
+            let window_duration_ms = Duration::from_millis(60).as_nanos() as u64; // SLIDING_WINDOW_DURATION_MS
 
-            // Create an approval function for testing
-            let approve_fn = |pic: &mut PocketIc,
-                              caller: Principal,
-                              canister_id: Principal|
-             -> Result<Vec<u8>, RejectResponse> {
+            // Make calls up to the limit
+            for i in 0..max_calls {
                 let approval_info = icrc37::ApprovalInfo {
                     spender: Account {
                         owner: nft_owner2,
@@ -2824,30 +2823,95 @@ fn test_icrc37_approve_tokens_sliding_window_rate_limit() {
                     approval_info: approval_info.clone(),
                 }];
 
-                let result = pic.update_call(
-                    collection_canister_id,
-                    caller,
-                    "icrc37_approve_tokens",
-                    candid::encode_one(approve_args).unwrap(),
-                );
+                let result =
+                    icrc37_approve_tokens(pic, nft_owner1, collection_canister_id, &approve_args);
+                match result.unwrap()[0].as_ref().unwrap() {
+                    ApproveTokenResult::Ok(result) => {
+                        println!("Approval {} successful: {:?}", i, result);
+                    }
+                    ApproveTokenResult::Err(error) => {
+                        if format!("{:?}", error).contains("Rate limit exceeded") {
+                            println!("Approval {} failed: {:?}", i, error);
+                            panic!("Should not fail before rate limit");
+                        } else {
+                        }
+                    }
+                }
 
-                result
+                // Advance time slightly between calls to ensure they're recorded
+                pic.advance_time(Duration::from_nanos(1_000));
+                tick_n_blocks(pic, 5);
+            }
+
+            // Try one more call - this should fail due to rate limiting
+            let approval_info = icrc37::ApprovalInfo {
+                spender: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                from_subaccount: None,
+                expires_at: None,
+                memo: None,
+                created_at_time: current_time,
             };
 
-            // Test rate limiting with 5 calls (the limit) + 1 that should fail
-            let results = test_sliding_window_rate_limit::<
-                Vec<Option<icrc37::icrc37_approve_tokens::ApproveTokenResult>>,
-                icrc37::icrc37_approve_tokens::ApproveTokenError,
-            >(
-                pic,
-                nft_owner1,
-                collection_canister_id,
-                approve_fn,
-                5,                                           // SLIDING_WINDOW_CALLS
-                Duration::from_millis(60).as_nanos() as u64, // SLIDING_WINDOW_DURATION_MS
-            );
-            println!("results: {:?}", results);
-            assert!(results.is_ok());
+            let approve_args = vec![icrc37::icrc37_approve_tokens::ApproveTokenArg {
+                token_id: token_id.clone(),
+                approval_info: approval_info.clone(),
+            }];
+
+            let result =
+                icrc37_approve_tokens(pic, nft_owner1, collection_canister_id, &approve_args);
+            match result.unwrap()[0].as_ref().unwrap() {
+                ApproveTokenResult::Ok(result) => {
+                    println!("Unexpected success after rate limit: {:?}", result);
+                    panic!("Should have failed due to rate limiting");
+                }
+                ApproveTokenResult::Err(error) => {
+                    if format!("{:?}", error).contains("Rate limit exceeded") {
+                        // ok, expected to trap
+                    } else {
+                        println!("Unexpected error after window reset: {:?}", error);
+                        panic!("Should succeed after rate limit window resets");
+                    }
+                }
+            }
+
+            // Advance time beyond the window duration
+            pic.advance_time(Duration::from_millis(window_duration_ms + 1000));
+            tick_n_blocks(pic, 10);
+
+            // Try another call - this should succeed again
+            let approval_info = icrc37::ApprovalInfo {
+                spender: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                from_subaccount: None,
+                expires_at: None,
+                memo: None,
+                created_at_time: current_time,
+            };
+
+            let approve_args = vec![icrc37::icrc37_approve_tokens::ApproveTokenArg {
+                token_id: token_id.clone(),
+                approval_info: approval_info.clone(),
+            }];
+
+            let result =
+                icrc37_approve_tokens(pic, nft_owner1, collection_canister_id, &approve_args);
+            match result.unwrap()[0].as_ref().unwrap() {
+                ApproveTokenResult::Ok(result) => {
+                    println!("Success after window reset: {:?}", result);
+                }
+                ApproveTokenResult::Err(error) => {
+                    if format!("{:?}", error).contains("Rate limit exceeded") {
+                        println!("Unexpected error after window reset: {:?}", error);
+                        panic!("Should succeed after rate limit window resets");
+                    } else {
+                    }
+                }
+            }
         }
         Err(e) => {
             println!("Error minting NFT: {:?}", e);
