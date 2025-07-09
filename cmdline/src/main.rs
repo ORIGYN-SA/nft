@@ -1,9 +1,11 @@
 use anyhow::{anyhow, Result};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use candid::{Encode, Nat, Principal};
 use clap::{arg, value_parser, ArgAction, Command};
 use core_nft::types::management::mint;
 use core_nft::updates::management::{finalize_upload, init_upload, store_chunk};
 use ic_agent::{identity::Secp256k1Identity, Agent};
+use icrc_ledger_types::icrc::generic_value::ICRC3Value;
 use icrc_ledger_types::icrc1::account::Account;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -170,6 +172,95 @@ fn prompt_display_type(value_is_number: bool) -> Option<String> {
             }
         }
     }
+}
+
+fn create_metadata_interactive_hashmap() -> Result<Vec<(String, ICRC3Value)>> {
+    println!("=== Interactive Metadata Creation (HashMap Mode) ===");
+    let mut metadata = Vec::new();
+
+    loop {
+        println!("\n--- Adding metadata entry ---");
+        let key = prompt_input("Metadata key (or press Enter to finish)");
+        if key.is_empty() {
+            break;
+        }
+
+        println!("\nValue type options:");
+        println!("  1. Text");
+        println!("  2. Number (Nat)");
+        println!("  3. Integer (Int)");
+        println!("  4. Blob (Base64 encoded)");
+
+        let value_type = prompt_input("Choose value type (1-4)");
+        let value = match value_type.as_str() {
+            "1" => {
+                let text = prompt_input("Enter text value");
+                ICRC3Value::Text(text)
+            }
+            "2" => {
+                let num_str = prompt_input("Enter number value");
+                let num = num_str
+                    .parse::<u64>()
+                    .map_err(|_| anyhow!("Invalid number: {}", num_str))?;
+                ICRC3Value::Nat(Nat::from(num))
+            }
+            "3" => {
+                let int_str = prompt_input("Enter integer value");
+                let int = int_str
+                    .parse::<i64>()
+                    .map_err(|_| anyhow!("Invalid integer: {}", int_str))?;
+                ICRC3Value::Int(candid::Int::from(int))
+            }
+            "4" => {
+                let blob_str = prompt_input("Enter blob value (base64 encoded)");
+                let blob_bytes = BASE64
+                    .decode(&blob_str)
+                    .map_err(|_| anyhow!("Invalid base64: {}", blob_str))?;
+                ICRC3Value::Blob(serde_bytes::ByteBuf::from(blob_bytes))
+            }
+            _ => {
+                println!("Invalid choice, using text");
+                let text = prompt_input("Enter text value");
+                ICRC3Value::Text(text)
+            }
+        };
+
+        metadata.push((key, value));
+
+        if !prompt_bool("Add another metadata entry?") {
+            break;
+        }
+    }
+
+    Ok(metadata)
+}
+
+fn create_icrc97_metadata_from_url(url: &str) -> Vec<(String, ICRC3Value)> {
+    let metadata_json = json!({
+        "name": "NFT from URL",
+        "description": "NFT created from metadata URL",
+        "image": url
+    });
+
+    let json_string = serde_json::to_string(&metadata_json).unwrap();
+    let base64_data = BASE64.encode(json_string.as_bytes());
+    let data_url = format!("data:text/json;charset=utf-8;base64,{}", base64_data);
+
+    vec![(
+        "icrc97:metadata".to_string(),
+        ICRC3Value::Array(vec![ICRC3Value::Text(data_url)]),
+    )]
+}
+
+fn create_icrc97_metadata_from_json(metadata: &Value) -> Vec<(String, ICRC3Value)> {
+    let json_string = serde_json::to_string(metadata).unwrap();
+    let base64_data = BASE64.encode(json_string.as_bytes());
+    let data_url = format!("data:text/json;charset=utf-8;base64,{}", base64_data);
+
+    vec![(
+        "icrc97:metadata".to_string(),
+        ICRC3Value::Array(vec![ICRC3Value::Text(data_url)]),
+    )]
 }
 
 fn create_metadata_interactive() -> Result<Value> {
@@ -420,20 +511,17 @@ async fn mint_nft(
     canister_id: &Principal,
     owner: Principal,
     subaccount: Option<[u8; 32]>,
-    token_name: &str,
-    metadata_url: &str,
+    metadata: Vec<(String, ICRC3Value)>,
     memo: Option<&str>,
 ) -> Result<Nat> {
     println!("Minting NFT...");
     println!("Owner: {}", owner);
-    println!("Name: {}", token_name);
-    println!("Metadata URL: {}", metadata_url);
+    println!("Metadata entries: {}", metadata.len());
 
     let mint_args = mint::Args {
-        token_name: token_name.to_string(),
-        token_metadata_url: metadata_url.to_string(),
         token_owner: Account { owner, subaccount },
         memo: memo.map(|m| serde_bytes::ByteBuf::from(m.as_bytes())),
+        metadata,
     };
 
     let bytes = Encode!(&mint_args)?;
@@ -511,13 +599,22 @@ async fn main() -> Result<()> {
         )
         .subcommand(
             Command::new("mint")
-                .about("Mint an NFT with metadata URL")
+                .about("Mint an NFT with metadata")
                 .arg(arg!(-o --owner <OWNER> "Owner principal").required(true))
                 .arg(arg!(-n --name <NAME> "Token name").required(true))
-                .arg(arg!(-u --metadata_url <URL> "Metadata URL").required(true))
                 .arg(arg!(--memo <MEMO> "Optional memo"))
                 .arg(
                     arg!(--subaccount <SUBACCOUNT> "Optional subaccount (32 bytes hex)")
+                )
+                .arg(
+                    arg!(--icrc97_url <URL> "ICRC97 metadata URL (creates icrc97:metadata)")
+                )
+                .arg(
+                    arg!(--interactive "Use interactive mode to create metadata")
+                )
+                .arg(
+                    arg!(-m --metadata <KEY_VALUE> "Add metadata entry (format: key:value)")
+                        .action(ArgAction::Append)
                 )
         )
         .subcommand(
@@ -531,6 +628,7 @@ async fn main() -> Result<()> {
                 )
                 .arg(arg!(-f --file <FILE> "Use JSON metadata file"))
                 .arg(arg!(--interactive "Use interactive mode"))
+                .arg(arg!(--hashmap_mode "Use HashMap mode instead of ICRC97"))
                 .arg(arg!(-d --description <DESC> "NFT description (CLI mode)"))
                 .arg(arg!(--image <URL> "Image URL (CLI mode)"))
                 .arg(arg!(--external_url <URL> "External URL (CLI mode)"))
@@ -675,8 +773,9 @@ async fn main() -> Result<()> {
         Some(("mint", sub_matches)) => {
             let owner_str = sub_matches.get_one::<String>("owner").unwrap();
             let token_name = sub_matches.get_one::<String>("name").unwrap();
-            let metadata_url = sub_matches.get_one::<String>("metadata_url").unwrap();
             let memo = sub_matches.get_one::<String>("memo");
+            let icrc97_url = sub_matches.get_one::<String>("icrc97_url");
+            let interactive = sub_matches.get_flag("interactive");
 
             let owner = Principal::from_text(owner_str)?;
             let subaccount = if let Some(sub_str) = sub_matches.get_one::<String>("subaccount") {
@@ -691,13 +790,40 @@ async fn main() -> Result<()> {
                 None
             };
 
+            let metadata = if let Some(url) = icrc97_url {
+                println!("Creating ICRC97 metadata from URL: {}", url);
+                create_icrc97_metadata_from_url(url)
+            } else if interactive {
+                println!("Using interactive mode to create metadata");
+                create_metadata_interactive_hashmap()?
+            } else {
+                let mut metadata = Vec::new();
+                if let Some(entries) = sub_matches.get_many::<String>("metadata") {
+                    for entry in entries {
+                        let parts: Vec<&str> = entry.split(':').collect();
+                        if parts.len() >= 2 {
+                            let key = parts[0].to_string();
+                            let value_str = parts[1];
+                            let value = if let Ok(num) = value_str.parse::<u64>() {
+                                ICRC3Value::Nat(Nat::from(num))
+                            } else if let Ok(int) = value_str.parse::<i64>() {
+                                ICRC3Value::Int(candid::Int::from(int))
+                            } else {
+                                ICRC3Value::Text(value_str.to_string())
+                            };
+                            metadata.push((key, value));
+                        }
+                    }
+                }
+                metadata
+            };
+
             let token_id = mint_nft(
                 &agent,
                 &canister_id,
                 owner,
                 subaccount,
-                token_name,
-                metadata_url,
+                metadata,
                 memo.map(|s| s.as_str()),
             )
             .await?;
@@ -709,6 +835,7 @@ async fn main() -> Result<()> {
             let owner_str = sub_matches.get_one::<String>("owner").unwrap();
             let name = sub_matches.get_one::<String>("name").unwrap();
             let memo = sub_matches.get_one::<String>("memo");
+            let hashmap_mode = sub_matches.get_flag("hashmap_mode");
 
             let owner = Principal::from_text(owner_str)?;
             let subaccount = if let Some(sub_str) = sub_matches.get_one::<String>("subaccount") {
@@ -723,87 +850,97 @@ async fn main() -> Result<()> {
                 None
             };
 
-            let metadata = if let Some(file_path) = sub_matches.get_one::<String>("file") {
-                if !Path::new(file_path).exists() {
-                    return Err(anyhow!("Metadata file '{}' does not exist", file_path));
-                }
-                let content = std::fs::read_to_string(file_path)?;
-                let metadata: Value = serde_json::from_str(&content)?;
-                validate_icrc97_metadata(&metadata)?;
-                println!("Using metadata from file: {}", file_path);
-                metadata
-            } else if sub_matches.get_flag("interactive") {
-                create_metadata_interactive()?
-            } else {
-                let description = sub_matches
-                    .get_one::<String>("description")
-                    .ok_or_else(|| anyhow!("Description is required in CLI mode"))?;
-                let image_url = sub_matches.get_one::<String>("image");
-                let external_url = sub_matches.get_one::<String>("external_url");
-
-                let mut attributes = Vec::new();
-                if let Some(attrs) = sub_matches.get_many::<String>("attribute") {
-                    for attr in attrs {
-                        let parts: Vec<&str> = attr.split(':').collect();
-                        if parts.len() >= 2 {
-                            let trait_type = parts[0].to_string();
-                            let value = if let Ok(num) = parts[1].parse::<f64>() {
-                                json!(num)
-                            } else {
-                                json!(parts[1])
-                            };
-                            let display_type = if parts.len() > 2 {
-                                Some(parts[2].to_string())
-                            } else {
-                                None
-                            };
-                            attributes.push((trait_type, value, display_type));
+            let metadata = if hashmap_mode {
+                // HashMap mode - create metadata directly as Vec<(String, ICRC3Value)>
+                if sub_matches.get_flag("interactive") {
+                    println!("Using interactive HashMap mode");
+                    create_metadata_interactive_hashmap()?
+                } else {
+                    let mut metadata = Vec::new();
+                    if let Some(attrs) = sub_matches.get_many::<String>("attribute") {
+                        for attr in attrs {
+                            let parts: Vec<&str> = attr.split(':').collect();
+                            if parts.len() >= 2 {
+                                let key = parts[0].to_string();
+                                let value_str = parts[1];
+                                let value = if let Ok(num) = value_str.parse::<u64>() {
+                                    ICRC3Value::Nat(Nat::from(num))
+                                } else if let Ok(int) = value_str.parse::<i64>() {
+                                    ICRC3Value::Int(candid::Int::from(int))
+                                } else {
+                                    ICRC3Value::Text(value_str.to_string())
+                                };
+                                metadata.push((key, value));
+                            }
                         }
                     }
+                    metadata
                 }
+            } else {
+                // ICRC97 mode - create JSON metadata and convert to ICRC97 format
+                let json_metadata = if let Some(file_path) = sub_matches.get_one::<String>("file") {
+                    if !Path::new(file_path).exists() {
+                        return Err(anyhow!("Metadata file '{}' does not exist", file_path));
+                    }
+                    let content = std::fs::read_to_string(file_path)?;
+                    let metadata: Value = serde_json::from_str(&content)?;
+                    validate_icrc97_metadata(&metadata)?;
+                    println!("Using metadata from file: {}", file_path);
+                    metadata
+                } else if sub_matches.get_flag("interactive") {
+                    create_metadata_interactive()?
+                } else {
+                    let description = sub_matches
+                        .get_one::<String>("description")
+                        .ok_or_else(|| anyhow!("Description is required in CLI mode"))?;
+                    let image_url = sub_matches.get_one::<String>("image");
+                    let external_url = sub_matches.get_one::<String>("external_url");
 
-                create_icrc97_metadata(
-                    name,
-                    description,
-                    image_url.map(|s| s.as_str()),
-                    external_url.map(|s| s.as_str()),
-                    attributes,
-                )
+                    let mut attributes = Vec::new();
+                    if let Some(attrs) = sub_matches.get_many::<String>("attribute") {
+                        for attr in attrs {
+                            let parts: Vec<&str> = attr.split(':').collect();
+                            if parts.len() >= 2 {
+                                let trait_type = parts[0].to_string();
+                                let value = if let Ok(num) = parts[1].parse::<f64>() {
+                                    json!(num)
+                                } else {
+                                    json!(parts[1])
+                                };
+                                let display_type = if parts.len() > 2 {
+                                    Some(parts[2].to_string())
+                                } else {
+                                    None
+                                };
+                                attributes.push((trait_type, value, display_type));
+                            }
+                        }
+                    }
+
+                    create_icrc97_metadata(
+                        name,
+                        description,
+                        image_url.map(|s| s.as_str()),
+                        external_url.map(|s| s.as_str()),
+                        attributes,
+                    )
+                };
+
+                create_icrc97_metadata_from_json(&json_metadata)
             };
-
-            let mut temp_file = NamedTempFile::new()?;
-            let json_string = serde_json::to_string_pretty(&metadata)?;
-            write(temp_file.path(), &json_string)?;
-
-            let hash = Sha256::digest(json_string.as_bytes());
-            let hash_string = format!("{:x}", hash);
-            let destination_path = format!("/{}.json", hash_string);
-
-            let metadata_url = upload_file_to_canister(
-                &agent,
-                &canister_id,
-                temp_file.path().to_str().unwrap(),
-                &destination_path,
-                1048576,
-            )
-            .await?;
-
-            println!("Metadata uploaded: {}", metadata_url);
 
             let token_id = mint_nft(
                 &agent,
                 &canister_id,
                 owner,
                 subaccount,
-                name,
-                &metadata_url.to_string(),
+                metadata,
                 memo.map(|s| s.as_str()),
             )
             .await?;
 
             println!("NFT created and minted successfully!");
             println!("Token ID: {}", token_id);
-            println!("Metadata URL: {}", metadata_url);
         }
 
         _ => {

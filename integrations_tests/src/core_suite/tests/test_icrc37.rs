@@ -8,6 +8,7 @@ use crate::core_suite::setup::default_test_setup;
 use crate::core_suite::setup::setup::{TestEnv, MINUTE_IN_MS};
 use crate::core_suite::setup::setup_core::upgrade_core_canister;
 use crate::utils::random_principal;
+use crate::utils::{create_default_icrc97_metadata, create_default_metadata};
 use crate::utils::{mint_nft, tick_n_blocks};
 use bity_ic_types::BuildVersion;
 use candid::{Encode, Nat, Principal};
@@ -34,13 +35,13 @@ fn test_icrc37_approve_tokens() {
     // Mint a token for nft_owner1
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -112,13 +113,13 @@ fn test_icrc37_approve_collection() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: controller,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -197,13 +198,13 @@ fn test_icrc37_revoke_token_approvals() {
     // Mint a token and approve it first
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -300,13 +301,13 @@ fn test_icrc37_transfer_from() {
     // Mint a token and approve it first
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -429,13 +430,13 @@ fn test_icrc37_transfer_from_unauthorized_account() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -527,13 +528,13 @@ fn test_icrc37_transfer_from_multiple_approvals_unauthorized() {
     // Mint a token and approve it for multiple accounts
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -641,13 +642,13 @@ fn test_icrc37_transfer_from_single_approval_authorized() {
     // Mint a token and approve it for nft_owner2
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -739,13 +740,13 @@ fn test_icrc37_transfer_from_multiple_approvals_authorized() {
     // Mint a token and approve it for multiple accounts
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -855,13 +856,13 @@ fn test_icrc37_transfer_from_multiple_approvals_sequential_transfers() {
     // Mint a token and approve it for multiple accounts
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -1012,13 +1013,13 @@ fn test_icrc37_revoke_token_approvals_max_limit() {
     // Mint a token
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -1216,13 +1217,13 @@ fn test_icrc37_revoke_collection_approvals_max_limit() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: controller,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -1436,13 +1437,13 @@ fn test_icrc37_revoke_collection_approvals_within_limit() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: controller,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -1591,13 +1592,13 @@ fn test_icrc37_approve_collection_with_nft() {
     // Mint a token for nft_owner1
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -1721,13 +1722,13 @@ fn test_icrc37_approvals_reset_after_transfer_as_owner() {
     // Mint a token for nft_owner1
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     pic.advance_time(Duration::from_secs(1));
@@ -1918,13 +1919,13 @@ fn test_icrc37_approvals_reset_after_transfer_with_approvals() {
     // Mint a token for nft_owner1
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     pic.advance_time(Duration::from_secs(1));
@@ -2131,13 +2132,13 @@ fn test_icrc37_approve_and_revoke_before_transfer() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     tick_n_blocks(pic, 5);
@@ -2257,13 +2258,13 @@ fn test_icrc37_approve_with_expiration() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -2360,13 +2361,13 @@ fn test_icrc37_approve_with_subaccount() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -2456,13 +2457,13 @@ fn test_icrc37_approve_with_memo() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -2552,13 +2553,13 @@ fn test_icrc37_approvals_persistence_after_upgrade() {
     // Mint a token for nft_owner1
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -2790,13 +2791,13 @@ fn test_icrc37_approve_tokens_sliding_window_rate_limit() {
     // Mint a token for nft_owner1
     let mint_return = mint_nft(
         pic,
-        "test_rate_limit".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {

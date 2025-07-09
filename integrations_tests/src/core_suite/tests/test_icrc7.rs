@@ -7,8 +7,8 @@ use crate::client::core_nft::{
 };
 use crate::core_suite::setup::setup::TestEnv;
 use crate::utils::{
-    extract_metadata_file_path, fetch_metadata_json, mint_nft, random_principal, setup_http_client,
-    upload_metadata,
+    create_default_icrc97_metadata, create_default_metadata, extract_metadata_file_path,
+    fetch_metadata_json, mint_nft, random_principal, setup_http_client, upload_metadata,
 };
 use candid::{Encode, Nat, Principal};
 use core_nft::types::icrc7;
@@ -19,6 +19,7 @@ use icrc_ledger_types::icrc3::blocks::GetBlocksRequest;
 use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
 use serde_json::json;
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use crate::{core_suite::setup::default_test_setup, utils::tick_n_blocks};
@@ -81,13 +82,13 @@ fn test_icrc7_total_supply() {
 
     let _ = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     tick_n_blocks(pic, 10);
@@ -101,13 +102,13 @@ fn test_icrc7_total_supply() {
 
     let _ = mint_nft(
         pic,
-        "test2".to_string(),
         Account {
             owner: nft_owner2,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     tick_n_blocks(pic, 10);
@@ -131,15 +132,48 @@ fn test_icrc7_token_metadata_simple() {
         nft_owner2,
     } = test_env;
 
+    let metadata_json = json!({
+        "description": "test",
+        "name": "test1",
+        "attributes": [
+            {
+                "trait_type": "test1",
+                "value": "test1"
+            },
+            {
+                "trait_type": "test2",
+                "value": "test2"
+            },
+            {
+                "trait_type": "test4",
+                "value": 1.4,
+                "display_type": "number"
+            },
+            {
+                "display_type": "boost_percentage",
+                "trait_type": "test10",
+                "value": 10
+            },
+            {
+                "display_type": "test3",
+                "trait_type": "Generation",
+                "value": 2
+            }
+        ]
+    });
+
+    let metadata_url =
+        upload_metadata(pic, controller, collection_canister_id, metadata_json).unwrap();
+
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_icrc97_metadata(metadata_url),
     );
 
     match mint_return {
@@ -170,8 +204,10 @@ fn test_icrc7_token_metadata_simple() {
 
             let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),
-                token_name: Some("test1".to_string()),
-                token_metadata_url: metadata_url.to_string(),
+                metadata: vec![(
+                    "icrc97:metadata".to_string(),
+                    Value::Array(vec![Value::Text(metadata_url.to_string())]),
+                )],
             };
 
             let _ = update_nft_metadata(
@@ -258,15 +294,48 @@ fn test_icrc7_token_metadata_multiple_insert() {
         nft_owner2,
     } = test_env;
 
+    let metadata_json = json!({
+        "description": "test",
+        "name": "test1",
+        "attributes": [
+            {
+                "trait_type": "test1",
+                "value": "test1"
+            },
+            {
+                "trait_type": "test2",
+                "value": "test2"
+            },
+            {
+                "trait_type": "test4",
+                "value": 1.4,
+                "display_type": "number"
+            },
+            {
+                "display_type": "boost_percentage",
+                "trait_type": "test10",
+                "value": 10
+            },
+            {
+                "display_type": "test3",
+                "trait_type": "Generation",
+                "value": 2
+            }
+        ]
+    });
+
+    let metadata_url =
+        upload_metadata(pic, controller, collection_canister_id, metadata_json).unwrap();
+
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_icrc97_metadata(metadata_url),
     );
 
     match mint_return {
@@ -297,8 +366,7 @@ fn test_icrc7_token_metadata_multiple_insert() {
 
             let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),
-                token_name: Some("test1".to_string()),
-                token_metadata_url: metadata_url_1.to_string(),
+                metadata: create_default_icrc97_metadata(metadata_url_1.clone()),
             };
 
             let ret = update_nft_metadata(
@@ -352,8 +420,7 @@ fn test_icrc7_token_metadata_multiple_insert() {
 
             let update_nft_metadata_args_2 = update_nft_metadata::Args {
                 token_id: token_id.clone(),
-                token_name: None,
-                token_metadata_url: metadata_url_2.to_string(),
+                metadata: create_default_icrc97_metadata(metadata_url_2.clone()),
             };
 
             println!("update_nft_metadata_args_2");
@@ -448,15 +515,48 @@ fn test_icrc7_token_metadata_multiple_insert_dup_name() {
         nft_owner2,
     } = test_env;
 
+    let metadata_json = json!({
+        "description": "test",
+        "name": "test1",
+        "attributes": [
+            {
+                "trait_type": "test1",
+                "value": "test1"
+            },
+            {
+                "trait_type": "test2",
+                "value": "test2"
+            },
+            {
+                "trait_type": "test4",
+                "value": 1.4,
+                "display_type": "number"
+            },
+            {
+                "display_type": "boost_percentage",
+                "trait_type": "test10",
+                "value": 10
+            },
+            {
+                "display_type": "test3",
+                "trait_type": "Generation",
+                "value": 2
+            }
+        ]
+    });
+
+    let metadata_url =
+        upload_metadata(pic, controller, collection_canister_id, metadata_json).unwrap();
+
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_icrc97_metadata(metadata_url),
     );
 
     tick_n_blocks(pic, 5);
@@ -483,8 +583,7 @@ fn test_icrc7_token_metadata_multiple_insert_dup_name() {
 
             let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),
-                token_name: Some("test1".to_string()),
-                token_metadata_url: metadata_url_1.to_string(),
+                metadata: create_default_icrc97_metadata(metadata_url_1.clone()),
             };
 
             let _ = update_nft_metadata(
@@ -533,8 +632,7 @@ fn test_icrc7_token_metadata_multiple_insert_dup_name() {
 
             let update_nft_metadata_args_2 = update_nft_metadata::Args {
                 token_id: token_id.clone(),
-                token_name: None,
-                token_metadata_url: metadata_url_2.to_string(),
+                metadata: create_default_icrc97_metadata(metadata_url_2.clone()),
             };
 
             let _ = update_nft_metadata(
@@ -637,13 +735,13 @@ fn test_icrc7_supply_cap() {
         println!("Minting token: {}", i);
         let mint_return = mint_nft(
             pic,
-            format!("test{}", i),
             Account {
                 owner: nft_owner1,
                 subaccount: None,
             },
             controller,
             collection_canister_id,
+            create_default_metadata(),
         );
         pic.advance_time(Duration::from_secs(1));
         tick_n_blocks(pic, 5);
@@ -652,13 +750,13 @@ fn test_icrc7_supply_cap() {
 
     let mint_return = mint_nft(
         pic,
-        "test_overflow".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
     assert!(mint_return.is_err());
 
@@ -677,15 +775,48 @@ fn test_icrc7_transfer_with_metadata_updates() {
         nft_owner2,
     } = test_env;
 
+    let metadata_json = json!({
+        "description": "test",
+        "name": "test1",
+        "attributes": [
+            {
+                "trait_type": "test1",
+                "value": "test1"
+            },
+            {
+                "trait_type": "test2",
+                "value": "test2"
+            },
+            {
+                "trait_type": "test4",
+                "value": 1.4,
+                "display_type": "number"
+            },
+            {
+                "display_type": "boost_percentage",
+                "trait_type": "test10",
+                "value": 10
+            },
+            {
+                "display_type": "test3",
+                "trait_type": "Generation",
+                "value": 2
+            }
+        ]
+    });
+
+    let metadata_url =
+        upload_metadata(pic, controller, collection_canister_id, metadata_json).unwrap();
+
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_icrc97_metadata(metadata_url),
     );
     tick_n_blocks(pic, 5);
 
@@ -713,8 +844,7 @@ fn test_icrc7_transfer_with_metadata_updates() {
 
             let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),
-                token_name: Some("test1".to_string()),
-                token_metadata_url: metadata_url_1.to_string(),
+                metadata: create_default_icrc97_metadata(metadata_url_1),
             };
 
             let _ = update_nft_metadata(
@@ -763,8 +893,7 @@ fn test_icrc7_transfer_with_metadata_updates() {
 
             let update_nft_metadata_args_2 = update_nft_metadata::Args {
                 token_id: token_id.clone(),
-                token_name: Some("test2".to_string()),
-                token_metadata_url: metadata_url_2.to_string(),
+                metadata: create_default_icrc97_metadata(metadata_url_2.clone()),
             };
 
             let _ = update_nft_metadata(
@@ -949,13 +1078,13 @@ fn test_icrc7_transfer() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -1042,13 +1171,13 @@ fn test_icrc7_collection_metadata() {
 
     let _ = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     let updated_metadata = icrc7_collection_metadata(pic, controller, collection_canister_id, &());
@@ -1082,13 +1211,13 @@ fn test_icrc3_logs_metadata_updates() {
 
     let mint_return = mint_nft(
         pic,
-        "test_metadata_logs".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     tick_n_blocks(pic, 5);
@@ -1130,8 +1259,7 @@ fn test_icrc3_logs_metadata_updates() {
 
             let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),
-                token_name: Some("updated_test".to_string()),
-                token_metadata_url: metadata_url.to_string(),
+                metadata: create_default_icrc97_metadata(metadata_url.clone()),
             };
 
             let update_result = update_nft_metadata(
@@ -1255,13 +1383,15 @@ fn test_icrc3_logs_metadata_updates() {
                 &vec![token_id.clone()],
             );
 
+            println!("final_metadata: {:?}", final_metadata);
+
             assert_eq!(
                 final_metadata[0].clone().unwrap()[0].0,
                 "icrc97:metadata".to_string()
             );
             assert_eq!(
                 final_metadata[0].clone().unwrap()[0].1,
-                Value::Array(vec![Value::Text(metadata_url.to_string())])
+                Value::Array(vec![Value::Text(metadata_url.to_string())]),
             );
         }
         Err(e) => {
@@ -1354,13 +1484,13 @@ fn test_icrc7_tokens() {
 
     let _ = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     tick_n_blocks(pic, 5);
@@ -1378,13 +1508,13 @@ fn test_icrc7_tokens() {
 
     let _ = mint_nft(
         pic,
-        "test2".to_string(),
         Account {
             owner: nft_owner2,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     tick_n_blocks(pic, 5);
@@ -1436,13 +1566,13 @@ fn test_icrc7_tokens_of() {
 
     let _ = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     tick_n_blocks(pic, 5);
@@ -1470,13 +1600,13 @@ fn test_icrc7_tokens_of() {
 
     let _ = mint_nft(
         pic,
-        "test2".to_string(),
         Account {
             owner: nft_owner2,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     tick_n_blocks(pic, 5);
@@ -1530,13 +1660,13 @@ fn test_icrc7_balance_of() {
 
     let _ = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     tick_n_blocks(pic, 5);
@@ -1555,13 +1685,13 @@ fn test_icrc7_balance_of() {
 
     let _ = mint_nft(
         pic,
-        "test2".to_string(),
         Account {
             owner: nft_owner2,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
     tick_n_blocks(pic, 5);
 
@@ -1593,13 +1723,13 @@ fn test_icrc7_transfer_batch() {
     for i in 0..3 {
         let mint_return = mint_nft(
             pic,
-            format!("test{}", i),
             Account {
                 owner: nft_owner1,
                 subaccount: None,
             },
             controller,
             collection_canister_id,
+            create_default_metadata(),
         );
 
         tick_n_blocks(pic, 5);
@@ -1655,13 +1785,13 @@ fn test_icrc7_transfer_invalid_recipient() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -1714,13 +1844,13 @@ fn test_icrc7_transfer_permitted_drift() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -1776,13 +1906,13 @@ fn test_icrc7_transfer_within_permitted_drift() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -1842,13 +1972,13 @@ fn test_icrc7_transfer_too_old() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -1904,13 +2034,13 @@ fn test_icrc7_transfer_old_but_valid() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -1975,13 +2105,13 @@ fn test_icrc7_transfer_batch_with_memo() {
     for i in 0..3 {
         let mint_return = mint_nft(
             pic,
-            format!("test{}", i),
             Account {
                 owner: nft_owner1,
                 subaccount: None,
             },
             controller,
             collection_canister_id,
+            create_default_metadata(),
         );
         if let Ok(token_id) = mint_return {
             token_ids.push(token_id);
@@ -2046,7 +2176,6 @@ fn test_icrc7_transfer_batch_with_subaccounts() {
     for i in 0..3 {
         let mint_return = mint_nft(
             pic,
-            format!("test{}", i),
             Account {
                 owner: nft_owner1,
                 subaccount: if i % 2 == 0 {
@@ -2057,6 +2186,7 @@ fn test_icrc7_transfer_batch_with_subaccounts() {
             },
             controller,
             collection_canister_id,
+            create_default_metadata(),
         );
         if let Ok(token_id) = mint_return {
             token_ids.push(token_id);
@@ -2137,13 +2267,13 @@ fn test_icrc7_transfer_batch_with_time_constraints() {
     for i in 0..3 {
         let mint_return = mint_nft(
             pic,
-            format!("test{}", i),
             Account {
                 owner: nft_owner1,
                 subaccount: None,
             },
             controller,
             collection_canister_id,
+            create_default_metadata(),
         );
 
         tick_n_blocks(pic, 5);
@@ -2201,13 +2331,13 @@ fn test_icrc7_transfer_with_max_memo_size() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -2278,13 +2408,13 @@ fn test_icrc7_transfer_with_supply_cap() {
     for i in 0..supply_cap {
         let mint_return = mint_nft(
             pic,
-            format!("test{}", i),
             Account {
                 owner: nft_owner1,
                 subaccount: None,
             },
             controller,
             collection_canister_id,
+            create_default_metadata(),
         );
         assert!(mint_return.is_ok());
         tick_n_blocks(pic, 5);
@@ -2292,13 +2422,13 @@ fn test_icrc7_transfer_with_supply_cap() {
 
     let mint_return = mint_nft(
         pic,
-        "test_overflow".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
     assert!(mint_return.is_err());
     tick_n_blocks(pic, 5);
@@ -2324,13 +2454,13 @@ fn test_icrc7_transfer_chain() {
     // Mint a token for nft_owner1
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     tick_n_blocks(pic, 5);
@@ -2425,13 +2555,13 @@ fn test_icrc7_transfer_after_fail() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        create_default_metadata(),
     );
 
     match mint_return {
@@ -2482,6 +2612,609 @@ fn test_icrc7_transfer_after_fail() {
                     subaccount: None
                 })
             );
+        }
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
+    }
+}
+
+#[test]
+fn test_icrc7_mint_with_hashmap_metadata() {
+    let mut test_env: TestEnv = default_test_setup();
+    println!("test_env: {:?}", test_env);
+
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let hashmap_metadata = vec![
+        (
+            "name".to_string(),
+            Value::Text("NFT with HashMap".to_string()),
+        ),
+        (
+            "description".to_string(),
+            Value::Text("Direct description without URL".to_string()),
+        ),
+        (
+            "image".to_string(),
+            Value::Text("https://example.com/image.png".to_string()),
+        ),
+        (
+            "external_url".to_string(),
+            Value::Text("https://example.com".to_string()),
+        ),
+        (
+            "attributes".to_string(),
+            Value::Array(vec![
+                Value::Map(BTreeMap::from([
+                    ("trait_type".to_string(), Value::Text("Rarity".to_string())),
+                    ("value".to_string(), Value::Text("Legendary".to_string())),
+                ])),
+                Value::Map(BTreeMap::from([
+                    ("trait_type".to_string(), Value::Text("Level".to_string())),
+                    ("value".to_string(), Value::Nat(Nat::from(100u64))),
+                ])),
+                Value::Map(BTreeMap::from([
+                    ("trait_type".to_string(), Value::Text("Power".to_string())),
+                    ("value".to_string(), Value::Int(candid::Int::from(999))),
+                ])),
+            ]),
+        ),
+    ];
+
+    let mint_return = mint_nft(
+        pic,
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+        hashmap_metadata.clone(),
+    );
+
+    match mint_return {
+        Ok(token_id) => {
+            tick_n_blocks(pic, 10);
+
+            let metadata = icrc7_token_metadata(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![token_id.clone()],
+            );
+
+            let token_metadata = metadata[0].clone().unwrap();
+
+            assert!(token_metadata.iter().any(|(key, value)| {
+                key == "name" && matches!(value, Value::Text(text) if text == "NFT with HashMap")
+            }));
+
+            assert!(token_metadata.iter().any(|(key, value)| {
+                key == "description"
+                    && matches!(value, Value::Text(text) if text == "Direct description without URL")
+            }));
+
+            assert!(token_metadata.iter().any(|(key, value)| {
+                key == "image"
+                    && matches!(value, Value::Text(text) if text == "https://example.com/image.png")
+            }));
+
+            assert!(token_metadata
+                .iter()
+                .any(|(key, value)| { key == "attributes" && matches!(value, Value::Array(_)) }));
+        }
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
+    }
+}
+
+#[test]
+fn test_icrc7_mint_with_complex_hashmap_metadata() {
+    let mut test_env: TestEnv = default_test_setup();
+    println!("test_env: {:?}", test_env);
+
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    // Create complex metadata with different data types
+    let complex_metadata = vec![
+        ("name".to_string(), Value::Text("Complex NFT".to_string())),
+        (
+            "description".to_string(),
+            Value::Text("NFT with complex metadata".to_string()),
+        ),
+        (
+            "image".to_string(),
+            Value::Text("https://example.com/complex.png".to_string()),
+        ),
+        (
+            "animation_url".to_string(),
+            Value::Text("https://example.com/animation.mp4".to_string()),
+        ),
+        (
+            "background_color".to_string(),
+            Value::Text("000000".to_string()),
+        ),
+        (
+            "youtube_url".to_string(),
+            Value::Text("https://youtube.com/watch?v=example".to_string()),
+        ),
+        (
+            "properties".to_string(),
+            Value::Map(BTreeMap::from([
+                (
+                    "files".to_string(),
+                    Value::Array(vec![
+                        Value::Map(BTreeMap::from([
+                            (
+                                "uri".to_string(),
+                                Value::Text("https://example.com/file1.png".to_string()),
+                            ),
+                            ("type".to_string(), Value::Text("image/png".to_string())),
+                            ("size".to_string(), Value::Nat(Nat::from(1024u64))),
+                        ])),
+                        Value::Map(BTreeMap::from([
+                            (
+                                "uri".to_string(),
+                                Value::Text("https://example.com/file2.mp4".to_string()),
+                            ),
+                            ("type".to_string(), Value::Text("video/mp4".to_string())),
+                            ("size".to_string(), Value::Nat(Nat::from(2048u64))),
+                        ])),
+                    ]),
+                ),
+                ("category".to_string(), Value::Text("image".to_string())),
+                ("max_supply".to_string(), Value::Nat(Nat::from(1000u64))),
+                ("price".to_string(), Value::Int(candid::Int::from(1000000))),
+            ])),
+        ),
+        (
+            "attributes".to_string(),
+            Value::Array(vec![
+                Value::Map(BTreeMap::from([
+                    ("trait_type".to_string(), Value::Text("Rarity".to_string())),
+                    ("value".to_string(), Value::Text("Epic".to_string())),
+                    (
+                        "display_type".to_string(),
+                        Value::Text("boost_percentage".to_string()),
+                    ),
+                ])),
+                Value::Map(BTreeMap::from([
+                    ("trait_type".to_string(), Value::Text("Level".to_string())),
+                    ("value".to_string(), Value::Nat(Nat::from(50u64))),
+                    ("max_value".to_string(), Value::Nat(Nat::from(100u64))),
+                ])),
+                Value::Map(BTreeMap::from([
+                    ("trait_type".to_string(), Value::Text("Power".to_string())),
+                    ("value".to_string(), Value::Int(candid::Int::from(500))),
+                ])),
+                Value::Map(BTreeMap::from([
+                    ("trait_type".to_string(), Value::Text("Element".to_string())),
+                    ("value".to_string(), Value::Text("Fire".to_string())),
+                ])),
+            ]),
+        ),
+    ];
+
+    let mint_return = mint_nft(
+        pic,
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+        complex_metadata.clone(),
+    );
+
+    match mint_return {
+        Ok(token_id) => {
+            println!(
+                "Complex NFT minted successfully with token_id: {:?}",
+                token_id
+            );
+
+            tick_n_blocks(pic, 10);
+
+            let metadata = icrc7_token_metadata(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![token_id.clone()],
+            );
+
+            println!("complex metadata: {:?}", metadata);
+
+            let token_metadata = metadata[0].clone().unwrap();
+
+            assert!(token_metadata.iter().any(|(key, value)| {
+                key == "name" && matches!(value, Value::Text(text) if text == "Complex NFT")
+            }));
+
+            assert!(token_metadata.iter().any(|(key, value)| {
+                key == "description"
+                    && matches!(value, Value::Text(text) if text == "NFT with complex metadata")
+            }));
+
+            assert!(token_metadata
+                .iter()
+                .any(|(key, value)| { key == "properties" && matches!(value, Value::Map(_)) }));
+
+            assert!(token_metadata
+                .iter()
+                .any(|(key, value)| { key == "attributes" && matches!(value, Value::Array(_)) }));
+
+            if let Some((_, Value::Array(attributes))) =
+                token_metadata.iter().find(|(key, _)| key == "attributes")
+            {
+                assert_eq!(attributes.len(), 4);
+
+                // Verify first attribute (Rarity)
+                if let Value::Map(first_attr) = &attributes[0] {
+                    assert!(first_attr.iter().any(|(key, value)| {
+                        key == "trait_type"
+                            && matches!(value, Value::Text(text) if text == "Rarity")
+                    }));
+                    assert!(first_attr.iter().any(|(key, value)| {
+                        key == "value" && matches!(value, Value::Text(text) if text == "Epic")
+                    }));
+                }
+            }
+        }
+        Err(e) => {
+            println!("Error minting complex NFT: {:?}", e);
+            assert!(false);
+        }
+    }
+}
+
+#[test]
+fn test_icrc7_mint_with_hashmap_and_update_metadata() {
+    let mut test_env: TestEnv = default_test_setup();
+    println!("test_env: {:?}", test_env);
+
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let initial_metadata = vec![
+        ("name".to_string(), Value::Text("Initial NFT".to_string())),
+        (
+            "description".to_string(),
+            Value::Text("Initial description".to_string()),
+        ),
+        ("level".to_string(), Value::Nat(Nat::from(1u64))),
+    ];
+
+    let mint_return = mint_nft(
+        pic,
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+        initial_metadata.clone(),
+    );
+
+    match mint_return {
+        Ok(token_id) => {
+            println!(
+                "Initial NFT minted successfully with token_id: {:?}",
+                token_id
+            );
+
+            tick_n_blocks(pic, 10);
+
+            let initial_metadata_result = icrc7_token_metadata(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![token_id.clone()],
+            );
+
+            let initial_token_metadata = initial_metadata_result[0].clone().unwrap();
+            assert!(initial_token_metadata.iter().any(|(key, value)| {
+                key == "name" && matches!(value, Value::Text(text) if text == "Initial NFT")
+            }));
+
+            let updated_metadata = vec![
+                ("name".to_string(), Value::Text("Updated NFT".to_string())),
+                (
+                    "description".to_string(),
+                    Value::Text("Updated description".to_string()),
+                ),
+                ("level".to_string(), Value::Nat(Nat::from(10u64))),
+                (
+                    "new_attribute".to_string(),
+                    Value::Text("New value".to_string()),
+                ),
+                ("power".to_string(), Value::Int(candid::Int::from(100))),
+            ];
+
+            let update_nft_metadata_args = update_nft_metadata::Args {
+                token_id: token_id.clone(),
+                metadata: updated_metadata.clone(),
+            };
+
+            let update_result = update_nft_metadata(
+                pic,
+                controller,
+                collection_canister_id,
+                &update_nft_metadata_args,
+            );
+
+            assert!(update_result.is_ok());
+
+            tick_n_blocks(pic, 10);
+
+            let updated_metadata_result = icrc7_token_metadata(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![token_id.clone()],
+            );
+
+            let updated_token_metadata = updated_metadata_result[0].clone().unwrap();
+
+            println!("updated_token_metadata: {:?}", updated_token_metadata);
+
+            assert!(updated_token_metadata.iter().any(|(key, value)| {
+                key == "name" && matches!(value, Value::Text(text) if text == "Updated NFT")
+            }));
+
+            assert!(updated_token_metadata.iter().any(|(key, value)| {
+                key == "description"
+                    && matches!(value, Value::Text(text) if text == "Updated description")
+            }));
+
+            assert!(updated_token_metadata.iter().any(|(key, value)| {
+                key == "level" && matches!(value, Value::Nat(n) if n == &Nat::from(10u64))
+            }));
+
+            assert!(updated_token_metadata.iter().any(|(key, value)| {
+                key == "new_attribute" && matches!(value, Value::Text(text) if text == "New value")
+            }));
+
+            assert!(updated_token_metadata.iter().any(|(key, value)| {
+                key == "power" && matches!(value, Value::Int(n) if n == &candid::Int::from(100))
+            }));
+
+            assert!(updated_token_metadata.iter().any(|(key, value)| {
+                key == "name" && matches!(value, Value::Text(text) if text == "Updated NFT")
+            }));
+        }
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
+    }
+}
+
+#[test]
+fn test_icrc7_mint_with_hashmap_and_icrc3_logs() {
+    let mut test_env: TestEnv = default_test_setup();
+    println!("test_env: {:?}", test_env);
+
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let hashmap_metadata = vec![
+        (
+            "name".to_string(),
+            Value::Text("NFT ICRC3 Test".to_string()),
+        ),
+        (
+            "description".to_string(),
+            Value::Text("ICRC3 logs test with HashMap".to_string()),
+        ),
+        (
+            "test_attribute".to_string(),
+            Value::Text("test_value".to_string()),
+        ),
+        ("test_number".to_string(), Value::Nat(Nat::from(42u64))),
+    ];
+
+    let mint_return = mint_nft(
+        pic,
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+        hashmap_metadata.clone(),
+    );
+
+    tick_n_blocks(pic, 5);
+
+    match mint_return {
+        Ok(token_id) => {
+            println!("NFT minted successfully with token_id: {:?}", token_id);
+
+            let blocks_before = icrc3_get_blocks(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![GetBlocksRequest {
+                    start: Nat::from(0u64),
+                    length: Nat::from(10u64),
+                }],
+            );
+
+            println!("blocks_before: {:?}", blocks_before);
+            let initial_log_length = blocks_before.log_length.clone();
+
+            let updated_metadata = vec![
+                (
+                    "name".to_string(),
+                    Value::Text("NFT ICRC3 Updated".to_string()),
+                ),
+                (
+                    "description".to_string(),
+                    Value::Text("Updated description for ICRC3 test".to_string()),
+                ),
+                (
+                    "test_attribute".to_string(),
+                    Value::Text("new_value".to_string()),
+                ),
+                ("test_number".to_string(), Value::Nat(Nat::from(84u64))),
+            ];
+
+            let update_nft_metadata_args = update_nft_metadata::Args {
+                token_id: token_id.clone(),
+                metadata: updated_metadata.clone(),
+            };
+
+            let update_result = update_nft_metadata(
+                pic,
+                controller,
+                collection_canister_id,
+                &update_nft_metadata_args,
+            );
+
+            assert!(update_result.is_ok());
+
+            tick_n_blocks(pic, 10);
+
+            let blocks_after = icrc3_get_blocks(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![GetBlocksRequest {
+                    start: Nat::from(0u64),
+                    length: Nat::from(20u64),
+                }],
+            );
+
+            println!("blocks_after: {:?}", blocks_after);
+            println!("initial_log_length: {:?}", initial_log_length);
+            println!("final_log_length: {:?}", blocks_after.log_length);
+
+            assert!(
+                blocks_after.log_length > initial_log_length,
+                "Log length should increase after metadata update"
+            );
+
+            let mut found_update_block = false;
+
+            for block in &blocks_after.blocks {
+                match &block.block {
+                    Value::Map(map) => {
+                        if let Some(Value::Text(btype)) = map.get("btype") {
+                            if btype == "7update_token" {
+                                found_update_block = true;
+
+                                if let Some(Value::Map(tx_map)) = map.get("tx") {
+                                    assert!(
+                                        tx_map.contains_key("tid"),
+                                        "The updated transaction must contain tx"
+                                    );
+
+                                    if let Some(Value::Nat(tx_token_id)) = tx_map.get("token_id") {
+                                        assert_eq!(
+                                            *tx_token_id, token_id,
+                                            "The updated transaction must contain token_id"
+                                        );
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            // Check in archived blocks if not found in main blocks
+            if !found_update_block {
+                for archived_block_info in &blocks_after.archived_blocks {
+                    let archived_blocks = icrc3_get_blocks(
+                        pic,
+                        controller,
+                        archived_block_info.callback.canister_id,
+                        &archived_block_info.args,
+                    );
+
+                    for block in &archived_blocks.blocks {
+                        match &block.block {
+                            Value::Map(map) => {
+                                if let Some(Value::Text(btype)) = map.get("btype") {
+                                    if btype == "7update_token" {
+                                        found_update_block = true;
+
+                                        if let Some(Value::Map(tx_map)) = map.get("tx") {
+                                            if let Some(Value::Nat(tx_token_id)) =
+                                                tx_map.get("token_id")
+                                            {
+                                                assert_eq!(*tx_token_id, token_id,);
+                                            }
+                                        }
+
+                                        break;
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    if found_update_block {
+                        break;
+                    }
+                }
+            }
+
+            assert!(
+                found_update_block,
+                "A 7update_token block should be found in ICRC3 logs after metadata update"
+            );
+
+            // Verify final metadata
+            let final_metadata = icrc7_token_metadata(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![token_id.clone()],
+            );
+
+            println!("final_metadata: {:?}", final_metadata);
+
+            assert_eq!(
+                final_metadata[0].clone().unwrap()[0].0,
+                "description".to_string()
+            );
+
+            assert_eq!(
+                final_metadata[0].clone().unwrap()[0].1,
+                Value::Text("Updated description for ICRC3 test".to_string())
+            );
+
+            println!("ICRC3 logs verification with HashMap metadata successful!");
         }
         Err(e) => {
             println!("Error minting NFT: {:?}", e);

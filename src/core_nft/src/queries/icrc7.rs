@@ -1,5 +1,6 @@
 use crate::state::read_state;
 use crate::types::icrc7;
+use crate::types::metadata::__METADATA;
 
 use candid::Nat;
 use ic_cdk_macros::query;
@@ -192,22 +193,20 @@ pub fn icrc7_token_metadata(
     }
 
     let mut ret = Vec::new();
+
     for token_id in token_ids {
         let token = read_state(|state| state.data.get_token_by_id(&token_id).cloned());
         match token {
             Some(token) => {
-                let metadata_url = token.token_metadata_url.clone();
-
-                ret.push(Some(vec![(
-                    "icrc97:metadata".to_string(),
-                    ICRC3Value::Array(vec![ICRC3Value::Text(metadata_url)]),
-                )]));
+                let metadata = token.token_metadata(&__METADATA.with_borrow(|m| m.clone()));
+                ret.push(Some(metadata));
             }
             None => {
                 ret.push(None);
             }
         }
     }
+
     ret
 }
 

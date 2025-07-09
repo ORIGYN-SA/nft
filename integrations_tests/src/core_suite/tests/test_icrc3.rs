@@ -2,9 +2,10 @@ use crate::client::core_nft::{
     icrc3_get_archives, icrc3_get_blocks, icrc3_get_properties, icrc3_get_tip_certificate,
     icrc3_supported_block_types, icrc7_owner_of, icrc7_transfer,
 };
-use crate::utils::{mint_nft, tick_n_blocks};
+use crate::utils::{create_default_metadata, mint_nft, tick_n_blocks};
 use candid::Nat;
 use core_nft::types::icrc7;
+use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
 use icrc_ledger_types::icrc1::account::Account;
 use icrc_ledger_types::icrc3::blocks::GetBlocksRequest;
 use std::time::{self, Duration};
@@ -27,13 +28,13 @@ fn test_icrc7_transfer() {
 
     let mint_return = mint_nft(
         pic,
-        "test1".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        vec![("name".to_string(), Icrc3Value::Text("test".to_string()))],
     );
 
     match mint_return {
@@ -113,13 +114,16 @@ fn test_icrc3_get_blocks_after_multiple_operations() {
     for i in 0..5 {
         let mint_return = mint_nft(
             pic,
-            format!("test{}", i),
             Account {
                 owner: nft_owner1,
                 subaccount: None,
             },
             controller,
             collection_canister_id,
+            vec![(
+                "name".to_string(),
+                Icrc3Value::Text(format!("test{}", i).to_string()),
+            )],
         );
 
         match mint_return {
@@ -277,13 +281,16 @@ fn test_icrc3_get_tip_certificate() {
 
     let mint_return = mint_nft(
         pic,
-        "test_cert".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        vec![(
+            "name".to_string(),
+            Icrc3Value::Text("test_cert".to_string()),
+        )],
     );
 
     assert!(mint_return.is_ok(), "Failed to mint NFT: {:?}", mint_return);
@@ -419,13 +426,16 @@ fn test_icrc3_block_range_validation() {
 
     let mint_return = mint_nft(
         pic,
-        "test_range".to_string(),
         Account {
             owner: nft_owner1,
             subaccount: None,
         },
         controller,
         collection_canister_id,
+        vec![(
+            "name".to_string(),
+            Icrc3Value::Text("test_range".to_string()),
+        )],
     );
 
     assert!(mint_return.is_ok(), "Failed to mint NFT: {:?}", mint_return);
