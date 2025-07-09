@@ -92,9 +92,6 @@ fn handle_transfer_consent(
                 }
 
                 let token = read_state(|state| state.data.get_token_by_id(&arg.token_id).cloned());
-                if let Some(token) = token {
-                    fields.push(("Token Name".to_string(), token.token_name));
-                }
             }
 
             let generic_message = if token_count > 1 {
@@ -144,9 +141,6 @@ fn handle_approve_tokens_consent(
                 }
 
                 let token = read_state(|state| state.data.get_token_by_id(&arg.token_id).cloned());
-                if let Some(token) = token {
-                    fields.push(("Token Name".to_string(), token.token_name));
-                }
             }
 
             let generic_message = if token_count > 1 {
@@ -242,9 +236,6 @@ fn handle_revoke_token_approvals_consent(
                 }
 
                 let token = read_state(|state| state.data.get_token_by_id(&arg.token_id).cloned());
-                if let Some(token) = token {
-                    fields.push(("Token Name".to_string(), token.token_name));
-                }
             }
 
             let generic_message = if token_count > 1 {
@@ -342,9 +333,6 @@ fn handle_transfer_from_consent(
                 }
 
                 let token = read_state(|state| state.data.get_token_by_id(&arg.token_id).cloned());
-                if let Some(token) = token {
-                    fields.push(("Token Name".to_string(), token.token_name));
-                }
             }
 
             let generic_message = if token_count > 1 {
@@ -375,7 +363,6 @@ fn handle_mint_consent(
                 ("Method".to_string(), "mint".to_string()),
             ];
 
-            fields.push(("Token Name".to_string(), mint_args.token_name.clone()));
             fields.push((
                 "Owner".to_string(),
                 format!("{}", mint_args.token_owner.owner),
@@ -384,13 +371,8 @@ fn handle_mint_consent(
                 fields.push(("Memo".to_string(), format!("{:?}", memo)));
             }
 
-            let generic_message = format!(
-                "You are about to mint a new NFT named '{}'. Method: mint",
-                mint_args.token_name
-            );
-
             create_consent_info(
-                generic_message,
+                "You are about to mint a new NFT. Method: mint".to_string(),
                 "Mint NFT".to_string(),
                 fields,
                 args.user_preferences.metadata,
@@ -411,10 +393,6 @@ fn handle_update_nft_metadata_consent(
             ];
 
             fields.push(("Token ID".to_string(), update_args.token_id.to_string()));
-
-            if let Some(name) = &update_args.token_name {
-                fields.push(("New Token Name".to_string(), name.clone()));
-            }
 
             let generic_message = format!(
                 "You are about to update metadata for NFT {}. Method: update_nft_metadata",
@@ -445,12 +423,6 @@ fn handle_burn_nft_consent(
             ];
 
             fields.push(("Token ID".to_string(), token_id.to_string()));
-
-            // Récupérer les métadonnées du token
-            let token = read_state(|state| state.data.get_token_by_id(&token_id).cloned());
-            if let Some(token) = token {
-                fields.push(("Token Name".to_string(), token.token_name));
-            }
 
             let generic_message = format!(
                 "You are about to burn NFT {}. This action cannot be undone. Method: burn_nft",

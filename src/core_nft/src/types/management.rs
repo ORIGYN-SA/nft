@@ -2,6 +2,7 @@ use crate::types::value_custom::CustomValue;
 
 use bity_ic_storage_canister_api::types::storage::UploadState;
 use candid::{CandidType, Nat, Principal};
+use icrc_ledger_types::icrc::generic_value::ICRC3Value;
 use icrc_ledger_types::icrc1::account::Account;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -11,10 +12,9 @@ pub mod mint {
 
     #[derive(CandidType, Serialize, Deserialize, Clone)]
     pub struct Args {
-        pub token_name: String,
-        pub token_metadata_url: String,
         pub token_owner: Account,
         pub memo: Option<serde_bytes::ByteBuf>,
+        pub metadata: Vec<(String, ICRC3Value)>,
     }
     #[derive(Serialize, Deserialize, CandidType, Debug)]
     pub enum MintError {
@@ -46,8 +46,7 @@ pub mod update_nft_metadata {
     #[derive(CandidType, Serialize, Deserialize, Clone)]
     pub struct Args {
         pub token_id: Nat,
-        pub token_name: Option<String>,
-        pub token_metadata_url: String,
+        pub metadata: Vec<(String, ICRC3Value)>,
     }
     #[derive(Serialize, Deserialize, CandidType, Debug)]
     pub enum UpdateNftMetadataError {

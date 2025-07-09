@@ -11,10 +11,10 @@ use http::Request;
 use http_body_util::BodyExt;
 use ic_agent::Agent;
 use ic_http_gateway::{HttpGatewayClient, HttpGatewayRequestArgs};
+use icrc_ledger_types::icrc::generic_value::ICRC3Value;
 use icrc_ledger_types::icrc1::account::Account;
-use pocket_ic::{PocketIc, RejectResponse};
+use pocket_ic::PocketIc;
 use rand::{rng, RngCore};
-use serde::de::DeserializeOwned;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use std::fs::File;
@@ -39,49 +39,15 @@ pub fn tick_n_blocks(pic: &PocketIc, times: u32) {
 
 pub fn mint_nft(
     pic: &mut PocketIc,
-    token_name: String,
     owner: Account,
     controller: Principal,
     collection_canister_id: Principal,
+    metadata: Vec<(String, ICRC3Value)>,
 ) -> MintResponse {
-    let metadata_json = json!({
-        "description": "test",
-        "name": token_name.clone(),
-        "attributes": [
-            {
-                "trait_type": "test1",
-                "value": "test1"
-            },
-            {
-                "trait_type": "test2",
-                "value": "test2"
-            },
-            {
-                "trait_type": "test4",
-                "value": 1.4,
-                "display_type": "number"
-            },
-            {
-                "display_type": "boost_percentage",
-                "trait_type": "test10",
-                "value": 10
-            },
-            {
-                "display_type": "test3",
-                "trait_type": "Generation",
-                "value": 2
-            }
-        ]
-    });
-
-    let metadata_url =
-        upload_metadata(pic, controller, collection_canister_id, metadata_json).unwrap();
-
     let mint_args: MintArgs = MintArgs {
-        token_name: token_name,
-        token_metadata_url: metadata_url.to_string(),
         token_owner: owner,
         memo: Some(serde_bytes::ByteBuf::from("memo")),
+        metadata,
     };
 
     let mint_call = mint(pic, controller, collection_canister_id, &mint_args);
@@ -378,4 +344,22 @@ pub fn fetch_metadata_json(
     }
 
     panic!("No location header found in redirection response");
+}
+
+pub fn create_default_metadata() -> Vec<(String, ICRC3Value)> {
+    vec![
+        ("name".to_string(), ICRC3Value::Text("test".to_string())),
+        (
+            "description".to_string(),
+            ICRC3Value::Text("test".to_string()),
+        ),
+        ("test".to_string(), ICRC3Value::Text("test".to_string())),
+    ]
+}
+
+pub fn create_default_icrc97_metadata(url: Url) -> Vec<(String, ICRC3Value)> {
+    vec![(
+        "icrc97:metadata".to_string(),
+        ICRC3Value::Array(vec![ICRC3Value::Text(url.to_string())]),
+    )]
 }

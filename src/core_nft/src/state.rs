@@ -1,4 +1,3 @@
-use crate::types::icrc37::{CollectionApprovals, TokenApprovals};
 use crate::types::nft::Icrc7Token;
 use crate::types::sub_canister;
 use crate::types::sub_canister::StorageSubCanisterManager;
@@ -16,8 +15,6 @@ use candid::{CandidType, Nat, Principal};
 use icrc_ledger_types::icrc1::account::Account;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
-
-use crate::types::icrc37::{init_collection_approvals, init_token_approvals};
 
 pub use bity_ic_storage_canister_api::lifecycle::{init::InitArgs, post_upgrade::UpgradeArgs};
 
@@ -93,7 +90,6 @@ pub struct Data {
     pub sub_canister_manager: StorageSubCanisterManager,
     pub last_token_id: Nat,
     pub media_redirections: HashMap<String, String>,
-    // pub archive_init: Option<InitArchiveArg>,
 }
 
 impl Data {

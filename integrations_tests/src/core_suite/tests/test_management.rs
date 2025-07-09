@@ -4,6 +4,7 @@ use crate::client::core_nft::{
     update_authorized_principals, update_collection_metadata, update_minting_authorities,
     update_nft_metadata,
 };
+use crate::utils::{create_default_icrc97_metadata, create_default_metadata};
 use candid::{Encode, Nat, Principal};
 use icrc_ledger_types::icrc1::account::Account;
 
@@ -1088,8 +1089,7 @@ fn test_update_nft_metadata_unauthorized() {
         collection_canister_id,
         &(update_nft_metadata::Args {
             token_id: Nat::from(0u64),
-            token_name: None,
-            token_metadata_url: metadata_url.to_string(),
+            metadata: create_default_icrc97_metadata(metadata_url),
         }),
     );
 }
@@ -1259,8 +1259,7 @@ fn test_mint_unauthorized() {
         unauthorized_principal,
         collection_canister_id,
         &(mint::Args {
-            token_name: "test".to_string(),
-            token_metadata_url: metadata_url.to_string(),
+            metadata: create_default_icrc97_metadata(metadata_url),
             token_owner: Account {
                 owner: nft_owner1,
                 subaccount: None,
@@ -1311,8 +1310,7 @@ fn test_mint_authorized() {
         nft_owner1,
         collection_canister_id,
         &(mint::Args {
-            token_name: "test".to_string(),
-            token_metadata_url: metadata_url.to_string(),
+            metadata: create_default_icrc97_metadata(metadata_url.clone()),
             token_owner: Account {
                 owner: nft_owner1,
                 subaccount: None,
@@ -1400,8 +1398,7 @@ fn test_add_then_remove_minting_authorities_unauthorized() {
         nft_owner1,
         collection_canister_id,
         &(mint::Args {
-            token_name: "test".to_string(),
-            token_metadata_url: metadata_url.to_string(),
+            metadata: create_default_icrc97_metadata(metadata_url),
             token_owner: Account {
                 owner: nft_owner1,
                 subaccount: None,
@@ -1451,8 +1448,7 @@ fn test_mint_with_metadata() {
         controller,
         collection_canister_id,
         &(mint::Args {
-            token_name: "test".to_string(),
-            token_metadata_url: metadata_url.to_string(),
+            metadata: create_default_icrc97_metadata(metadata_url.clone()),
             token_owner: Account {
                 owner: nft_owner1,
                 subaccount: None,

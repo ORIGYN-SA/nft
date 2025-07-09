@@ -1,6 +1,7 @@
 use crate::guards::{caller_is_governance_principal, caller_is_minting_authority, GuardManagement};
 use crate::state::{icrc3_add_transaction, mutate_state, read_state, InternalFilestorageData};
 use crate::types::http::add_redirection;
+use crate::types::metadata::__METADATA;
 use crate::types::sub_canister::StorageCanister;
 use crate::types::{icrc7, management, nft};
 use crate::utils::{check_memo, trace};
@@ -15,7 +16,6 @@ use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
 use icrc_ledger_types::icrc1::account::Account;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-use url::Url;
 
 #[update(guard = "caller_is_governance_principal")]
 pub async fn update_collection_metadata(
@@ -147,12 +147,9 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
             return Err(management::mint::MintError::TokenAlreadyExists);
         }
         false => {
-            let new_token = nft::Icrc7Token::new(
-                token_id.clone(),
-                req.token_name,
-                Url::parse(&req.token_metadata_url).unwrap(),
-                req.token_owner,
-            );
+            let mut new_token = nft::Icrc7Token::new(token_id.clone(), req.token_owner);
+
+            __METADATA.with_borrow_mut(|m| new_token.add_metadata(m, req.metadata));
 
             let transaction = ICRC7Transaction::new(
                 "7mint".to_string(),
@@ -211,21 +208,39 @@ pub fn update_nft_metadata(
         true => {
             let mut token = token_list.get(&token_name_hash.clone()).unwrap().clone();
 
+            let previous_metadata =
+                __METADATA.with_borrow(|m| m.get_all_data(Some(token_name_hash.clone())));
+
+            __METADATA.with_borrow_mut(|m| token.replace_metadata(m, req.metadata));
+
+            let new_metadata =
+                __METADATA.with_borrow(|m| m.get_all_data(Some(token_name_hash.clone())));
+
             let mut metadata_map = BTreeMap::new();
 
             metadata_map.insert(
-                "icrc7:previous_metadata_url".to_string(),
-                Icrc3Value::Text(token.token_metadata_url.clone()),
+                "icrc7:previous_metadata".to_string(),
+                Icrc3Value::Map(
+                    previous_metadata
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|(k, v)| (k, v.0))
+                        .collect(),
+                ),
             );
 
             metadata_map.insert(
-                "icrc7:new_metadata_url".to_string(),
-                Icrc3Value::Text(req.token_metadata_url.clone()),
+                "icrc7:new_metadata".to_string(),
+                Icrc3Value::Map(
+                    new_metadata
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|(k, v)| (k, v.0))
+                        .collect(),
+                ),
             );
 
             let meta = Icrc3Value::Map(metadata_map);
-
-            token.token_metadata_url = req.token_metadata_url;
 
             let transaction = ICRC7Transaction::new(
                 "7update_token".to_string(),
