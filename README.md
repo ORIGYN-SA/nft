@@ -46,16 +46,18 @@ A comprehensive test suite that ensures the reliability and correctness of the i
 - PocketIC for running integration tests
 - Rust toolchain
 
+
 ### Installation
 
 1. Clone the repository:
 ```bash
 git clone https://github.com/ORIGYN-SA/nft.git
-cd icrc7
+cd nft
 ```
 
 2. Build the project:
 ```bash
+cargo install ic-wasm
 bash ./scripts/build_all.sh
 ```
 
