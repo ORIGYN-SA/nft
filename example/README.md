@@ -16,7 +16,7 @@ export YOUR_PRINCIPAL_ID="YOUR_PRINCIPAL_ID"
 # Configuration
 export COLLECTION_NAME="MyCollection"
 export COLLECTION_SYMBOL="MC"
-export IDENTITY_FILE="identity.pem"
+export IDENTITY_FILE="$(dfx identity whoami).pem"
 ```
 
 ## Prerequisites
@@ -27,7 +27,7 @@ export IDENTITY_FILE="identity.pem"
 
 ## Step 1: Update canister_ids.json
 
-Update your `canister_ids.json` file with your canister ID using this command:
+The deployment script automatically updates your `canister_ids.json` file with the correct canister ID. However, if you need to do it manually, you can use these commands:
 
 ```bash
 sed -i '' "s/YOUR_CANISTER_ID/$NFT_CANISTER_ID/g" canister_ids.json
@@ -49,67 +49,100 @@ The file should look like this:
 
 ## Step 2: Check for Latest Version
 
-Before deploying, check the latest version of the NFT canister at [ORIGYN NFT Releases](https://github.com/ORIGYN-SA/nft/releases). The current version used in this guide is v2025.05.21-db5cee0, but you should verify if a newer version is available, and update url in dfx.json according.
+Before deploying, check the latest version of the NFT canister at [ORIGYN NFT Releases](https://github.com/ORIGYN-SA/nft/releases). The current version used in this guide is v2025.05.21-db5cee0, but you should verify if a newer version is available, and update url in dfx.json accordingly.
+
+**Note**: The deployment script uses version 1.1.1 for production compatibility.
 
 ## Step 3: Deploy the Collection
 
-Deploy your collection using the following command:
+You have two options for deploying your collection:
+
+### Option A: Automated Deployment (Recommended)
+
+Use the automated deployment script that handles everything for you:
+
+```bash
+./deploy_collection.sh
+```
+
+This script will:
+- Check prerequisites
+- Set up environment variables interactively
+- Create the identity file automatically
+- Update canister_ids.json
+- Deploy the collection
+- Build the CLI tool
+- Test file upload
+- Optionally mint NFTs
+
+### Option B: Manual Deployment
+
+If you prefer to deploy manually, use the following command:
 
 ```bash
 dfx deploy --network ic nft --mode reinstall --argument '(
-  variant { Init = record {
-    test_mode = true;
-    version = record { major = 0 : nat32; minor = 0 : nat32; patch = 0 : nat32;};
-    commit_hash = "commit_hash";
-    permissions = record {
-      user_permissions = vec {
-        record {
-          principal = "$YOUR_PRINCIPAL_ID" : principal;
-          permissions = vec {
-            variant { Minting };
-            variant { ManageAuthorities };
-            variant { UpdateMetadata };
-            variant { UpdateCollectionMetadata };
-            variant { ReadUploads };
-            variant { UpdateUploads };
+  variant {
+    Init = record {
+      permissions = record {
+        user_permissions = vec {
+          record {
+            principal "$YOUR_PRINCIPAL_ID";
+            vec {
+              variant { UpdateMetadata };
+              variant { Minting };
+              variant { UpdateCollectionMetadata };
+              variant { UpdateUploads };
+              variant { ManageAuthorities };
+              variant { ReadUploads };
+            };
           };
         };
       };
-    };
-    description = opt "$COLLECTION_DESCRIPTION";
-    symbol = "$COLLECTION_SYMBOL";
-    name = "$COLLECTION_NAME";
-    logo = null;
-    supply_cap = null;
-    max_query_batch_size = null;
-    max_update_batch_size = null;
-    max_take_value = null;
-    default_take_value = null;
-    max_memo_size = null;
-    atomic_batch_transfers = null;
-    tx_window = null;
-    permitted_drift = null;
-    max_canister_storage_threshold = null;
-    collection_metadata = vec {};
-    approval_init = record {
-      max_approvals_per_token_or_collection = opt (10 : nat);
-      max_revoke_approvals = opt (10 : nat);
-    };
+      supply_cap = null;
+      tx_window = null;
+      test_mode = false;
+      default_take_value = null;
+      max_canister_storage_threshold = null;
+      logo = null;
+      permitted_drift = null;
+      name = "$COLLECTION_NAME";
+      description = opt "$COLLECTION_DESCRIPTION";
+      version = record {
+        major = 1 : nat32;
+        minor = 1 : nat32;
+        patch = 1 : nat32;
+      };
+      max_take_value = null;
+      max_update_batch_size = null;
+      max_query_batch_size = null;
+      commit_hash = "aaa";
+      max_memo_size = null;
+      atomic_batch_transfers = null;
+      collection_metadata = vec {};
+      symbol = "$COLLECTION_SYMBOL";
+      approval_init = record {
+        max_approvals_per_token_or_collection = null;
+        max_revoke_approvals = null;
+      };
+    }
   }
-})'
+)'
 ```
 
 ### Important Notes:
 - The collection automatically manages storage canisters, so you don't need to create them manually
 - Set a high storage threshold to ensure smooth operation
 - Replace `YOUR_PRINCIPAL_ID` with your actual principal ID
-- The `test_mode` parameter is set to `true` for testing purposes
+- The `test_mode` parameter is set to `false` for production use
 - The `permissions` field uses the new structure with `user_permissions` and specific permission variants
 - All permissions are granted to your principal for full control of the collection
+- The version is set to 1.1.1 for production compatibility
 
 ## Step 4: Build the CLI Tool
 
-First, compile the ICRC7 NFT command-line tool:
+**If you used the automated script**: The CLI tool was built automatically.
+
+**If you deployed manually**: Compile the ICRC7 NFT command-line tool:
 
 ```bash
 cd ../cmdline
@@ -120,14 +153,21 @@ The tool will be available at `../target/release/origyn_icrc7_cmdlinetools`.
 
 ## Step 5: Upload Files to the Collection
 
-Upload files using the CLI tool. The identity file should be the .pem file of an identity that has the right to manage/upload media on the collection (must be in `authorized_principals`). You can export it with `dfx identity export identity_name > identity.pem`.
+**If you used the automated script**: The identity file was created automatically and is ready to use.
 
+**If you deployed manually**: Export your identity to a .pem file first:
+```bash
+dfx identity export $(dfx identity whoami) > $(dfx identity whoami).pem
+export IDENTITY_FILE="$(dfx identity whoami).pem"
+```
+
+Then upload your files:
 ```bash
 ../target/release/origyn_icrc7_cmdlinetools \
   --network ic \
   --identity $IDENTITY_FILE \
   --canister $NFT_CANISTER_ID \
-  upload-file ./origynlogo.png /images/origynlogo.png
+  upload-file ./origynlogo.png origynlogo.png
 ```
 
 ### Upload Options:
