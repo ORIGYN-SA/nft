@@ -16,6 +16,9 @@ use serde::{Deserialize, Serialize};
 const MAX_STORAGE_SIZE: u128 = 500 * 1024 * 1024 * 1024; // 500 GiB TODO maybe we should put a be less here ?
 const MAX_FILE_SIZE: u128 = 2 * 1024 * 1024 * 1024; // 2 GiB
 
+pub const INITIAL_CYCLES_BALANCE: u128 = 5_000_000_000_000; // 5T cycles
+pub const RESERVED_CYCLES_BALANCE: u128 = 2_000_000_000_000; // 2T cycles
+
 pub use bity_ic_storage_canister_api::lifecycle::Args as ArgsStorage;
 
 #[derive(Serialize, Deserialize, Clone)]

@@ -6,13 +6,13 @@ use crate::lifecycle::Args;
 pub use crate::state::InitApprovalsArg;
 use crate::state::{init_icrc3, start_default_archive_job, Data, RuntimeState};
 use crate::types::http::certify_all_assets;
+use crate::types::permissions::{Permission, PermissionManager};
 use crate::types::value_custom::CustomValue as Value;
 
 use bity_ic_canister_tracing_macros::trace;
 use bity_ic_icrc3::config::{ICRC3Config, ICRC3Properties};
 use bity_ic_types::BuildVersion;
 use bity_ic_utils::env::{CanisterEnv, Environment};
-use candid::Principal;
 use candid::{CandidType, Nat};
 use ic_cdk_macros::init;
 use icrc_ledger_types::icrc3::blocks::SupportedBlockType;
@@ -24,8 +24,7 @@ pub struct InitArgs {
     pub test_mode: bool,
     pub version: BuildVersion,
     pub commit_hash: String,
-    pub authorized_principals: Vec<Principal>,
-    pub minting_authorities: Vec<Principal>,
+    pub permissions: PermissionManager,
     pub description: Option<String>,
     pub symbol: String,
     pub name: String,
@@ -66,12 +65,13 @@ fn init(args: Args) {
                 None => {}
             };
 
+            ic_cdk::println!("init_args.permissions: {:?}", init_args.permissions);
+
             let mut data = Data::new(
                 init_args.test_mode,
                 init_args.commit_hash,
                 init_args.version,
-                init_args.authorized_principals,
-                init_args.minting_authorities,
+                init_args.permissions,
                 init_args.description,
                 init_args.symbol,
                 init_args.name,
@@ -90,7 +90,18 @@ fn init(args: Args) {
             );
 
             if env.is_test_mode() {
-                data.authorized_principals.push(env.caller());
+                data.permissions
+                    .grant_permission(env.caller(), Permission::Minting);
+                data.permissions
+                    .grant_permission(env.caller(), Permission::UpdateMetadata);
+                data.permissions
+                    .grant_permission(env.caller(), Permission::UpdateCollectionMetadata);
+                data.permissions
+                    .grant_permission(env.caller(), Permission::UpdateUploads);
+                data.permissions
+                    .grant_permission(env.caller(), Permission::ManageAuthorities);
+                data.permissions
+                    .grant_permission(env.caller(), Permission::ReadUploads);
             }
 
             let _tx_window = match init_args.tx_window {

@@ -1,0 +1,15 @@
+{
+  "canisters": {
+    "nft": {
+      "candid": "../src/core_nft/wasm/can.did",
+      "type": "custom",
+      "wasm": "../src/core_nft/wasm/core_nft_canister.wasm.gz",
+      "metadata": [
+        {
+          "name": "candid:service"
+        }
+      ]
+    }
+  },
+  "version": 1
+}

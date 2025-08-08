@@ -4,6 +4,7 @@ pub use crate::types::icrc10;
 pub use crate::types::icrc21;
 pub use crate::types::icrc7;
 pub use crate::types::management;
+pub use bity_ic_icrc3::transaction::ICRC7Transaction;
 pub use bity_ic_storage_canister_api::updates::cancel_upload;
 pub use bity_ic_storage_canister_api::updates::finalize_upload;
 pub use bity_ic_storage_canister_api::updates::init_upload;

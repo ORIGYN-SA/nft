@@ -18,10 +18,9 @@ use core_nft::types::icrc7::{
     icrc7_tokens, icrc7_tokens_of, icrc7_total_supply, icrc7_transfer, icrc7_tx_window,
 };
 use core_nft::types::management::{
-    cancel_upload, finalize_upload, get_all_uploads, get_upload_status, init_upload, mint,
-    remove_authorized_principals, remove_minting_authorities, store_chunk,
-    update_authorized_principals, update_collection_metadata, update_minting_authorities,
-    update_nft_metadata,
+    cancel_upload, finalize_upload, get_all_uploads, get_upload_status, get_user_permissions,
+    grant_permission, has_permission, init_upload, mint, revoke_permission, store_chunk,
+    update_collection_metadata, update_nft_metadata,
 };
 
 generate_pocket_query_call!(icrc7_collection_metadata);
@@ -56,16 +55,16 @@ generate_pocket_update_call!(icrc7_transfer);
 
 generate_pocket_update_call!(mint);
 generate_pocket_update_call!(update_nft_metadata);
-generate_pocket_update_call!(update_minting_authorities);
-generate_pocket_update_call!(remove_minting_authorities);
-generate_pocket_update_call!(update_authorized_principals);
-generate_pocket_update_call!(remove_authorized_principals);
 generate_pocket_update_call!(init_upload);
 generate_pocket_update_call!(store_chunk);
 generate_pocket_update_call!(finalize_upload);
 generate_pocket_update_call!(cancel_upload);
 generate_pocket_update_call!(update_collection_metadata);
+generate_pocket_update_call!(grant_permission);
+generate_pocket_update_call!(revoke_permission);
 
+generate_pocket_query_call!(get_user_permissions);
+generate_pocket_query_call!(has_permission);
 generate_pocket_query_call!(get_upload_status);
 
 generate_pocket_update_call!(icrc37_approve_collection);

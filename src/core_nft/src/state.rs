@@ -1,6 +1,9 @@
 use crate::types::nft::Icrc7Token;
+use crate::types::permissions::{Permission, PermissionManager};
 use crate::types::sub_canister;
-use crate::types::sub_canister::StorageSubCanisterManager;
+use crate::types::sub_canister::{
+    StorageSubCanisterManager, INITIAL_CYCLES_BALANCE, RESERVED_CYCLES_BALANCE,
+};
 
 use bity_ic_canister_state_macros::canister_state;
 use bity_ic_icrc3::transaction::TransactionType;
@@ -43,14 +46,6 @@ impl RuntimeState {
         }
     }
 
-    pub fn is_caller_governance_principal(&self) -> bool {
-        self.data.authorized_principals.contains(&self.env.caller())
-    }
-
-    pub fn is_caller_minting_authority(&self) -> bool {
-        self.data.minting_authorities.contains(&self.env.caller())
-    }
-
     pub fn metrics(&self) -> Metrics {
         Metrics {
             canister_info: CanisterInfo {
@@ -61,15 +56,14 @@ impl RuntimeState {
                 memory_used: MemorySize::used(),
                 cycles_balance: self.env.cycles_balance(),
             },
-            authorized_principals: self.data.authorized_principals.to_vec(),
+            permissions: self.data.permissions.clone(),
         }
     }
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct Data {
-    pub authorized_principals: Vec<Principal>,
-    pub minting_authorities: Vec<Principal>,
+    pub permissions: PermissionManager,
     pub description: Option<String>,
     pub symbol: String,
     pub name: String,
@@ -98,8 +92,7 @@ impl Data {
         test_mode: bool,
         commit_hash: String,
         version: BuildVersion,
-        authorized_principals: Vec<Principal>,
-        minting_authorities: Vec<Principal>,
+        permissions: PermissionManager,
         description: Option<String>,
         symbol: String,
         name: String,
@@ -116,6 +109,21 @@ impl Data {
         permitted_drift: Option<Nat>,
         approval_init: InitApprovalsArg,
     ) -> Self {
+        let mut authorized_principals = vec![];
+
+        for permission in permissions.user_permissions.clone() {
+            match permission
+                .1
+                .iter()
+                .find(|p| *p == &Permission::ManageAuthorities)
+            {
+                Some(_) => {
+                    authorized_principals.push(permission.0.clone());
+                }
+                None => {}
+            }
+        }
+
         let sub_canister_manager = StorageSubCanisterManager::new(
             sub_canister::ArgsStorage::Init(InitArgs {
                 test_mode: test_mode.clone(),
@@ -135,16 +143,15 @@ impl Data {
             HashMap::new(),
             vec![],
             authorized_principals.clone(),
-            2_000_000_000_000, // todo gwojda create constant here
-            2_000_000_000_000, // todo gwojda create constant here
+            INITIAL_CYCLES_BALANCE,
+            RESERVED_CYCLES_BALANCE,
             test_mode.clone(),
             commit_hash.clone(),
             STORAGE_WASM.to_vec(),
         );
 
         Self {
-            authorized_principals: authorized_principals.into_iter().collect(),
-            minting_authorities: minting_authorities.into_iter().collect(),
+            permissions,
             description,
             symbol,
             name,
@@ -223,8 +230,7 @@ impl Data {
 impl Clone for Data {
     fn clone(&self) -> Self {
         Self {
-            authorized_principals: self.authorized_principals.clone(),
-            minting_authorities: self.minting_authorities.clone(),
+            permissions: self.permissions.clone(),
             description: self.description.clone(),
             symbol: self.symbol.clone(),
             name: self.name.clone(),
@@ -258,7 +264,7 @@ pub struct InitApprovalsArg {
 #[derive(CandidType, Serialize)]
 pub struct Metrics {
     pub canister_info: CanisterInfo,
-    pub authorized_principals: Vec<Principal>,
+    pub permissions: PermissionManager,
 }
 
 #[derive(CandidType, Deserialize, Serialize)]

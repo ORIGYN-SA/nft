@@ -1,18 +1,18 @@
 use crate::client::core_nft::{
-    cancel_upload, finalize_upload, get_upload_status, icrc7_token_metadata, init_upload, mint,
-    remove_authorized_principals, remove_minting_authorities, store_chunk,
-    update_authorized_principals, update_collection_metadata, update_minting_authorities,
-    update_nft_metadata,
+    cancel_upload, finalize_upload, get_upload_status, get_user_permissions, grant_permission,
+    icrc7_token_metadata, init_upload, mint, revoke_permission, store_chunk,
+    update_collection_metadata, update_nft_metadata,
 };
 use crate::utils::{create_default_icrc97_metadata, create_default_metadata};
+
 use candid::{Encode, Nat, Principal};
+use core_nft::types::permissions::Permission;
 use icrc_ledger_types::icrc1::account::Account;
 
 use bity_ic_storage_canister_api::types::storage::UploadState;
 use core_nft::types::management::{
-    cancel_upload, finalize_upload, get_upload_status, init_upload, mint,
-    remove_authorized_principals, remove_minting_authorities, store_chunk,
-    update_authorized_principals, update_collection_metadata, update_minting_authorities,
+    cancel_upload, finalize_upload, get_upload_status, get_user_permissions, grant_permission,
+    init_upload, mint, revoke_permission, store_chunk, update_collection_metadata,
     update_nft_metadata,
 };
 use ic_cdk::println;
@@ -927,136 +927,6 @@ fn test_management_cycles() {
 }
 
 #[test]
-fn test_management_authorized_principals() {
-    let mut test_env: TestEnv = default_test_setup();
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let new_authorized_principal = nft_owner1; // Principal non autorisé
-
-    let authorized_principals = vec![controller, new_authorized_principal];
-    let result = update_authorized_principals(
-        pic,
-        controller,
-        collection_canister_id,
-        &(update_authorized_principals::Args {
-            authorized_principals,
-        }),
-    );
-    assert!(result.is_ok(), "Should succeed with authorized principal");
-
-    let result = update_authorized_principals(
-        pic,
-        new_authorized_principal,
-        collection_canister_id,
-        &(update_authorized_principals::Args {
-            authorized_principals: vec![nft_owner2],
-        }),
-    );
-    assert!(
-        result.is_ok(),
-        "Should succeed with newly authorized principal"
-    );
-}
-
-#[test]
-#[should_panic]
-fn test_update_authorized_principals_unauthorized() {
-    let mut test_env: TestEnv = default_test_setup();
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let unauthorized_principal = nft_owner1;
-    let _ = update_authorized_principals(
-        pic,
-        unauthorized_principal,
-        collection_canister_id,
-        &(update_authorized_principals::Args {
-            authorized_principals: vec![nft_owner1],
-        }),
-    );
-}
-
-#[test]
-#[should_panic]
-fn test_remove_authorized_principals_unauthorized() {
-    let mut test_env: TestEnv = default_test_setup();
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let unauthorized_principal = nft_owner1;
-    let _ = remove_authorized_principals(
-        pic,
-        unauthorized_principal,
-        collection_canister_id,
-        &(remove_authorized_principals::Args {
-            authorized_principals: vec![nft_owner1],
-        }),
-    );
-}
-
-#[test]
-#[should_panic]
-fn test_update_minting_authorities_unauthorized() {
-    let mut test_env: TestEnv = default_test_setup();
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let unauthorized_principal = nft_owner1;
-    let _ = update_minting_authorities(
-        pic,
-        unauthorized_principal,
-        collection_canister_id,
-        &(update_minting_authorities::Args {
-            minting_authorities: vec![nft_owner1],
-        }),
-    );
-}
-
-#[test]
-#[should_panic]
-fn test_remove_minting_authorities_unauthorized() {
-    let mut test_env: TestEnv = default_test_setup();
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let unauthorized_principal = nft_owner1;
-    let _ = remove_minting_authorities(
-        pic,
-        unauthorized_principal,
-        collection_canister_id,
-        &(remove_minting_authorities::Args {
-            minting_authorities: vec![nft_owner1],
-        }),
-    );
-}
-
-#[test]
 #[should_panic]
 fn test_update_nft_metadata_unauthorized() {
     let mut test_env: TestEnv = default_test_setup();
@@ -1192,42 +1062,6 @@ fn test_cancel_upload_unauthorized() {
 }
 
 #[test]
-fn test_authorized_principals_workflow() {
-    let mut test_env: TestEnv = default_test_setup();
-    let TestEnv {
-        ref mut pic,
-        collection_canister_id,
-        controller,
-        nft_owner1,
-        nft_owner2,
-    } = test_env;
-
-    let authorized_principals = vec![controller, nft_owner1];
-    let result = update_authorized_principals(
-        pic,
-        controller,
-        collection_canister_id,
-        &(update_authorized_principals::Args {
-            authorized_principals,
-        }),
-    );
-    assert!(result.is_ok(), "Should succeed with authorized principal");
-
-    let result = update_authorized_principals(
-        pic,
-        nft_owner1,
-        collection_canister_id,
-        &(update_authorized_principals::Args {
-            authorized_principals: vec![nft_owner2],
-        }),
-    );
-    assert!(
-        result.is_ok(),
-        "Should succeed with newly authorized principal"
-    );
-}
-
-#[test]
 #[should_panic]
 fn test_mint_unauthorized() {
     let mut test_env: TestEnv = default_test_setup();
@@ -1281,12 +1115,13 @@ fn test_mint_authorized() {
         nft_owner2,
     } = test_env;
 
-    let result = update_minting_authorities(
+    let result = grant_permission(
         pic,
         controller,
         collection_canister_id,
-        &(update_minting_authorities::Args {
-            minting_authorities: vec![nft_owner1],
+        &(grant_permission::Args {
+            principal: nft_owner1,
+            permission: Permission::Minting,
         }),
     );
     assert!(result.is_ok(), "Should succeed with authorized principal");
@@ -1359,22 +1194,24 @@ fn test_add_then_remove_minting_authorities_unauthorized() {
         nft_owner2,
     } = test_env;
 
-    let result = update_minting_authorities(
+    let result = grant_permission(
         pic,
         controller,
         collection_canister_id,
-        &(update_minting_authorities::Args {
-            minting_authorities: vec![nft_owner1],
+        &(grant_permission::Args {
+            principal: nft_owner1,
+            permission: Permission::Minting,
         }),
     );
     assert!(result.is_ok(), "Should succeed with authorized principal");
 
-    let result = remove_minting_authorities(
+    let result = revoke_permission(
         pic,
         controller,
         collection_canister_id,
-        &(remove_minting_authorities::Args {
-            minting_authorities: vec![nft_owner1],
+        &(revoke_permission::Args {
+            principal: nft_owner1,
+            permission: Permission::Minting,
         }),
     );
     assert!(result.is_ok(), "Should succeed with authorized principal");
@@ -1749,5 +1586,321 @@ fn test_update_collection_metadata_unauthorized() {
             Err(core_nft::types::management::update_collection_metadata::UpdateCollectionMetadataError::ConcurrentManagementCall)
         ),
         "Should fail for unauthorized principal"
+    );
+}
+
+#[test]
+fn test_permissions_add_and_remove_one_by_one() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let test_principal = nft_owner1;
+
+    let metadata_json = json!({
+        "description": "Test before minting permission",
+        "name": "test_before_minting",
+        "attributes": [{"trait_type": "test", "value": "before"}]
+    });
+    let metadata_url =
+        upload_metadata(pic, controller, collection_canister_id, metadata_json).unwrap();
+
+    let grant_result = grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: test_principal,
+            permission: Permission::Minting,
+        }),
+    );
+    assert!(
+        grant_result.is_ok(),
+        "Should grant minting permission successfully"
+    );
+
+    // Verify minting works after permission
+    let metadata_json = json!({
+        "description": "Test after minting permission",
+        "name": "test_after_minting",
+        "attributes": [{"trait_type": "test", "value": "after"}]
+    });
+    let metadata_url =
+        upload_metadata(pic, controller, collection_canister_id, metadata_json).unwrap();
+
+    let mint_result_after = mint(
+        pic,
+        test_principal,
+        collection_canister_id,
+        &(mint::Args {
+            metadata: create_default_icrc97_metadata(metadata_url),
+            token_owner: Account {
+                owner: test_principal,
+                subaccount: None,
+            },
+            memo: None,
+        }),
+    );
+    assert!(
+        mint_result_after.is_ok(),
+        "Minting should work after permission is granted"
+    );
+    let token_id = mint_result_after.unwrap();
+
+    // Revoke minting permission
+    let revoke_result = revoke_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(revoke_permission::Args {
+            principal: test_principal,
+            permission: Permission::Minting,
+        }),
+    );
+    assert!(
+        revoke_result.is_ok(),
+        "Should revoke minting permission successfully"
+    );
+
+    let grant_result = grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: test_principal,
+            permission: Permission::UpdateMetadata,
+        }),
+    );
+    assert!(
+        grant_result.is_ok(),
+        "Should grant UpdateMetadata permission successfully"
+    );
+
+    // Verify metadata update works after permission
+    let update_metadata_json = json!({
+        "description": "Authorized update attempt",
+        "name": "authorized_update",
+        "attributes": [{"trait_type": "authorized", "value": "should_work"}]
+    });
+    let update_metadata_url = upload_metadata(
+        pic,
+        controller,
+        collection_canister_id,
+        update_metadata_json,
+    )
+    .unwrap();
+
+    let update_result_after = update_nft_metadata(
+        pic,
+        test_principal,
+        collection_canister_id,
+        &(update_nft_metadata::Args {
+            token_id: token_id.clone(),
+            metadata: create_default_icrc97_metadata(update_metadata_url),
+        }),
+    );
+    assert!(
+        update_result_after.is_ok(),
+        "Metadata update should work after permission is granted"
+    );
+
+    // Revoke UpdateMetadata permission
+    let revoke_result = revoke_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(revoke_permission::Args {
+            principal: test_principal,
+            permission: Permission::UpdateMetadata,
+        }),
+    );
+    assert!(
+        revoke_result.is_ok(),
+        "Should revoke UpdateMetadata permission successfully"
+    );
+
+    let grant_result = grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: test_principal,
+            permission: Permission::UpdateUploads,
+        }),
+    );
+    assert!(
+        grant_result.is_ok(),
+        "Should grant UpdateUploads permission successfully"
+    );
+
+    let init_result_after = init_upload(
+        pic,
+        test_principal,
+        collection_canister_id,
+        &(init_upload::Args {
+            file_path: "/test_permissions.png".to_string(),
+            file_hash: "dummy_hash".to_string(),
+            file_size: 1024,
+            chunk_size: None,
+        }),
+    );
+    assert!(
+        init_result_after.is_ok(),
+        "Upload should work after permission is granted"
+    );
+
+    let revoke_result = revoke_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(revoke_permission::Args {
+            principal: test_principal,
+            permission: Permission::UpdateUploads,
+        }),
+    );
+    assert!(
+        revoke_result.is_ok(),
+        "Should revoke UpdateUploads permission successfully"
+    );
+
+    let grant_result = grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: test_principal,
+            permission: Permission::ReadUploads,
+        }),
+    );
+    assert!(
+        grant_result.is_ok(),
+        "Should grant ReadUploads permission successfully"
+    );
+
+    let status_result_after = get_upload_status(
+        pic,
+        test_principal,
+        collection_canister_id,
+        &"/test_permissions.png".to_string(),
+    );
+    assert!(
+        status_result_after.is_ok(),
+        "Get upload status should work after permission is granted"
+    );
+
+    let revoke_result = revoke_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(revoke_permission::Args {
+            principal: test_principal,
+            permission: Permission::ReadUploads,
+        }),
+    );
+    assert!(
+        revoke_result.is_ok(),
+        "Should revoke ReadUploads permission successfully"
+    );
+
+    let grant_result = grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: test_principal,
+            permission: Permission::UpdateCollectionMetadata,
+        }),
+    );
+    assert!(
+        grant_result.is_ok(),
+        "Should grant UpdateCollectionMetadata permission successfully"
+    );
+
+    let collection_update_result_after = update_collection_metadata(
+        pic,
+        test_principal,
+        collection_canister_id,
+        &(update_collection_metadata::Args {
+            description: Some("Authorized collection update".to_string()),
+            symbol: None,
+            name: None,
+            logo: None,
+            supply_cap: None,
+            max_query_batch_size: None,
+            max_update_batch_size: None,
+            max_take_value: None,
+            default_take_value: None,
+            max_memo_size: None,
+            atomic_batch_transfers: None,
+            tx_window: None,
+            permitted_drift: None,
+            max_canister_storage_threshold: None,
+            collection_metadata: None,
+        }),
+    );
+    assert!(
+        collection_update_result_after.is_ok(),
+        "Collection metadata update should work after permission is granted"
+    );
+
+    let revoke_result = revoke_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(revoke_permission::Args {
+            principal: test_principal,
+            permission: Permission::UpdateCollectionMetadata,
+        }),
+    );
+    assert!(
+        revoke_result.is_ok(),
+        "Should revoke UpdateCollectionMetadata permission successfully"
+    );
+
+    let grant_result = grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: test_principal,
+            permission: Permission::ManageAuthorities,
+        }),
+    );
+    assert!(
+        grant_result.is_ok(),
+        "Should grant ManageAuthorities permission successfully"
+    );
+
+    let permission_result_after = grant_permission(
+        pic,
+        test_principal,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: nft_owner2,
+            permission: Permission::Minting,
+        }),
+    );
+    assert!(
+        permission_result_after.is_ok(),
+        "Permission management should work after permission is granted"
+    );
+
+    let revoke_result = revoke_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(revoke_permission::Args {
+            principal: test_principal,
+            permission: Permission::ManageAuthorities,
+        }),
+    );
+    assert!(
+        revoke_result.is_ok(),
+        "Should revoke ManageAuthorities permission successfully"
     );
 }

@@ -1,3 +1,4 @@
+use crate::types::permissions::Permission;
 use crate::types::value_custom::CustomValue;
 
 use bity_ic_storage_canister_api::types::storage::UploadState;
@@ -33,6 +34,7 @@ pub mod burn_nft {
     pub type Args = Nat;
     #[derive(Serialize, Deserialize, CandidType, Debug)]
     pub enum BurnNftError {
+        NotTokenOwner,
         ConcurrentManagementCall,
         TokenDoesNotExist,
         StorageCanisterError(String),
@@ -56,67 +58,6 @@ pub mod update_nft_metadata {
     }
     pub type Response = Result<Nat, UpdateNftMetadataError>;
 }
-
-pub mod update_minting_authorities {
-    use super::*;
-
-    #[derive(CandidType, Serialize, Deserialize, Clone)]
-    pub struct Args {
-        pub minting_authorities: Vec<Principal>,
-    }
-    #[derive(Serialize, Deserialize, CandidType, Debug)]
-    pub enum UpdateMintingAuthoritiesError {
-        ConcurrentManagementCall,
-        StorageCanisterError(String),
-    }
-    pub type Response = Result<(), UpdateMintingAuthoritiesError>;
-}
-
-pub mod remove_minting_authorities {
-    use super::*;
-
-    #[derive(CandidType, Serialize, Deserialize, Clone)]
-    pub struct Args {
-        pub minting_authorities: Vec<Principal>,
-    }
-    #[derive(Serialize, Deserialize, CandidType, Debug)]
-    pub enum RemoveMintingAuthoritiesError {
-        ConcurrentManagementCall,
-        StorageCanisterError(String),
-    }
-    pub type Response = Result<(), RemoveMintingAuthoritiesError>;
-}
-
-pub mod update_authorized_principals {
-    use super::*;
-
-    #[derive(CandidType, Serialize, Deserialize, Clone)]
-    pub struct Args {
-        pub authorized_principals: Vec<Principal>,
-    }
-    #[derive(Serialize, Deserialize, CandidType, Debug)]
-    pub enum UpdateAuthorizedPrincipalsError {
-        ConcurrentManagementCall,
-        StorageCanisterError(String),
-    }
-    pub type Response = Result<(), UpdateAuthorizedPrincipalsError>;
-}
-
-pub mod remove_authorized_principals {
-    use super::*;
-
-    #[derive(CandidType, Serialize, Deserialize, Clone)]
-    pub struct Args {
-        pub authorized_principals: Vec<Principal>,
-    }
-    #[derive(Serialize, Deserialize, CandidType, Debug)]
-    pub enum RemoveAuthorizedPrincipalsError {
-        ConcurrentManagementCall,
-        StorageCanisterError(String),
-    }
-    pub type Response = Result<(), RemoveAuthorizedPrincipalsError>;
-}
-
 pub mod get_upload_status {
     use super::*;
 
@@ -298,5 +239,71 @@ pub mod cancel_upload {
                 }
             },
         }
+    }
+}
+
+pub mod grant_permission {
+    use super::*;
+
+    #[derive(CandidType, Serialize, Deserialize, Clone)]
+    pub struct Args {
+        pub principal: Principal,
+        pub permission: Permission,
+    }
+    pub type Response = Result<(), GrantPermissionError>;
+
+    #[derive(Serialize, Deserialize, CandidType, Debug)]
+    pub enum GrantPermissionError {
+        ConcurrentManagementCall,
+        DefaultError(String),
+    }
+}
+
+pub mod revoke_permission {
+    use super::*;
+
+    #[derive(CandidType, Serialize, Deserialize, Clone)]
+    pub struct Args {
+        pub principal: Principal,
+        pub permission: Permission,
+    }
+    pub type Response = Result<(), RevokePermissionError>;
+
+    #[derive(Serialize, Deserialize, CandidType, Debug)]
+    pub enum RevokePermissionError {
+        ConcurrentManagementCall,
+        DefaultError(String),
+    }
+}
+
+pub mod get_user_permissions {
+    use super::*;
+
+    #[derive(CandidType, Serialize, Deserialize, Clone)]
+    pub struct Args {
+        pub principal: Principal,
+    }
+    pub type Response = Result<Vec<Permission>, GetUserPermissionsError>;
+
+    #[derive(Serialize, Deserialize, CandidType, Debug)]
+    pub enum GetUserPermissionsError {
+        UserNotFound,
+        DefaultError(String),
+    }
+}
+
+pub mod has_permission {
+    use super::*;
+
+    #[derive(CandidType, Serialize, Deserialize, Clone)]
+    pub struct Args {
+        pub principal: Principal,
+        pub permission: Permission,
+    }
+    pub type Response = Result<bool, HasPermissionError>;
+
+    #[derive(Serialize, Deserialize, CandidType, Debug)]
+    pub enum HasPermissionError {
+        DefaultError(String),
     }
 }

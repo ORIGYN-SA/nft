@@ -58,26 +58,39 @@ Deploy your collection using the following command:
 ```bash
 dfx deploy --network ic nft --mode reinstall --argument '(
   variant { Init = record {
-    supply_cap = null;
-    tx_window = null;
     test_mode = true;
-    default_take_value = null;
-    max_canister_storage_threshold = null;
-    logo = null;
-    permitted_drift = null;
-    name = "$COLLECTION_NAME";
-    minting_authorities = vec { principal "$YOUR_PRINCIPAL_ID";};
-    description = null;
-    authorized_principals = vec { principal "$YOUR_PRINCIPAL_ID";};
     version = record { major = 0 : nat32; minor = 0 : nat32; patch = 0 : nat32;};
-    max_take_value = null;
-    max_update_batch_size = null;
-    max_query_batch_size = null;
     commit_hash = "commit_hash";
+    permissions = record {
+      user_permissions = vec {
+        record {
+          principal = "$YOUR_PRINCIPAL_ID" : principal;
+          permissions = vec {
+            variant { Minting };
+            variant { ManageAuthorities };
+            variant { UpdateMetadata };
+            variant { UpdateCollectionMetadata };
+            variant { ReadUploads };
+            variant { UpdateUploads };
+          };
+        };
+      };
+    };
+    description = opt "$COLLECTION_DESCRIPTION";
+    symbol = "$COLLECTION_SYMBOL";
+    name = "$COLLECTION_NAME";
+    logo = null;
+    supply_cap = null;
+    max_query_batch_size = null;
+    max_update_batch_size = null;
+    max_take_value = null;
+    default_take_value = null;
     max_memo_size = null;
     atomic_batch_transfers = null;
+    tx_window = null;
+    permitted_drift = null;
+    max_canister_storage_threshold = null;
     collection_metadata = vec {};
-    symbol = "$COLLECTION_SYMBOL";
     approval_init = record {
       max_approvals_per_token_or_collection = opt (10 : nat);
       max_revoke_approvals = opt (10 : nat);
@@ -91,6 +104,8 @@ dfx deploy --network ic nft --mode reinstall --argument '(
 - Set a high storage threshold to ensure smooth operation
 - Replace `YOUR_PRINCIPAL_ID` with your actual principal ID
 - The `test_mode` parameter is set to `true` for testing purposes
+- The `permissions` field uses the new structure with `user_permissions` and specific permission variants
+- All permissions are granted to your principal for full control of the collection
 
 ## Step 4: Build the CLI Tool
 
@@ -180,7 +195,7 @@ This will return a metadata URL that you can use for minting.
 
 ## Step 8: Mint NFTs
 
-### Method 1: Mint with Existing Metadata URL
+### Method 1: Mint with ICRC97 URL
 
 ```bash
 ../target/release/origyn_icrc7_cmdlinetools \
@@ -190,51 +205,94 @@ This will return a metadata URL that you can use for minting.
   mint \
   --owner $YOUR_PRINCIPAL_ID \
   --name "My NFT" \
-  --metadata_url "https://$NFT_CANISTER_ID.raw.icp0.io/abc123.json" \
+  --icrc97_url "https://$NFT_CANISTER_ID.raw.icp0.io/abc123.json" \
   --memo "First NFT"
 ```
 
-### Method 2: Create Metadata and Mint in One Step
+### Method 2: Mint with Interactive Metadata Creation
 
-#### Interactive Mode:
 ```bash
 ../target/release/origyn_icrc7_cmdlinetools \
   --network ic \
   --identity $IDENTITY_FILE \
   --canister $NFT_CANISTER_ID \
-  mint-with-metadata \
+  mint \
   --owner $YOUR_PRINCIPAL_ID \
   --name "My Interactive NFT" \
   --interactive
 ```
 
-#### CLI Mode:
+### Method 3: Mint with Direct Metadata Entries
+
 ```bash
 ../target/release/origyn_icrc7_cmdlinetools \
   --network ic \
   --identity $IDENTITY_FILE \
   --canister $NFT_CANISTER_ID \
-  mint-with-metadata \
+  mint \
   --owner $YOUR_PRINCIPAL_ID \
   --name "My CLI NFT" \
-  --description "Created via CLI" \
-  --image "https://$NFT_CANISTER_ID.raw.icp0.io/images/origynlogo.png" \
-  --attribute "Type:Legendary" \
-  --attribute "Level:100:number" \
+  --metadata "description:A beautiful NFT created via CLI" \
+  --metadata "image:https://$NFT_CANISTER_ID.raw.icp0.io/images/origynlogo.png" \
+  --metadata "rarity:Legendary" \
+  --metadata "power:95" \
   --memo "CLI created NFT"
 ```
 
-#### From File:
+## Step 9: Manage Permissions
+
+The CLI tool also provides commands to manage permissions on your NFT collection:
+
+### Grant Permissions
 ```bash
 ../target/release/origyn_icrc7_cmdlinetools \
   --network ic \
   --identity $IDENTITY_FILE \
   --canister $NFT_CANISTER_ID \
-  mint-with-metadata \
-  --owner $YOUR_PRINCIPAL_ID \
-  --name "My File NFT" \
-  --file metadata.json
+  permissions grant \
+  --principal "YOUR_TARGET_PRINCIPAL" \
+  --permission "minting"
 ```
+
+### Revoke Permissions
+```bash
+../target/release/origyn_icrc7_cmdlinetools \
+  --network ic \
+  --identity $IDENTITY_FILE \
+  --canister $NFT_CANISTER_ID \
+  permissions revoke \
+  --principal "YOUR_TARGET_PRINCIPAL" \
+  --permission "minting"
+```
+
+### List Permissions
+```bash
+../target/release/origyn_icrc7_cmdlinetools \
+  --network ic \
+  --identity $IDENTITY_FILE \
+  --canister $NFT_CANISTER_ID \
+  permissions list \
+  --principal "YOUR_TARGET_PRINCIPAL"
+```
+
+### Check Permission
+```bash
+../target/release/origyn_icrc7_cmdlinetools \
+  --network ic \
+  --identity $IDENTITY_FILE \
+  --canister $NFT_CANISTER_ID \
+  permissions has \
+  --principal "YOUR_TARGET_PRINCIPAL" \
+  --permission "minting"
+```
+
+### Available Permissions:
+- `minting`: Can mint new NFTs
+- `manage_authorities`: Can manage other authorities
+- `update_metadata`: Can update token metadata
+- `update_collection_metadata`: Can update collection metadata
+- `read_uploads`: Can read uploaded files
+- `update_uploads`: Can upload new files
 
 ## ICRC97 Metadata Format
 
@@ -284,6 +342,18 @@ dfx canister call nft --network ic icrc7_owner_of '(vec { 1 })'
 ```bash
 dfx canister call nft --network ic icrc7_total_supply '()'
 ```
+
+## CLI Tool Architecture
+
+The CLI tool has been refactored into a modular architecture for better maintainability:
+
+- **`main.rs`**: Entry point and command orchestration
+- **`cli.rs`**: CLI argument definitions using clap
+- **`commands.rs`**: Command execution handlers
+- **`metadata.rs`**: ICRC97 metadata creation and validation
+- **`prompts.rs`**: Interactive user input functions
+- **`calls/`**: Canister interaction modules
+- **`utils.rs`**: Utility functions and agent initialization
 
 ## Troubleshooting
 

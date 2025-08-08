@@ -2,6 +2,7 @@ use self::setup::{TestEnv, TestEnvBuilder};
 use bity_ic_types::{BuildVersion, CanisterId, Milliseconds};
 use candid::Nat;
 use core_nft::init::{InitApprovalsArg, InitArgs};
+use core_nft::types::permissions::{Permission, PermissionManager};
 use std::collections::HashMap;
 
 pub mod setup;
@@ -10,12 +11,24 @@ pub mod setup_core;
 pub fn default_test_setup() -> TestEnv {
     let mut test_env = TestEnvBuilder::new();
 
+    let mut user_permissions = HashMap::new();
+    user_permissions.insert(
+        test_env.controller.clone(),
+        vec![
+            Permission::Minting,
+            Permission::ManageAuthorities,
+            Permission::UpdateMetadata,
+            Permission::UpdateCollectionMetadata,
+            Permission::ReadUploads,
+            Permission::UpdateUploads,
+        ],
+    );
+
     let init_args = InitArgs {
         test_mode: true,
         version: BuildVersion::min(),
         commit_hash: "commit_hash".to_string(),
-        authorized_principals: vec![test_env.controller.clone()],
-        minting_authorities: vec![test_env.controller.clone()],
+        permissions: PermissionManager::new(user_permissions),
         description: None,
         symbol: "MC".to_string(),
         name: "MyCollection".to_string(),
@@ -43,12 +56,24 @@ pub fn default_test_setup() -> TestEnv {
 pub fn test_setup_atomic_batch_transfers() -> TestEnv {
     let mut test_env = TestEnvBuilder::new();
 
+    let mut user_permissions = HashMap::new();
+    user_permissions.insert(
+        test_env.controller.clone(),
+        vec![
+            Permission::Minting,
+            Permission::ManageAuthorities,
+            Permission::UpdateMetadata,
+            Permission::UpdateCollectionMetadata,
+            Permission::ReadUploads,
+            Permission::UpdateUploads,
+        ],
+    );
+
     let init_args = InitArgs {
         test_mode: true,
         version: BuildVersion::min(),
         commit_hash: "commit_hash".to_string(),
-        authorized_principals: vec![test_env.controller.clone()],
-        minting_authorities: vec![test_env.controller.clone()],
+        permissions: PermissionManager::new(user_permissions),
         description: None,
         symbol: "MC".to_string(),
         name: "MyCollection".to_string(),
@@ -76,12 +101,24 @@ pub fn test_setup_atomic_batch_transfers() -> TestEnv {
 pub fn test_setup_no_limit() -> TestEnv {
     let mut test_env = TestEnvBuilder::new();
 
+    let mut user_permissions = HashMap::new();
+    user_permissions.insert(
+        test_env.controller.clone(),
+        vec![
+            Permission::Minting,
+            Permission::ManageAuthorities,
+            Permission::UpdateMetadata,
+            Permission::UpdateCollectionMetadata,
+            Permission::ReadUploads,
+            Permission::UpdateUploads,
+        ],
+    );
+
     let init_args = InitArgs {
         test_mode: true,
         version: BuildVersion::min(),
         commit_hash: "commit_hash".to_string(),
-        authorized_principals: vec![test_env.controller.clone()],
-        minting_authorities: vec![test_env.controller.clone()],
+        permissions: PermissionManager::new(user_permissions),
         description: None,
         symbol: "MC".to_string(),
         name: "MyCollection".to_string(),

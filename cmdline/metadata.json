@@ -1,0 +1,16 @@
+{
+  "attributes": [
+    {
+      "display_type": "number",
+      "trait_type": "testing",
+      "value": 0.0
+    },
+    {
+      "trait_type": "test2",
+      "value": "this is a test"
+    }
+  ],
+  "description": "This is a test nft",
+  "image": "https://z64rk-hiaaa-aaaaa-qallq-cai.raw.icp0.io/images/origynlogo.png",
+  "name": "Nft Test"
+}

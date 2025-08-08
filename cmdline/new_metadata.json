@@ -1,0 +1,15 @@
+{
+  "attributes": [
+    {
+      "trait_type": "test1",
+      "value": "this is a test"
+    },
+    {
+      "display_type": "number",
+      "trait_type": "test2",
+      "value": 2.0
+    }
+  ],
+  "description": "this is a test",
+  "name": "test1"
+}
