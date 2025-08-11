@@ -1,4 +1,8 @@
-use crate::guards::{caller_is_governance_principal, caller_is_minting_authority, GuardManagement};
+use crate::guards::{
+    caller_has_manage_authorities_permission, caller_has_minting_permission,
+    caller_has_read_uploads_permission, caller_has_update_collection_metadata_permission,
+    caller_has_update_metadata_permission, caller_has_update_uploads_permission, GuardManagement,
+};
 use crate::state::{icrc3_add_transaction, mutate_state, read_state, InternalFilestorageData};
 use crate::types::http::add_redirection;
 use crate::types::metadata::__METADATA;
@@ -6,10 +10,14 @@ use crate::types::sub_canister::StorageCanister;
 use crate::types::{icrc7, management, nft};
 use crate::utils::{check_memo, trace};
 
-pub use crate::types::management::{cancel_upload, finalize_upload, init_upload, store_chunk};
+pub use crate::types::management::{
+    cancel_upload, finalize_upload, get_user_permissions, grant_permission, has_permission,
+    init_upload, revoke_permission, store_chunk,
+};
+pub use crate::types::permissions::Permission;
 use bity_ic_icrc3::transaction::{ICRC7Transaction, ICRC7TransactionData};
 use bity_ic_storage_canister_api::types::storage::UploadState;
-pub use candid::Nat;
+pub use candid::{Nat, Principal};
 pub use ic_cdk::call::RejectCode;
 use ic_cdk_macros::{query, update};
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
@@ -17,7 +25,7 @@ use icrc_ledger_types::icrc1::account::Account;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 
-#[update(guard = "caller_is_governance_principal")]
+#[update(guard = "caller_has_update_collection_metadata_permission")]
 pub async fn update_collection_metadata(
     req: management::update_collection_metadata::Args,
 ) -> management::update_collection_metadata::Response {
@@ -112,7 +120,7 @@ pub async fn update_collection_metadata(
     Ok(())
 }
 
-#[update(guard = "caller_is_minting_authority")]
+#[update(guard = "caller_has_minting_permission")]
 pub fn mint(req: management::mint::Args) -> management::mint::Response {
     trace("Minting NFT");
     trace(&format!("timestamp: {:?}", ic_cdk::api::time()));
@@ -190,7 +198,7 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
     Ok(token_id.clone())
 }
 
-#[update(guard = "caller_is_governance_principal")]
+#[update(guard = "caller_has_update_metadata_permission")]
 pub fn update_nft_metadata(
     req: management::update_nft_metadata::Args,
 ) -> management::update_nft_metadata::Response {
@@ -287,7 +295,7 @@ pub fn update_nft_metadata(
     Ok(token_name_hash.clone())
 }
 
-#[update(guard = "caller_is_governance_principal")]
+#[update]
 pub fn burn_nft(token_id: Nat) -> management::burn_nft::Response {
     let caller = ic_cdk::api::msg_caller();
     let _guard_principal = GuardManagement::new(caller)
@@ -299,6 +307,10 @@ pub fn burn_nft(token_id: Nat) -> management::burn_nft::Response {
             return Err(management::burn_nft::BurnNftError::TokenDoesNotExist);
         }
     };
+
+    if caller != token.token_owner.owner {
+        return Err(management::burn_nft::BurnNftError::NotTokenOwner);
+    }
 
     let transaction = ICRC7Transaction::new(
         "7burn".to_string(),
@@ -330,7 +342,7 @@ pub fn burn_nft(token_id: Nat) -> management::burn_nft::Response {
     Ok(())
 }
 
-#[update(guard = "caller_is_governance_principal")]
+#[update(guard = "caller_has_update_uploads_permission")]
 pub async fn init_upload(data: init_upload::Args) -> init_upload::Response {
     let caller = ic_cdk::api::msg_caller();
     let _guard_principal = GuardManagement::new(caller)
@@ -366,7 +378,7 @@ pub async fn init_upload(data: init_upload::Args) -> init_upload::Response {
     Ok(init_upload::InitUploadResp {})
 }
 
-#[update(guard = "caller_is_governance_principal")]
+#[update(guard = "caller_has_update_uploads_permission")]
 pub async fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
     let caller = ic_cdk::api::msg_caller();
     let _guard_principal = GuardManagement::new(caller)
@@ -425,7 +437,7 @@ pub async fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
     Ok(store_chunk::StoreChunkResp {})
 }
 
-#[update(guard = "caller_is_governance_principal")]
+#[update(guard = "caller_has_update_uploads_permission")]
 pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Response {
     trace(&format!("Finalizing upload: {:?}", data));
     let caller = ic_cdk::api::msg_caller();
@@ -510,13 +522,13 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
     return Ok(finalize_upload::FinalizeUploadResp { url: url });
 }
 
-#[query(guard = "caller_is_governance_principal")]
+#[query(guard = "caller_has_manage_authorities_permission")]
 pub fn get_all_storage_subcanisters() -> Vec<candid::Principal> {
     let sub_canister_manager = read_state(|state| state.data.sub_canister_manager.clone());
     sub_canister_manager.list_canisters_ids()
 }
 
-#[query(guard = "caller_is_governance_principal")]
+#[query(guard = "caller_has_read_uploads_permission")]
 pub fn get_upload_status(file_path: String) -> management::get_upload_status::Response {
     let upload_status = read_state(|state| state.internal_filestorage.get(&file_path).cloned());
     match upload_status {
@@ -525,7 +537,7 @@ pub fn get_upload_status(file_path: String) -> management::get_upload_status::Re
     }
 }
 
-#[query(guard = "caller_is_governance_principal")]
+#[query(guard = "caller_has_read_uploads_permission")]
 pub fn get_all_uploads(
     prev: Option<Nat>,
     take: Option<Nat>,
@@ -546,7 +558,7 @@ pub fn get_all_uploads(
     Ok(filtered_uploads)
 }
 
-#[update(guard = "caller_is_governance_principal")]
+#[update(guard = "caller_has_update_uploads_permission")]
 pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response {
     let caller = ic_cdk::api::msg_caller();
     let _guard_principal = GuardManagement::new(caller)
@@ -598,88 +610,61 @@ pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response
     Ok(cancel_upload::CancelUploadResp {})
 }
 
-#[update(guard = "caller_is_governance_principal")]
-pub fn update_minting_authorities(
-    req: management::update_minting_authorities::Args,
-) -> management::update_minting_authorities::Response {
+#[update(guard = "caller_has_manage_authorities_permission")]
+pub fn grant_permission(args: grant_permission::Args) -> grant_permission::Response {
     let caller = ic_cdk::api::msg_caller();
     let _guard_principal = GuardManagement::new(caller)
-        .map_err(|_| management::update_minting_authorities::UpdateMintingAuthoritiesError::ConcurrentManagementCall)?;
-
-    let mut minting_authorities = req.minting_authorities.clone();
-    let previous_minting_authorities = mutate_state(|state| state.data.minting_authorities.clone());
-
-    minting_authorities.append(&mut previous_minting_authorities.clone());
-    minting_authorities.sort();
-    minting_authorities.dedup();
+        .map_err(|_| grant_permission::GrantPermissionError::ConcurrentManagementCall)?;
 
     mutate_state(|state| {
-        state.data.minting_authorities = minting_authorities.into_iter().collect();
+        state
+            .data
+            .permissions
+            .grant_permission(args.principal, args.permission);
     });
 
     Ok(())
 }
 
-#[update(guard = "caller_is_governance_principal")]
-pub fn remove_minting_authorities(
-    req: management::remove_minting_authorities::Args,
-) -> management::remove_minting_authorities::Response {
+#[update(guard = "caller_has_manage_authorities_permission")]
+pub fn revoke_permission(args: revoke_permission::Args) -> revoke_permission::Response {
     let caller = ic_cdk::api::msg_caller();
     let _guard_principal = GuardManagement::new(caller)
-        .map_err(|_| management::remove_minting_authorities::RemoveMintingAuthoritiesError::ConcurrentManagementCall)?;
-
-    let mut minting_authorities = req.minting_authorities.clone();
-    let previous_minting_authorities = mutate_state(|state| state.data.minting_authorities.clone());
-
-    minting_authorities.retain(|auth| !previous_minting_authorities.contains(auth));
+        .map_err(|_| revoke_permission::RevokePermissionError::ConcurrentManagementCall)?;
 
     mutate_state(|state| {
-        state.data.minting_authorities = minting_authorities.into_iter().collect();
+        state
+            .data
+            .permissions
+            .revoke_permission(&args.principal, &args.permission);
     });
 
     Ok(())
 }
 
-#[update(guard = "caller_is_governance_principal")]
-pub async fn update_authorized_principals(
-    req: management::update_authorized_principals::Args,
-) -> management::update_authorized_principals::Response {
-    let caller = ic_cdk::api::msg_caller();
-    let _guard_principal = GuardManagement::new(caller)
-        .map_err(|_| management::update_authorized_principals::UpdateAuthorizedPrincipalsError::ConcurrentManagementCall)?;
-
-    let mut authorized_principals = req.authorized_principals.clone();
-    let previous_authorized_principals =
-        mutate_state(|state| state.data.authorized_principals.clone());
-
-    authorized_principals.append(&mut previous_authorized_principals.clone());
-    authorized_principals.sort();
-    authorized_principals.dedup();
-
-    mutate_state(|state| {
-        state.data.authorized_principals = authorized_principals.into_iter().collect();
+#[query(guard = "caller_has_manage_authorities_permission")]
+pub fn get_user_permissions(args: get_user_permissions::Args) -> get_user_permissions::Response {
+    let permissions = read_state(|state| {
+        state
+            .data
+            .permissions
+            .get_permissions(&args.principal)
+            .cloned()
     });
-
-    Ok(())
+    match permissions {
+        Some(permissions) => Ok(permissions),
+        None => Err(get_user_permissions::GetUserPermissionsError::UserNotFound),
+    }
 }
 
-#[update(guard = "caller_is_governance_principal")]
-pub async fn remove_authorized_principals(
-    req: management::remove_authorized_principals::Args,
-) -> management::remove_authorized_principals::Response {
-    let caller = ic_cdk::api::msg_caller();
-    let _guard_principal =
-        GuardManagement::new(caller).map_err(|_| management::remove_authorized_principals::RemoveAuthorizedPrincipalsError::ConcurrentManagementCall)?;
-
-    let mut authorized_principals = req.authorized_principals.clone();
-    let previous_authorized_principals =
-        mutate_state(|state| state.data.authorized_principals.clone());
-
-    authorized_principals.retain(|auth| !previous_authorized_principals.contains(auth));
-
-    mutate_state(|state| {
-        state.data.authorized_principals = authorized_principals.into_iter().collect();
+#[query(guard = "caller_has_manage_authorities_permission")]
+pub fn has_permission(args: has_permission::Args) -> has_permission::Response {
+    let has_permission = read_state(|state| {
+        state
+            .data
+            .permissions
+            .has_permission(&args.principal, &args.permission)
     });
 
-    Ok(())
+    Ok(has_permission)
 }

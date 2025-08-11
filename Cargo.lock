@@ -315,9 +315,9 @@ dependencies = [
 
 [[package]]
 name = "bity-ic-icrc3"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "572418b02553e90041c1d5b8743559cb97ed387dace90b246d572256e11760fa"
+checksum = "a245f654c7ccbd6ecc64f621ad9e3111524091981c9f087e41a7cfec15724c95"
 dependencies = [
  "anyhow",
  "bity-ic-canister-time",
@@ -379,9 +379,9 @@ dependencies = [
 
 [[package]]
 name = "bity-ic-icrc3-macros"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3172915297f9cc733d027f73b98714b4c39a9f77e85b91ca63bb79989e9ef26d"
+checksum = "3cac3c6f28e4bbcb5f5384baf34eb617cc70a78ef188456cf3c9f2761f9eece6"
 dependencies = [
  "bity-ic-canister-time",
  "lazy_static",

@@ -8,6 +8,7 @@ pub mod icrc7;
 pub mod management;
 pub mod metadata;
 pub mod nft;
+pub mod permissions;
 pub mod sub_canister;
 pub mod value_custom;
 
@@ -20,5 +21,6 @@ pub use icrc7::*;
 pub use management::*;
 pub use metadata::*;
 pub use nft::*;
+pub use permissions::*;
 pub use sub_canister::*;
 pub use value_custom::*;

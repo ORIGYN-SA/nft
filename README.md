@@ -6,9 +6,8 @@ This repository contains the first complete and production-ready implementation 
 
 This project provides a complete solution for NFT management on the Internet Computer, consisting of three main components:
 
-1. **Core NFT Canister**: A full implementation of the ICRC7/ICRC37 standard for NFT management
-2. **Storage Canister**: A high-performance storage solution for NFT assets
-3. **Integration Tests**: Comprehensive test suite ensuring reliability and correctness
+**Core NFT Canister**: A full implementation of the ICRC7/ICRC37 standard for NFT management
+**Integration Tests**: Comprehensive test suite ensuring reliability and correctness
 
 ## Key Features
 
@@ -27,11 +26,6 @@ This project provides a complete solution for NFT management on the Internet Com
 The main NFT ledger implementation that handles all NFT operations according to the ICRC7/ICRC37 standard. It uses the ICRC3 standard for transaction history and can work with any storage solution.
 
 [Read more about Core NFT Canister](./src/core_nft/README.md)
-
-### Storage Canister (`src/storage_canister`)
-A specialized storage solution that serves assets via HTTP endpoints. Unlike DFINITY's asset canisters, it uses stable memory for storage with an intelligent caching system in heap memory.
-
-[Read more about Storage Canister](./src/storage_canister/README.md)
 
 ### Integration Tests (`integrations_tests`)
 A comprehensive test suite that ensures the reliability and correctness of the implementation. The tests cover all aspects of the NFT standard and storage functionality.
@@ -74,6 +68,17 @@ This is currently the only complete implementation of the ICRC7/ICRC37 standard 
 - Is under review by DFINITY Foundation
 - Uses modern IC features like certified HTTP and stable memory
 - Provides a flexible storage solution
+
+## This project also use 
+
+### Storage Canister
+
+[Read more about Storage Canister](https://gitlab.bity.com/bity/dev/icp/storage-canister)
+
+### ICRC3 library
+
+[Read more about ICRC3 library](https://github.com/BitySA/dfinity-rust-libraries/tree/master/src/icrc3)
+
 
 ## Contributing
 
