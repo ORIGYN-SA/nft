@@ -201,7 +201,7 @@ Create metadata using command-line parameters:
   --output metadata.json \
   --name "My NFT" \
   --description "A beautiful NFT" \
-  --image "https://$NFT_CANISTER_ID.raw.icp0.io/images/origynlogo.png" \
+  --image "https://$NFT_CANISTER_ID.raw.icp0.io/origynlogo.png" \
   --attribute "Rarity:Legendary:boost_number" \
   --attribute "Power:95:number" \
   --attribute "Element:Fire"
@@ -273,7 +273,7 @@ This will return a metadata URL that you can use for minting.
   --owner $YOUR_PRINCIPAL_ID \
   --name "My CLI NFT" \
   --metadata "description:A beautiful NFT created via CLI" \
-  --metadata "image:https://$NFT_CANISTER_ID.raw.icp0.io/images/origynlogo.png" \
+  --metadata "image:https://$NFT_CANISTER_ID.raw.icp0.io/origynlogo.png" \
   --metadata "rarity:Legendary" \
   --metadata "power:95" \
   --memo "CLI created NFT"
