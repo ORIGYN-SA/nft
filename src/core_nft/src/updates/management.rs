@@ -524,8 +524,7 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
 
 #[query(guard = "caller_has_manage_authorities_permission")]
 pub fn get_all_storage_subcanisters() -> Vec<candid::Principal> {
-    let sub_canister_manager = read_state(|state| state.data.sub_canister_manager.clone());
-    sub_canister_manager.list_canisters_ids()
+    read_state(|state| state.data.sub_canister_manager.list_canisters_ids())
 }
 
 #[query(guard = "caller_has_read_uploads_permission")]
