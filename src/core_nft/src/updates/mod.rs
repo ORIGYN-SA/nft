@@ -1,4 +1,4 @@
-pub mod icrc37;
+mod icrc37;
 pub mod icrc7;
 pub mod management;
 

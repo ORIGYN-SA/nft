@@ -3,8 +3,8 @@ pub use crate::types::icrc37::{
     icrc37_approve_collection, icrc37_approve_tokens, icrc37_revoke_collection_approvals,
     icrc37_revoke_token_approvals, icrc37_transfer_from, Approval,
 };
-use crate::types::icrc37::{WappedAccount, WappedNat, WrappedApprovalValue};
 use crate::types::nft;
+use crate::types::wrapped_types::{WrappedAccount, WrappedNat, WrappedApprovalValue};
 use crate::types::{__COLLECTION_APPROVALS, __TOKEN_APPROVALS};
 
 use bity_ic_icrc3::{
@@ -137,8 +137,8 @@ fn approve_token(
     let memo_clone = arg.approval_info.memo.clone();
 
     let approval = Approval {
-        spender: WappedAccount::from(arg.approval_info.spender.clone()),
-        from: WappedAccount::from(from_account.clone()),
+        spender: WrappedAccount::from(arg.approval_info.spender.clone()),
+        from: WrappedAccount::from(from_account.clone()),
         expires_at: arg.approval_info.expires_at,
         created_at: current_time,
         memo: memo_clone.clone().map(|m| m.to_vec()),
@@ -146,10 +146,10 @@ fn approve_token(
 
     let would_exceed_max_approvals = __TOKEN_APPROVALS.with_borrow(|token_approvals| {
         token_approvals
-            .get(&WappedNat::from(arg.token_id.clone()))
+            .get(&WrappedNat::from(arg.token_id.clone()))
             .is_some()
             && token_approvals
-                .get(&WappedNat::from(arg.token_id.clone()))
+                .get(&WrappedNat::from(arg.token_id.clone()))
                 .unwrap()
                 .0
                 .len()
@@ -189,7 +189,7 @@ fn approve_token(
     };
 
     __TOKEN_APPROVALS.with_borrow_mut(|s| {
-        let token_approvals = s.get(&WappedNat::from(arg.token_id.clone()));
+        let token_approvals = s.get(&WrappedNat::from(arg.token_id.clone()));
 
         let mut approval_map = if token_approvals.is_none() {
             HashMap::new()
@@ -198,12 +198,12 @@ fn approve_token(
         };
 
         approval_map.insert(
-            WappedAccount::from(arg.approval_info.spender.clone()),
+            WrappedAccount::from(arg.approval_info.spender.clone()),
             approval,
         );
 
         s.insert(
-            WappedNat::from(arg.token_id.clone()),
+            WrappedNat::from(arg.token_id.clone()),
             WrappedApprovalValue(approval_map),
         );
     });
@@ -290,8 +290,8 @@ fn approve_collection(
     let memo_clone = arg.approval_info.memo.clone();
 
     let approval = Approval {
-        spender: WappedAccount::from(arg.approval_info.spender.clone()),
-        from: WappedAccount::from(from_account.clone()),
+        spender: WrappedAccount::from(arg.approval_info.spender.clone()),
+        from: WrappedAccount::from(from_account.clone()),
         expires_at: arg.approval_info.expires_at,
         created_at: current_time,
         memo: memo_clone.clone().map(|m| m.to_vec()),
@@ -314,10 +314,10 @@ fn approve_collection(
 
     let would_exceed_max_approvals = __COLLECTION_APPROVALS.with_borrow(|collection_approvals| {
         collection_approvals
-            .get(&WappedAccount::from(from_account.clone()))
+            .get(&WrappedAccount::from(from_account.clone()))
             .is_some()
             && collection_approvals
-                .get(&WappedAccount::from(from_account.clone()))
+                .get(&WrappedAccount::from(from_account.clone()))
                 .unwrap()
                 .0
                 .len()
@@ -357,7 +357,7 @@ fn approve_collection(
     };
 
     __COLLECTION_APPROVALS.with_borrow_mut(|collection_approvals| {
-        let op_approval_map = collection_approvals.get(&WappedAccount::from(from_account.clone()));
+        let op_approval_map = collection_approvals.get(&WrappedAccount::from(from_account.clone()));
 
         let mut approval_map = if op_approval_map.is_none() {
             WrappedApprovalValue(HashMap::new())
@@ -366,11 +366,11 @@ fn approve_collection(
         };
 
         approval_map.0.insert(
-            WappedAccount::from(arg.approval_info.spender.clone()),
+            WrappedAccount::from(arg.approval_info.spender.clone()),
             approval,
         );
 
-        collection_approvals.insert(WappedAccount::from(from_account.clone()), approval_map);
+        collection_approvals.insert(WrappedAccount::from(from_account.clone()), approval_map);
     });
 
     ApproveCollectionResult::Ok(Nat::from(index))
@@ -462,7 +462,7 @@ fn revoke_token_approvals(
     }
 
     let token_approvals = __TOKEN_APPROVALS
-        .with_borrow(|token_approvals| token_approvals.get(&WappedNat::from(arg.token_id.clone())));
+        .with_borrow(|token_approvals| token_approvals.get(&WrappedNat::from(arg.token_id.clone())));
 
     if token_approvals.is_none() {
         return RevokeTokenApprovalResponse::Err(RevokeTokenApprovalError::ApprovalDoesNotExist);
@@ -471,7 +471,7 @@ fn revoke_token_approvals(
     let mut approval_map = token_approvals.unwrap().0;
 
     if let Some(spender) = &arg.spender {
-        approval_map.remove(&WappedAccount::from(spender.clone()));
+        approval_map.remove(&WrappedAccount::from(spender.clone()));
     } else {
         approval_map.clear();
     };
@@ -505,7 +505,7 @@ fn revoke_token_approvals(
 
     __TOKEN_APPROVALS.with_borrow_mut(|token_approvals| {
         token_approvals.insert(
-            WappedNat::from(arg.token_id.clone()),
+            WrappedNat::from(arg.token_id.clone()),
             WrappedApprovalValue(approval_map),
         );
     });
@@ -586,7 +586,7 @@ fn revoke_collection_approvals(
     };
 
     let collection_approvals = __COLLECTION_APPROVALS.with_borrow(|collection_approvals| {
-        collection_approvals.get(&WappedAccount::from(from_account.clone()))
+        collection_approvals.get(&WrappedAccount::from(from_account.clone()))
     });
 
     if collection_approvals.is_none() {
@@ -598,7 +598,7 @@ fn revoke_collection_approvals(
     let mut approval_map = collection_approvals.unwrap().0;
 
     if let Some(spender) = &arg.spender {
-        approval_map.remove(&WappedAccount::from(spender.clone()));
+        approval_map.remove(&WrappedAccount::from(spender.clone()));
     } else {
         approval_map.clear();
     }
@@ -634,7 +634,7 @@ fn revoke_collection_approvals(
 
     __COLLECTION_APPROVALS.with_borrow_mut(|collection_approvals| {
         collection_approvals.insert(
-            WappedAccount::from(from_account.clone()),
+            WrappedAccount::from(from_account.clone()),
             WrappedApprovalValue(approval_map),
         );
     });
@@ -715,15 +715,15 @@ fn transfer_from(
     let is_owner = nft.token_owner == arg.from;
 
     let has_token_approval = __TOKEN_APPROVALS.with_borrow_mut(|token_approvals| {
-        if let Some(token_approval) = token_approvals.get(&WappedNat::from(arg.token_id.clone())) {
+        if let Some(token_approval) = token_approvals.get(&WrappedNat::from(arg.token_id.clone())) {
             let mut approval_map = token_approval.0;
 
-            if let Some(approval) = approval_map.get(&WappedAccount::from(spender_account)) {
+            if let Some(approval) = approval_map.get(&WrappedAccount::from(spender_account)) {
                 if let Some(expires_at) = approval.expires_at {
                     if expires_at <= current_time {
-                        approval_map.remove(&WappedAccount::from(spender_account));
+                        approval_map.remove(&WrappedAccount::from(spender_account));
                         token_approvals.insert(
-                            WappedNat::from(arg.token_id.clone()),
+                            WrappedNat::from(arg.token_id.clone()),
                             WrappedApprovalValue(approval_map),
                         );
                         return false;
@@ -738,22 +738,22 @@ fn transfer_from(
 
     let has_collection_approval = __COLLECTION_APPROVALS.with_borrow_mut(|collection_approvals| {
         if let Some(token_owner_approvals) =
-            collection_approvals.get(&WappedAccount::from(nft.token_owner.clone()))
+            collection_approvals.get(&WrappedAccount::from(nft.token_owner.clone()))
         {
             let mut approval_map = token_owner_approvals.0;
 
-            if let Some(approval) = approval_map.get(&WappedAccount::from(spender_account.clone()))
+            if let Some(approval) = approval_map.get(&WrappedAccount::from(spender_account.clone()))
             {
                 if let Some(expires_at) = approval.expires_at {
                     // remove the approval if it has expired
                     if expires_at <= current_time {
-                        approval_map.remove(&WappedAccount::from(spender_account));
+                        approval_map.remove(&WrappedAccount::from(spender_account));
                         if approval_map.is_empty() {
-                            collection_approvals.remove(&WappedAccount::from(nft.token_owner));
+                            collection_approvals.remove(&WrappedAccount::from(nft.token_owner));
                         }
 
                         collection_approvals.insert(
-                            WappedAccount::from(nft.token_owner.clone()),
+                            WrappedAccount::from(nft.token_owner.clone()),
                             WrappedApprovalValue(approval_map),
                         );
                         return false;
@@ -817,18 +817,18 @@ fn transfer_from(
     });
 
     __TOKEN_APPROVALS.with_borrow_mut(|token_approvals| {
-        token_approvals.remove(&WappedNat::from(arg.token_id.clone()));
+        token_approvals.remove(&WrappedNat::from(arg.token_id.clone()));
     });
 
     let has_nfts = __TOKEN_APPROVALS.with_borrow(|token_approvals| {
         token_approvals
-            .get(&WappedNat::from(arg.token_id.clone()))
+            .get(&WrappedNat::from(arg.token_id.clone()))
             .is_some()
     });
 
     if !has_nfts {
         __COLLECTION_APPROVALS.with_borrow_mut(|collection_approvals| {
-            collection_approvals.remove(&WappedAccount::from(arg.from.clone()));
+            collection_approvals.remove(&WrappedAccount::from(arg.from.clone()));
         });
     }
 

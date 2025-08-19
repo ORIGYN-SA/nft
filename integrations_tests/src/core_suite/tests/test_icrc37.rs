@@ -7,17 +7,16 @@ use crate::client::core_nft::{
 use crate::core_suite::setup::default_test_setup;
 use crate::core_suite::setup::setup::{TestEnv, MINUTE_IN_MS};
 use crate::core_suite::setup::setup_core::upgrade_core_canister;
+use crate::utils::create_default_metadata;
 use crate::utils::random_principal;
-use crate::utils::{create_default_icrc97_metadata, create_default_metadata};
 use crate::utils::{mint_nft, tick_n_blocks};
 use bity_ic_types::BuildVersion;
-use candid::{Encode, Nat, Principal};
+use candid::{Encode, Nat};
 use core_nft::icrc37_approve_tokens::ApproveTokenResult;
 use core_nft::lifecycle::Args;
 use core_nft::post_upgrade::UpgradeArgs;
 use core_nft::types::icrc37;
 use icrc_ledger_types::icrc1::account::Account;
-use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
 use std::time::Duration;
 

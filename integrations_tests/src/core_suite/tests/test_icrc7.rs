@@ -1,7 +1,6 @@
 use crate::client::core_nft::{
     icrc3_get_blocks, icrc7_atomic_batch_transfers, icrc7_balance_of, icrc7_collection_metadata,
-    icrc7_default_take_value, icrc7_description, icrc7_logo, icrc7_max_memo_size,
-    icrc7_max_query_batch_size, icrc7_max_take_value, icrc7_max_update_batch_size, icrc7_name,
+    icrc7_description, icrc7_logo, icrc7_max_memo_size, icrc7_max_take_value, icrc7_name,
     icrc7_owner_of, icrc7_permitted_drift, icrc7_supply_cap, icrc7_symbol, icrc7_token_metadata,
     icrc7_total_supply, icrc7_transfer, icrc7_tx_window, update_nft_metadata,
 };
@@ -16,7 +15,6 @@ use core_nft::types::update_nft_metadata;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
 use icrc_ledger_types::icrc1::account::Account;
 use icrc_ledger_types::icrc3::blocks::GetBlocksRequest;
-use pocket_ic::{PocketIc, RejectResponse};
 use serde_bytes::ByteBuf;
 use serde_json::json;
 use std::collections::BTreeMap;

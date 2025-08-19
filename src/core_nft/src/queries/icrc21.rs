@@ -86,8 +86,6 @@ fn handle_transfer_consent(
                 if let Some(memo) = &arg.memo {
                     fields.push(("Memo".to_string(), format!("{:?}", memo)));
                 }
-
-                let token = read_state(|state| state.data.get_token_by_id(&arg.token_id).cloned());
             }
 
             let generic_message = if token_count > 1 {
@@ -135,8 +133,6 @@ fn handle_approve_tokens_consent(
                 if let Some(expires_at) = arg.approval_info.expires_at {
                     fields.push(("Expires At".to_string(), expires_at.to_string()));
                 }
-
-                let token = read_state(|state| state.data.get_token_by_id(&arg.token_id).cloned());
             }
 
             let generic_message = if token_count > 1 {
@@ -230,8 +226,6 @@ fn handle_revoke_token_approvals_consent(
                 if let Some(spender) = &arg.spender {
                     fields.push(("Spender".to_string(), format!("{}", spender.owner)));
                 }
-
-                let token = read_state(|state| state.data.get_token_by_id(&arg.token_id).cloned());
             }
 
             let generic_message = if token_count > 1 {
@@ -327,8 +321,6 @@ fn handle_transfer_from_consent(
                 if let Some(memo) = &arg.memo {
                     fields.push(("Memo".to_string(), format!("{:?}", memo)));
                 }
-
-                let token = read_state(|state| state.data.get_token_by_id(&arg.token_id).cloned());
             }
 
             let generic_message = if token_count > 1 {

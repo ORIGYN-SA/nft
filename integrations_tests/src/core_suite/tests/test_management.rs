@@ -1,9 +1,8 @@
 use crate::client::core_nft::{
-    cancel_upload, finalize_upload, get_upload_status, get_user_permissions, grant_permission,
-    icrc7_token_metadata, init_upload, mint, revoke_permission, store_chunk,
-    update_collection_metadata, update_nft_metadata,
+    cancel_upload, finalize_upload, get_upload_status, grant_permission, init_upload, mint,
+    revoke_permission, store_chunk, update_collection_metadata, update_nft_metadata,
 };
-use crate::utils::{create_default_icrc97_metadata, create_default_metadata};
+use crate::utils::create_default_icrc97_metadata;
 
 use candid::{Encode, Nat, Principal};
 use core_nft::types::permissions::Permission;
@@ -11,9 +10,8 @@ use icrc_ledger_types::icrc1::account::Account;
 
 use bity_ic_storage_canister_api::types::storage::UploadState;
 use core_nft::types::management::{
-    cancel_upload, finalize_upload, get_upload_status, get_user_permissions, grant_permission,
-    init_upload, mint, revoke_permission, store_chunk, update_collection_metadata,
-    update_nft_metadata,
+    cancel_upload, finalize_upload, grant_permission, init_upload, mint, revoke_permission,
+    store_chunk, update_collection_metadata, update_nft_metadata,
 };
 use ic_cdk::println;
 use sha2::{Digest, Sha256};

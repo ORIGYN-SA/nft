@@ -1,11 +1,9 @@
-use candid::Principal;
-use ic_stable_structures::{storable::Bound, StableBTreeMap, Storable};
-use minicbor::{Decode, Encode, Encoder};
-
+use ic_stable_structures::StableBTreeMap;
+use minicbor::{Decode, Encode};
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 use std::collections::HashMap;
 
+use super::wrapped_types::{WrappedAccount, WrappedApprovalValue, WrappedNat};
 use crate::memory::{get_collection_approvals_memory, get_token_approvals_memory, VM};
 use bity_ic_types::TimestampNanos;
 use candid::{CandidType, Nat};
@@ -21,9 +19,9 @@ thread_local! {
 #[derive(Encode, Decode, CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct Approval {
     #[n(0)]
-    pub spender: WappedAccount,
+    pub spender: WrappedAccount,
     #[n(1)]
-    pub from: WappedAccount,
+    pub from: WrappedAccount,
     #[n(2)]
     pub expires_at: Option<TimestampNanos>,
     #[n(3)]
@@ -41,162 +39,8 @@ pub struct ApprovalInfo {
     pub created_at_time: TimestampNanos,
 }
 
-#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
-pub struct WappedNat(pub Nat);
-
-impl From<Nat> for WappedNat {
-    fn from(nat: Nat) -> Self {
-        WappedNat(nat)
-    }
-}
-
-impl Storable for WappedNat {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        let mut buffer = Vec::new();
-        minicbor::encode(self, &mut buffer).expect("failed to encode Nat");
-        Cow::Owned(buffer)
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        minicbor::decode(&bytes).expect("failed to decode WrappedNat")
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
-}
-
-impl<C> minicbor::Encode<C> for WappedNat {
-    fn encode<W: minicbor::encode::Write>(
-        &self,
-        e: &mut Encoder<W>,
-        _ctx: &mut C,
-    ) -> Result<(), minicbor::encode::Error<W::Error>> {
-        e.u64(u64::try_from(self.0 .0.clone()).unwrap())?;
-        Ok(())
-    }
-}
-
-impl<'b, C> minicbor::Decode<'b, C> for WappedNat {
-    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
-        let nat = d.u64()?;
-        Ok(WappedNat(Nat::from(nat)))
-    }
-}
-
-#[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq, Hash, Ord, PartialOrd)]
-pub struct WappedAccount(pub Account);
-
-impl From<Account> for WappedAccount {
-    fn from(account: Account) -> Self {
-        WappedAccount(account)
-    }
-}
-
-impl Storable for WappedAccount {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        let mut buffer = Vec::new();
-        minicbor::encode(self, &mut buffer).expect("failed to encode Account");
-        Cow::Owned(buffer)
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        minicbor::decode(&bytes).expect("failed to decode WrappedAccount")
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
-}
-
-impl Eq for WappedAccount {}
-
-impl<C> minicbor::Encode<C> for WappedAccount {
-    fn encode<W: minicbor::encode::Write>(
-        &self,
-        e: &mut Encoder<W>,
-        _ctx: &mut C,
-    ) -> Result<(), minicbor::encode::Error<W::Error>> {
-        e.array(2)?;
-        e.bytes(self.0.owner.as_slice())?;
-        match &self.0.subaccount {
-            Some(subaccount) => e.bytes(subaccount.as_slice())?,
-            None => e.null()?,
-        };
-        Ok(())
-    }
-}
-
-impl<'b, C> minicbor::Decode<'b, C> for WappedAccount {
-    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
-        let array = d.array()?.unwrap();
-        if array != 2 {
-            return Err(minicbor::decode::Error::message(
-                "expected array of length 2",
-            ));
-        }
-        let owner = d.bytes()?;
-        let subaccount = if d.datatype()? == minicbor::data::Type::Null {
-            d.null()?;
-            None
-        } else {
-            Some(d.bytes()?)
-        };
-        Ok(WappedAccount(Account {
-            owner: Principal::from_slice(&owner),
-            subaccount: subaccount.map(|subaccount| {
-                let mut subaccount_array = [0u8; 32];
-                subaccount_array.copy_from_slice(&subaccount);
-                subaccount_array
-            }),
-        }))
-    }
-}
-
-pub type TokenApprovalValue = HashMap<WappedAccount, Approval>;
-pub struct WrappedApprovalValue(pub TokenApprovalValue);
-
-impl Storable for WrappedApprovalValue {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        let mut buffer = Vec::new();
-        minicbor::encode(self, &mut buffer).expect("failed to encode TokenApprovalValue");
-        Cow::Owned(buffer)
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        minicbor::decode(&bytes).expect("failed to decode TokenApprovalValue")
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
-}
-
-impl<C> minicbor::Encode<C> for WrappedApprovalValue {
-    fn encode<W: minicbor::encode::Write>(
-        &self,
-        e: &mut Encoder<W>,
-        _ctx: &mut C,
-    ) -> Result<(), minicbor::encode::Error<W::Error>> {
-        e.map(self.0.len() as u64)?;
-        for (k, v) in self.0.iter() {
-            k.encode(e, _ctx)?;
-            v.encode(e, _ctx)?;
-        }
-        Ok(())
-    }
-}
-
-impl<'b, C> minicbor::Decode<'b, C> for WrappedApprovalValue {
-    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
-        let map = d.map()?.unwrap();
-        let mut new_map = HashMap::new();
-
-        for _ in 0..map {
-            let key = WappedAccount::decode(d, ctx)?;
-            let value = Approval::decode(d, ctx)?;
-            new_map.insert(key, value);
-        }
-        Ok(WrappedApprovalValue(new_map))
-    }
-}
-
-// Map to store token approvals: token_id -> spender -> approval
-pub type TokenApprovals = StableBTreeMap<WappedNat, WrappedApprovalValue, VM>;
+pub type TokenApprovalValue = HashMap<WrappedAccount, Approval>;
+pub type TokenApprovals = StableBTreeMap<WrappedNat, WrappedApprovalValue, VM>;
 
 pub fn init_token_approvals() -> TokenApprovals {
     let memory = get_token_approvals_memory();
@@ -204,7 +48,7 @@ pub fn init_token_approvals() -> TokenApprovals {
 }
 
 // Map to store collection approvals: spender -> approval
-pub type CollectionApprovals = StableBTreeMap<WappedAccount, WrappedApprovalValue, VM>;
+pub type CollectionApprovals = StableBTreeMap<WrappedAccount, WrappedApprovalValue, VM>;
 
 pub fn init_collection_approvals() -> CollectionApprovals {
     let memory = get_collection_approvals_memory();

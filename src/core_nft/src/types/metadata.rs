@@ -1,5 +1,6 @@
 use crate::memory::VM;
 use crate::types::value_custom::CustomValue as Value;
+use crate::types::wrapped_types::WrappedNat;
 use crate::{memory::get_metadata_memory, utils::trace};
 
 use candid::{CandidType, Nat};
@@ -60,49 +61,10 @@ impl<'b, C> MinicborDecode<'b, C> for MetadataData {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, CandidType, PartialEq, Eq, PartialOrd, Ord)]
-pub struct NatWrapper(pub Nat);
-
-impl Storable for NatWrapper {
-    fn to_bytes(&self) -> Cow<[u8]> {
-        let mut buffer = Vec::new();
-        encode(self, &mut buffer).expect("failed to encode NatWrapper");
-        Cow::Owned(buffer)
-    }
-
-    fn from_bytes(bytes: Cow<[u8]>) -> Self {
-        decode(&bytes).expect("failed to decode NatWrapper")
-    }
-
-    const BOUND: Bound = Bound::Unbounded;
-}
-
-impl<C> MinicborEncode<C> for NatWrapper {
-    fn encode<W: minicbor::encode::Write>(
-        &self,
-        e: &mut minicbor::Encoder<W>,
-        _ctx: &mut C,
-    ) -> Result<(), minicbor::encode::Error<W::Error>> {
-        let n = self.0.to_string().parse::<u64>().unwrap();
-        e.u64(n)?;
-        Ok(())
-    }
-}
-
-impl<'b, C> MinicborDecode<'b, C> for NatWrapper {
-    fn decode(
-        d: &mut minicbor::Decoder<'b>,
-        _ctx: &mut C,
-    ) -> Result<Self, minicbor::decode::Error> {
-        let n = d.u64()?;
-        Ok(NatWrapper(Nat::from(n)))
-    }
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct Metadata {
     #[serde(skip, default = "init_btree_map")]
-    data: StableBTreeMap<NatWrapper, MetadataData, VM>,
+    data: StableBTreeMap<WrappedNat, MetadataData, VM>,
 }
 
 impl Clone for Metadata {
@@ -119,7 +81,7 @@ fn init_metadata() -> Metadata {
     }
 }
 
-fn init_btree_map() -> StableBTreeMap<NatWrapper, MetadataData, VM> {
+fn init_btree_map() -> StableBTreeMap<WrappedNat, MetadataData, VM> {
     let memory = get_metadata_memory();
     StableBTreeMap::init(memory)
 }
@@ -146,7 +108,7 @@ impl Metadata {
     pub fn insert_data(&mut self, nft_id: Option<Nat>, data_id: String, data: Value) {
         trace(&format!("Inserting data: {:?}", data_id));
 
-        let nat_wrapper = NatWrapper(nft_id.unwrap_or(Nat::from(0u64)));
+        let nat_wrapper = WrappedNat(nft_id.unwrap_or(Nat::from(0u64)));
 
         let mut metadata_data = if let Some(existing_data) = self.data.get(&nat_wrapper) {
             existing_data.data.clone()
@@ -168,7 +130,7 @@ impl Metadata {
         trace(&format!("Getting data: {:?}", data_id));
         let metadata_data = self
             .data
-            .get(&NatWrapper(nft_id.unwrap_or(Nat::from(0u64))))
+            .get(&WrappedNat(nft_id.unwrap_or(Nat::from(0u64))))
             .ok_or("Data not found".to_string())?;
 
         match metadata_data
@@ -189,7 +151,7 @@ impl Metadata {
             trace(&format!("Getting data for nft: {:?}", nft_id));
             let metadata_data = self
                 .data
-                .get(&NatWrapper(nft_id))
+                .get(&WrappedNat(nft_id))
                 .ok_or("Data not found".to_string());
             trace(&format!("Metadata data: {:?}", metadata_data));
             match metadata_data {
@@ -233,7 +195,7 @@ impl Metadata {
         trace(&format!("Updating data: {:?}", data_id));
         let metadata_data = self
             .data
-            .get(&NatWrapper(nft_id.clone().unwrap_or(Nat::from(0u64))))
+            .get(&WrappedNat(nft_id.clone().unwrap_or(Nat::from(0u64))))
             .ok_or("Data not found".to_string())?;
 
         let mut metadata_data = metadata_data.clone();
@@ -243,7 +205,7 @@ impl Metadata {
         metadata_data.data.insert(data_id, data);
 
         self.data
-            .insert(NatWrapper(nft_id.unwrap_or(Nat::from(0u64))), metadata_data);
+            .insert(WrappedNat(nft_id.unwrap_or(Nat::from(0u64))), metadata_data);
 
         trace(&format!("Old value: {:?}", old_value));
 
@@ -254,7 +216,7 @@ impl Metadata {
         trace(&format!("Deleting data: {:?}", data_id));
         let mut metadata_data = self
             .data
-            .get(&NatWrapper(nft_id.unwrap_or(Nat::from(0u64))))
+            .get(&WrappedNat(nft_id.unwrap_or(Nat::from(0u64))))
             .unwrap();
 
         metadata_data.data.remove(&data_id);
@@ -263,7 +225,7 @@ impl Metadata {
     pub fn replace_all_data(&mut self, nft_id: Option<Nat>, datas: BTreeMap<String, Value>) {
         trace(&format!("Replacing all data for nft: {:?}", nft_id));
         self.data
-            .remove(&NatWrapper(nft_id.clone().unwrap_or(Nat::from(0u64))));
+            .remove(&WrappedNat(nft_id.clone().unwrap_or(Nat::from(0u64))));
 
         for (key, value) in datas.iter() {
             self.insert_data(nft_id.clone(), key.clone(), value.clone());

@@ -11,6 +11,7 @@ pub mod nft;
 pub mod permissions;
 pub mod sub_canister;
 pub mod value_custom;
+pub mod wrapped_types;
 
 pub use fund_manager::*;
 pub use icrc10::*;
@@ -24,3 +25,4 @@ pub use nft::*;
 pub use permissions::*;
 pub use sub_canister::*;
 pub use value_custom::*;
+pub use wrapped_types::*;
