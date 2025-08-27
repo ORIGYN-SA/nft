@@ -7,7 +7,9 @@ use sha2::{Digest, Sha256};
 use std::fs::write;
 use std::path::Path;
 
-use crate::calls::{mint as calls_mint, permissions as calls_permissions, uploads as calls_uploads};
+use crate::calls::{
+    mint as calls_mint, permissions as calls_permissions, uploads as calls_uploads,
+};
 use crate::metadata::{
     create_icrc97_metadata, create_icrc97_metadata_from_url, create_metadata_interactive,
     create_metadata_interactive_hashmap, validate_icrc97_metadata,
@@ -27,14 +29,9 @@ pub async fn handle_upload_file(
         return Err(anyhow!("File '{}' does not exist", file_path));
     }
 
-    let url = calls_uploads::upload_file(
-        agent,
-        canister_id,
-        file_path,
-        destination_path,
-        chunk_size,
-    )
-    .await?;
+    let url =
+        calls_uploads::upload_file(agent, canister_id, file_path, destination_path, chunk_size)
+            .await?;
 
     println!("File upload completed successfully!");
     println!("URL: {}", url);
@@ -49,8 +46,8 @@ pub async fn handle_validate_metadata(sub_matches: &ArgMatches) -> Result<()> {
     }
 
     let metadata_content = std::fs::read_to_string(metadata_file)?;
-    let metadata: Value = serde_json::from_str(&metadata_content)
-        .map_err(|e| anyhow!("Invalid JSON: {}", e))?;
+    let metadata: Value =
+        serde_json::from_str(&metadata_content).map_err(|e| anyhow!("Invalid JSON: {}", e))?;
 
     validate_icrc97_metadata(&metadata)?;
 
@@ -70,7 +67,11 @@ pub async fn handle_create_metadata(sub_matches: &ArgMatches) -> Result<()> {
     let metadata = if interactive || (name.is_none() && description.is_none()) {
         create_metadata_interactive()?
     } else {
-        let name = name.ok_or_else(|| anyhow!("Name is required in non-interactive mode (use --interactive for interactive mode)"))?;
+        let name = name.ok_or_else(|| {
+            anyhow!(
+                "Name is required in non-interactive mode (use --interactive for interactive mode)"
+            )
+        })?;
         let description = description.ok_or_else(|| anyhow!("Description is required in non-interactive mode (use --interactive for interactive mode)"))?;
         let image_url = sub_matches.get_one::<String>("image");
         let external_url = sub_matches.get_one::<String>("external_url");
@@ -188,11 +189,17 @@ pub async fn handle_mint(
                     let key = parts[0].to_string();
                     let value_str = parts[1];
                     let value = if let Ok(num) = value_str.parse::<u64>() {
-                        icrc_ledger_types::icrc::generic_value::ICRC3Value::Nat(candid::Nat::from(num))
+                        icrc_ledger_types::icrc::generic_value::ICRC3Value::Nat(candid::Nat::from(
+                            num,
+                        ))
                     } else if let Ok(int) = value_str.parse::<i64>() {
-                        icrc_ledger_types::icrc::generic_value::ICRC3Value::Int(candid::Int::from(int))
+                        icrc_ledger_types::icrc::generic_value::ICRC3Value::Int(candid::Int::from(
+                            int,
+                        ))
                     } else {
-                        icrc_ledger_types::icrc::generic_value::ICRC3Value::Text(value_str.to_string())
+                        icrc_ledger_types::icrc::generic_value::ICRC3Value::Text(
+                            value_str.to_string(),
+                        )
                     };
                     metadata.push((key, value));
                 }

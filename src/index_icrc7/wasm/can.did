@@ -1,0 +1,30 @@
+type Account = record { owner : principal; subaccount : opt blob };
+type Args = record {
+  sort_by : opt SortBy;
+  start : nat64;
+  filter : opt IndexType;
+  length : nat64;
+};
+type Args_1 = variant { Upgrade : UpgradeArgs; Init : InitArgs };
+type BlockWithId = record { id : nat; block : ICRC3Value };
+type BuildVersion = record { major : nat32; minor : nat32; patch : nat32 };
+type ICRC3Value = variant {
+  Int : int;
+  Map : vec record { text; ICRC3Value };
+  Nat : nat;
+  Blob : blob;
+  Text : text;
+  Array : vec ICRC3Value;
+};
+type IndexType = variant { Account : Account; BlockType : text };
+type InitArgs = record {
+  test_mode : bool;
+  authorized_principals : vec principal;
+  version : BuildVersion;
+  ledger_canister_id : principal;
+  commit_hash : text;
+};
+type Response = record { blocks : vec BlockWithId };
+type SortBy = variant { Descending; Ascending };
+type UpgradeArgs = record { version : BuildVersion; commit_hash : text };
+service : (Args_1) -> { get_blocks : (Args) -> (Response) }

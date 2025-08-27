@@ -18,7 +18,7 @@ pub mod icrc3_get_properties {
 }
 
 pub mod icrc3_get_tip_certificate {
-    pub use bity_ic_icrc3::types::icrc3_get_tip_cerificate::{Args, Response};
+    pub use bity_ic_icrc3::types::icrc3_get_tip_certificate::{Args, Response};
 }
 
 pub mod icrc3_supported_block_types {

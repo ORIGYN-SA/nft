@@ -2,6 +2,7 @@
 members = [
     "integrations_tests",
     "src/core_nft",
+    "src/index_icrc7",
     "cmdline"
 ]
 resolver = "2"
@@ -12,7 +13,7 @@ panic = "abort"
 
 
 [workspace.dependencies]
-candid = { version = "0.10.14", features = ["value"] }
+candid = { version = "0.10.17", features = ["value"] }
 ciborium = "0.2.2"
 futures = "0.3.29"
 # Enable `custom` feature of k256's getrandom dependency. See icp_neuron/impl/src/ecdsa.rs for more details.
@@ -33,12 +34,12 @@ rmp-serde = "1.1.2"
 serde = "1.0.219"
 serde_bytes = "0.11.17"
 serde_cbor = "0.11.2"
-serde_json = "1.0.140"
+serde_json = "1.0.143"
 serde_with = "3.7.0"
 serde_yaml = "0.9.33"
 serde_tokenstream = "0.2.2"
 sha2 = "0.10.9"
-syn = "2.0.104"
+syn = "2.0.106"
 tracing = "0.1.40"
 tracing-attributes = "0.1.30"
 tracing-subscriber = "0.3.18"
@@ -64,7 +65,7 @@ bity-ic-canister-client         = "0.2.4"
 bity-ic-canister-logger         = "0.2.0"
 bity-ic-canister-state-macros   = "0.1.0"
 bity-ic-canister-tracing-macros = "0.1.0"
-bity-ic-canister-time           = "0.2.0"
+bity-ic-canister-time           = "0.2.1"
 bity-ic-serializer              = "0.1.0"
 bity-ic-stable-memory           = "0.2.1"
 bity-ic-types                   = "0.1.1"
@@ -73,4 +74,6 @@ bity-ic-subcanister-manager     = "0.3.1"
 bity-ic-icrc3                   = "0.4.8"
 bity-ic-icrc3-macros            = "0.3.3" 
 bity-ic-storage-canister-c2c    = "0.2.2"
-bity-ic-storage-canister-api    = "0.2.0"
+bity-ic-icrc3-archive-c2c-client    = "0.3.2"
+bity-ic-icrc3-c2c-client    = "0.1.0"
+bity-ic-storage-canister-api = "0.2.0"
