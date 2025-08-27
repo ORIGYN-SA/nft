@@ -1,2 +1,2 @@
 pub mod setup;
-mod tests;
+pub mod tests;
