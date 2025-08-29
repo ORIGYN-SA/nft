@@ -34,7 +34,7 @@ impl FromStr for WrappedAccount {
 }
 
 impl Storable for WrappedAccount {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         let mut buffer = Vec::new();
         minicbor::encode(self, &mut buffer).expect("failed to encode Account");
         Cow::Owned(buffer)
@@ -98,7 +98,7 @@ impl<'b, C> minicbor::Decode<'b, C> for WrappedAccount {
 pub struct CustomValue(pub Value);
 
 impl Storable for CustomValue {
-    fn to_bytes(&self) -> Cow<[u8]> {
+    fn to_bytes(&self) -> Cow<'_, [u8]> {
         let mut buffer = Vec::new();
         minicbor::encode(self, &mut buffer).expect("failed to encode CustomValue");
         Cow::Owned(buffer)

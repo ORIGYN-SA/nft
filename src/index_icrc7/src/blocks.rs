@@ -1,4 +1,5 @@
 use crate::cache::{insert_value, try_get_value};
+use crate::index::SortBy;
 use crate::state::read_state;
 use crate::wrapped_values::WrappedAccount;
 
@@ -129,18 +130,6 @@ pub trait TransactionDataExtractor {
                     .map_err(|_| "Invalid timestamp format")?)
             } else {
                 Err("Missing or invalid timestamp field".to_string())
-            }
-        } else {
-            Err("Invalid block data".to_string())
-        }
-    }
-
-    fn extract_block_id(&self, data: &ICRC3Value) -> Result<u64, String> {
-        if let ICRC3Value::Map(map) = data {
-            if let Some(ICRC3Value::Nat(block_id_nat)) = map.get("id") {
-                Ok(u64::try_from(block_id_nat.0.clone()).map_err(|_| "Invalid block ID format")?)
-            } else {
-                Err("Missing or invalid block ID field".to_string())
             }
         } else {
             Err("Invalid block data".to_string())
@@ -382,7 +371,10 @@ impl TransactionDataExtractor for RevokeCollectionBlock {
     }
 }
 
-pub async fn get_all_blocks(block_ids: Vec<u64>) -> Result<Vec<BlockWithId>, String> {
+pub async fn get_all_blocks(
+    block_ids: Vec<u64>,
+    sort_by: Option<SortBy>,
+) -> Result<Vec<BlockWithId>, String> {
     if block_ids.is_empty() {
         return Ok(Vec::new());
     }
@@ -392,23 +384,30 @@ pub async fn get_all_blocks(block_ids: Vec<u64>) -> Result<Vec<BlockWithId>, Str
 
     // First, check cache for each block ID
     for &block_id in &block_ids {
-        ic_cdk::println!("block_id: {:?}", block_id);
         if let Some(cached_block) = try_get_value(block_id) {
-            ic_cdk::println!("cached_block: {:?}", cached_block);
             let block_with_id = BlockWithId {
                 id: Nat::from(block_id),
                 block: cached_block.0,
             };
             ret_blocks.push(block_with_id);
         } else {
-            ic_cdk::println!("uncached_block_ids: {:?}", block_id);
             uncached_block_ids.push(block_id);
         }
     }
 
     // If all blocks were found in cache, return early
     if uncached_block_ids.is_empty() {
-        ret_blocks.sort_by(|a, b| a.id.cmp(&b.id));
+        match sort_by {
+            Some(SortBy::Ascending) => {
+                ret_blocks.sort_by(|a, b| a.id.cmp(&b.id));
+            }
+            Some(SortBy::Descending) => {
+                ret_blocks.sort_by(|a, b| b.id.cmp(&a.id));
+            }
+            None => {
+                ret_blocks.sort_by(|a, b| a.id.cmp(&b.id));
+            }
+        }
         return Ok(ret_blocks);
     }
 
@@ -417,8 +416,6 @@ pub async fn get_all_blocks(block_ids: Vec<u64>) -> Result<Vec<BlockWithId>, Str
     sorted_block_ids.sort();
 
     let chunks = group_consecutive_block_ids(&sorted_block_ids);
-
-    ic_cdk::println!("chunks: {:?}", chunks);
 
     let ledger_canister_id = read_state(|state| state.data.ledger_canister_id);
 
@@ -436,18 +433,13 @@ pub async fn get_all_blocks(block_ids: Vec<u64>) -> Result<Vec<BlockWithId>, Str
         .await
         .map_err(|e| e.to_string())?;
 
-        ic_cdk::println!("blocks: {:?}", blocks);
-
         for archive in blocks.archived_blocks {
             let archive_blocks = archive_get_blocks(archive.callback.canister_id, archive.args)
                 .await
                 .map_err(|e| e.to_string())?;
 
-            ic_cdk::println!("archive_blocks: {:?}", archive_blocks);
-
             for block in archive_blocks.blocks {
                 if let Ok(block_id) = u64::try_from(&block.id.0) {
-                    ic_cdk::println!("block_id: {:?}", block_id);
                     insert_value(
                         block_id,
                         crate::wrapped_values::CustomValue(block.block.clone()),
@@ -468,7 +460,17 @@ pub async fn get_all_blocks(block_ids: Vec<u64>) -> Result<Vec<BlockWithId>, Str
         }
     }
 
-    ret_blocks.sort_by(|a, b| a.id.cmp(&b.id));
+    match sort_by {
+        Some(SortBy::Ascending) => {
+            ret_blocks.sort_by(|a, b| a.id.cmp(&b.id));
+        }
+        Some(SortBy::Descending) => {
+            ret_blocks.sort_by(|a, b| b.id.cmp(&a.id));
+        }
+        None => {
+            ret_blocks.sort_by(|a, b| a.id.cmp(&b.id));
+        }
+    }
 
     Ok(ret_blocks)
 }

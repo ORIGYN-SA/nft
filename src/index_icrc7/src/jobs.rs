@@ -6,10 +6,10 @@ use crate::{
     index::add_block_to_index,
     state::{mutate_state, read_state},
 };
-use bity_ic_canister_time::{run_interval, DAY_IN_MS};
+use bity_ic_canister_time::{run_interval, DAY_IN_MS, MINUTE_IN_MS};
 
 const CACHE_CLEANUP_INTERVAL: u64 = DAY_IN_MS;
-const UPDATE_INDEX_INTERVAL: u64 = DAY_IN_MS;
+const UPDATE_INDEX_INTERVAL: u64 = MINUTE_IN_MS;
 const BLOCK_BATCH_SIZE: u64 = 100;
 
 pub fn start_job() {
@@ -39,11 +39,13 @@ async fn update_index() {
 
     // Generate block IDs array starting from last_block_id and incrementing
     let block_ids: Vec<u64> = (last_block_id..last_block_id + BLOCK_BATCH_SIZE).collect();
+    ic_cdk::println!("Block IDs: {:?}", block_ids);
 
-    let blocks = get_all_blocks(block_ids).await;
+    let blocks = get_all_blocks(block_ids, None).await;
     match blocks {
         Ok(blocks) => {
             for block in blocks {
+                ic_cdk::println!("Adding block to index: {:?}", block);
                 match add_block_to_index(&block) {
                     Ok(_) => {
                         last_block_id += 1;
@@ -53,7 +55,6 @@ async fn update_index() {
                         break;
                     }
                 }
-                last_block_id += 1;
             }
         }
         Err(e) => {

@@ -8,7 +8,7 @@ pub mod get_blocks {
     pub struct Args {
         pub start: u64,
         pub length: u64,
-        pub filter: Option<IndexType>,
+        pub filters: Vec<IndexType>,
         pub sort_by: Option<SortBy>,
     }
 

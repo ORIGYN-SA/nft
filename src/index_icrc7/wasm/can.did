@@ -1,8 +1,8 @@
 type Account = record { owner : principal; subaccount : opt blob };
 type Args = record {
   sort_by : opt SortBy;
+  filters : vec IndexType;
   start : nat64;
-  filter : opt IndexType;
   length : nat64;
 };
 type Args_1 = variant { Upgrade : UpgradeArgs; Init : InitArgs };
