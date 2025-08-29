@@ -9,8 +9,8 @@ use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
 use icrc_ledger_types::icrc1::account::Account;
 use std::time::Duration;
 
-use crate::index_suite::setup::default_test_setup;
 use crate::index_suite::setup::setup::TestEnv;
+use crate::index_suite::setup::{default_test_setup, test_setup_no_limit};
 use index_icrc7::{index::IndexType, types::get_blocks::Args};
 
 #[test]
@@ -1171,4 +1171,227 @@ fn test_get_blocks_complex_filters_and_ordering() {
     );
 
     println!("=== All complex filter and ordering tests passed! ===");
+}
+
+#[test]
+fn test_get_blocks_descending_order_with_limit() {
+    let mut test_env: TestEnv = test_setup_no_limit();
+    println!("test_env: {:?}", test_env);
+
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+        index_canister_id,
+    } = test_env;
+
+    let mut token_ids = Vec::new();
+
+    // Phase 1: Mint 15 NFTs to ensure we have more than 10 transactions
+    println!("=== Phase 1: Minting 15 NFTs ===");
+    for i in 0..15 {
+        let owner = if i % 2 == 0 { nft_owner1 } else { nft_owner2 };
+
+        let mint_return = mint_nft(
+            pic,
+            Account {
+                owner,
+                subaccount: None,
+            },
+            controller,
+            collection_canister_id,
+            vec![(
+                "name".to_string(),
+                Icrc3Value::Text(format!("test{}", i).to_string()),
+            )],
+        );
+
+        match mint_return {
+            Ok(token_id) => {
+                token_ids.push(token_id.clone());
+                println!("Minted token {}: {:?} for owner {:?}", i, token_id, owner);
+            }
+            Err(e) => {
+                println!("Error minting NFT {}: {:?}", i, e);
+                assert!(false);
+            }
+        }
+
+        pic.advance_time(Duration::from_millis(MINUTE_IN_MS));
+        tick_n_blocks(pic, 5);
+    }
+
+    // Phase 2: Transfer some NFTs to create more transactions
+    println!("=== Phase 2: Transferring some NFTs ===");
+    for i in 0..5 {
+        let from_owner = if i % 2 == 0 { nft_owner1 } else { nft_owner2 };
+        let to_owner = if from_owner == nft_owner1 {
+            nft_owner2
+        } else {
+            nft_owner1
+        };
+
+        let transfer_args = vec![icrc7::TransferArg {
+            to: Account {
+                owner: to_owner,
+                subaccount: None,
+            },
+            token_id: token_ids[i].clone(),
+            memo: None,
+            from_subaccount: None,
+            created_at_time: None,
+        }];
+
+        let transfer_response =
+            icrc7_transfer(pic, from_owner, collection_canister_id, &transfer_args);
+
+        assert!(
+            transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_ok(),
+            "Transfer {} failed: {:?}",
+            i,
+            transfer_response
+        );
+
+        println!(
+            "Transferred token {} from {:?} to {:?}",
+            i, from_owner, to_owner
+        );
+
+        pic.advance_time(Duration::from_millis(MINUTE_IN_MS));
+        tick_n_blocks(pic, 5);
+    }
+
+    // Wait for indexing to complete
+    tick_n_blocks(pic, 10);
+    pic.advance_time(Duration::from_millis(MINUTE_IN_MS * 2));
+
+    // Total expected: 15 mints + 5 transfers = 20 transactions
+    let total_expected_transactions = 20;
+    println!(
+        "Total expected transactions: {}",
+        total_expected_transactions
+    );
+
+    // Test 1: Get all blocks in descending order to verify total count
+    println!("=== Test 1: All blocks in descending order ===");
+    let all_blocks_desc = get_blocks(
+        pic,
+        controller,
+        index_canister_id,
+        &Args {
+            start: 0,
+            length: 50, // Large enough to get all blocks
+            filters: vec![],
+            sort_by: Some(index_icrc7::index::SortBy::Descending),
+        },
+    );
+
+    println!("All blocks (desc): {:?}", all_blocks_desc.blocks);
+
+    println!("All blocks (desc): {} blocks", all_blocks_desc.blocks.len());
+    assert_eq!(
+        all_blocks_desc.blocks.len(),
+        total_expected_transactions,
+        "Expected {} total transactions",
+        total_expected_transactions
+    );
+
+    // Verify descending order
+    for i in 0..all_blocks_desc.blocks.len() - 1 {
+        assert!(
+            all_blocks_desc.blocks[i].id > all_blocks_desc.blocks[i + 1].id,
+            "Blocks should be in descending order"
+        );
+    }
+
+    // Test 2: Get only 10 blocks in descending order (the main test)
+    println!("=== Test 2: Descending order with limit of 10 ===");
+    let blocks_desc_limit_10 = get_blocks(
+        pic,
+        controller,
+        index_canister_id,
+        &Args {
+            start: 0,
+            length: 10,
+            filters: vec![],
+            sort_by: Some(index_icrc7::index::SortBy::Descending),
+        },
+    );
+
+    println!(
+        "Blocks descending (limit 10): {:?}",
+        blocks_desc_limit_10.blocks
+    );
+    assert_eq!(
+        blocks_desc_limit_10.blocks.len(),
+        10,
+        "Should have exactly 10 blocks"
+    );
+
+    // Verify that we start from the highest block ID (most recent transaction)
+    let expected_first_block_id = total_expected_transactions - 1; // Since IDs start from 0
+    assert_eq!(
+        blocks_desc_limit_10.blocks[0].id,
+        Nat::from(expected_first_block_id),
+        "First block should have the highest ID (most recent transaction)"
+    );
+
+    // Verify that we end with the 10th most recent transaction
+    let expected_last_block_id = total_expected_transactions - 10; // 10th most recent
+    assert_eq!(
+        blocks_desc_limit_10.blocks[9].id,
+        Nat::from(expected_last_block_id),
+        "Last block should have ID {} (10th most recent transaction)",
+        expected_last_block_id
+    );
+
+    // Verify descending order within the limited results
+    for i in 0..blocks_desc_limit_10.blocks.len() - 1 {
+        assert!(
+            blocks_desc_limit_10.blocks[i].id > blocks_desc_limit_10.blocks[i + 1].id,
+            "Limited blocks should maintain descending order"
+        );
+    }
+
+    // Test 3: Verify that the next 10 blocks continue the sequence correctly
+    println!("=== Test 3: Next 10 blocks in descending order ===");
+    let blocks_desc_next_10 = get_blocks(
+        pic,
+        controller,
+        index_canister_id,
+        &Args {
+            start: 10,
+            length: 10,
+            filters: vec![],
+            sort_by: Some(index_icrc7::index::SortBy::Descending),
+        },
+    );
+
+    println!("Next 10 blocks (desc): {:?}", blocks_desc_next_10.blocks);
+    assert_eq!(
+        blocks_desc_next_10.blocks.len(),
+        10,
+        "Should have exactly 10 more blocks"
+    );
+
+    // Verify that the first block of the next 10 continues from where the previous 10 left off
+    let expected_continuation_id = expected_last_block_id - 1 + 10;
+    assert_eq!(
+        blocks_desc_next_10.blocks[0].id,
+        Nat::from(expected_continuation_id),
+        "First block of next 10 should continue the descending sequence"
+    );
+
+    // Verify descending order within the next 10 results
+    for i in 0..blocks_desc_next_10.blocks.len() - 1 {
+        assert!(
+            blocks_desc_next_10.blocks[i].id > blocks_desc_next_10.blocks[i + 1].id,
+            "Next 10 blocks should maintain descending order"
+        );
+    }
+
+    println!("=== Descending order with limit test passed! ===");
+    println!("Successfully verified that descending order with limit 10 starts from the end of transactions");
 }
