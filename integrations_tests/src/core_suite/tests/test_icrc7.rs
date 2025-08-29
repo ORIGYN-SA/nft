@@ -3220,3 +3220,253 @@ fn test_icrc7_mint_with_hashmap_and_icrc3_logs() {
         }
     }
 }
+
+#[test]
+fn test_icrc7_balance_of_comprehensive() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    let nft_owner3 = random_principal();
+
+    // Check initial balances
+    let initial_balance_owner1 = icrc7_balance_of(
+        pic,
+        controller,
+        collection_canister_id,
+        &vec![Account {
+            owner: nft_owner1,
+            subaccount: None,
+        }],
+    );
+    assert_eq!(initial_balance_owner1[0], Nat::from(0u64));
+
+    let initial_balance_owner2 = icrc7_balance_of(
+        pic,
+        controller,
+        collection_canister_id,
+        &vec![Account {
+            owner: nft_owner2,
+            subaccount: None,
+        }],
+    );
+    assert_eq!(initial_balance_owner2[0], Nat::from(0u64));
+
+    let initial_balance_owner3 = icrc7_balance_of(
+        pic,
+        controller,
+        collection_canister_id,
+        &vec![Account {
+            owner: nft_owner3,
+            subaccount: None,
+        }],
+    );
+    assert_eq!(initial_balance_owner3[0], Nat::from(0u64));
+
+    // Mint NFT for nft_owner1
+    let mint_return = mint_nft(
+        pic,
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+        create_default_metadata(),
+    );
+
+    match mint_return {
+        Ok(token_id) => {
+            tick_n_blocks(pic, 5);
+
+            // Check balance after mint
+            let balance_after_mint_owner1 = icrc7_balance_of(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![Account {
+                    owner: nft_owner1,
+                    subaccount: None,
+                }],
+            );
+            assert_eq!(balance_after_mint_owner1[0], Nat::from(1u64));
+
+            // Verify other balances unchanged
+            let balance_after_mint_owner2 = icrc7_balance_of(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                }],
+            );
+            assert_eq!(balance_after_mint_owner2[0], Nat::from(0u64));
+
+            // Test icrc7_transfer from nft_owner1 to nft_owner2
+            let current_time = pic.get_time().as_nanos_since_unix_epoch();
+            let transfer_args = vec![icrc7::TransferArg {
+                from_subaccount: None,
+                to: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                token_id: token_id.clone(),
+                memo: None,
+                created_at_time: Some(current_time),
+            }];
+
+            let transfer_response =
+                icrc7_transfer(pic, nft_owner1, collection_canister_id, &transfer_args);
+
+            assert!(transfer_response[0].is_some());
+            let result = transfer_response[0].as_ref().unwrap();
+            assert!(result.is_ok());
+            assert_eq!(result.clone().unwrap(), Nat::from(2u64));
+
+            tick_n_blocks(pic, 5);
+
+            // Check balances after icrc7_transfer
+            let balance_after_transfer_owner1 = icrc7_balance_of(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![Account {
+                    owner: nft_owner1,
+                    subaccount: None,
+                }],
+            );
+            assert_eq!(balance_after_transfer_owner1[0], Nat::from(0u64));
+
+            let balance_after_transfer_owner2 = icrc7_balance_of(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                }],
+            );
+            assert_eq!(balance_after_transfer_owner2[0], Nat::from(1u64));
+
+            // Test icrc37_transfer_from from nft_owner2 to nft_owner3
+            // First approve nft_owner1 to transfer on behalf of nft_owner2
+            let approval_info = core_nft::types::icrc37::ApprovalInfo {
+                spender: Account {
+                    owner: nft_owner1,
+                    subaccount: None,
+                },
+                from_subaccount: None,
+                expires_at: None,
+                memo: None,
+                created_at_time: current_time,
+            };
+
+            let approve_args = vec![
+                core_nft::types::icrc37::icrc37_approve_tokens::ApproveTokenArg {
+                    token_id: token_id.clone(),
+                    approval_info: approval_info.clone(),
+                },
+            ];
+
+            let approve_response = crate::client::core_nft::icrc37_approve_tokens(
+                pic,
+                nft_owner2,
+                collection_canister_id,
+                &approve_args,
+            );
+            assert!(approve_response.is_ok());
+            println!("approve_response: {:?}", approve_response);
+
+            tick_n_blocks(pic, 5);
+
+            // Now transfer using icrc37_transfer_from
+            let transfer_from_args = vec![
+                core_nft::types::icrc37::icrc37_transfer_from::TransferFromArg {
+                    spender_subaccount: None,
+                    from: Account {
+                        owner: nft_owner2,
+                        subaccount: None,
+                    },
+                    to: Account {
+                        owner: nft_owner3,
+                        subaccount: None,
+                    },
+                    token_id: token_id.clone(),
+                    memo: None,
+                    created_at_time: Some(current_time),
+                },
+            ];
+
+            let transfer_from_response = crate::client::core_nft::icrc37_transfer_from(
+                pic,
+                nft_owner1,
+                collection_canister_id,
+                &transfer_from_args,
+            );
+
+            println!("transfer_from_response: {:?}", transfer_from_response);
+
+            assert!(transfer_from_response.is_ok());
+            let results = transfer_from_response.unwrap();
+            assert!(results[0].is_some());
+            match results[0].as_ref().unwrap() {
+                core_nft::types::icrc37::icrc37_transfer_from::TransferFromResult::Ok(_) => {
+                    assert!(true)
+                }
+                core_nft::types::icrc37::icrc37_transfer_from::TransferFromResult::Err(_) => {
+                    assert!(false)
+                }
+            }
+
+            tick_n_blocks(pic, 5);
+
+            // Check balances after icrc37_transfer_from
+            let balance_after_transfer_from_owner1 = icrc7_balance_of(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![Account {
+                    owner: nft_owner1,
+                    subaccount: None,
+                }],
+            );
+            assert_eq!(balance_after_transfer_from_owner1[0], Nat::from(0u64));
+
+            let balance_after_transfer_from_owner2 = icrc7_balance_of(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                }],
+            );
+            assert_eq!(balance_after_transfer_from_owner2[0], Nat::from(0u64));
+
+            let balance_after_transfer_from_owner3 = icrc7_balance_of(
+                pic,
+                controller,
+                collection_canister_id,
+                &vec![Account {
+                    owner: nft_owner3,
+                    subaccount: None,
+                }],
+            );
+            assert_eq!(balance_after_transfer_from_owner3[0], Nat::from(1u64));
+
+            // Verify total supply remains the same
+            let total_supply = icrc7_total_supply(pic, controller, collection_canister_id, &());
+            assert_eq!(total_supply, Nat::from(1u64));
+        }
+        Err(e) => {
+            println!("Error minting NFT: {:?}", e);
+            assert!(false);
+        }
+    }
+}

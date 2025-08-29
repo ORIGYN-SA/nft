@@ -78,6 +78,8 @@ fn transfer_nft(arg: &icrc7::TransferArg) -> Result<Nat, icrc7::icrc7_transfer::
         },
     );
 
+    let previous_owner = nft.token_owner.clone();
+
     // this is safe to do this as they is no await in the method, meaning state is committed at the end of the icrc7_transfer method.
     match icrc3_add_transaction(transaction.clone()) {
         Ok(transaction_id) => {
@@ -93,7 +95,7 @@ fn transfer_nft(arg: &icrc7::TransferArg) -> Result<Nat, icrc7::icrc7_transfer::
                 state
                     .data
                     .tokens_list_by_owner
-                    .entry(nft.token_owner.clone())
+                    .entry(previous_owner)
                     .or_insert(vec![])
                     .retain(|id| *id != nft.token_id.clone());
             });

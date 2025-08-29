@@ -4,7 +4,7 @@ pub use crate::types::icrc37::{
     icrc37_revoke_token_approvals, icrc37_transfer_from, Approval,
 };
 use crate::types::nft;
-use crate::types::wrapped_types::{WrappedAccount, WrappedNat, WrappedApprovalValue};
+use crate::types::wrapped_types::{WrappedAccount, WrappedApprovalValue, WrappedNat};
 use crate::types::{__COLLECTION_APPROVALS, __TOKEN_APPROVALS};
 
 use bity_ic_icrc3::{
@@ -461,8 +461,9 @@ fn revoke_token_approvals(
         return RevokeTokenApprovalResponse::Err(RevokeTokenApprovalError::Unauthorized);
     }
 
-    let token_approvals = __TOKEN_APPROVALS
-        .with_borrow(|token_approvals| token_approvals.get(&WrappedNat::from(arg.token_id.clone())));
+    let token_approvals = __TOKEN_APPROVALS.with_borrow(|token_approvals| {
+        token_approvals.get(&WrappedNat::from(arg.token_id.clone()))
+    });
 
     if token_approvals.is_none() {
         return RevokeTokenApprovalResponse::Err(RevokeTokenApprovalError::ApprovalDoesNotExist);
@@ -810,10 +811,24 @@ fn transfer_from(
         },
     };
 
+    let previous_owner = nft.token_owner.clone();
+
     nft.transfer(arg.to.clone());
 
     mutate_state(|state| {
         state.data.update_token_by_id(&nft.token_id, &nft);
+        state
+            .data
+            .tokens_list_by_owner
+            .entry(arg.to.clone())
+            .or_insert(vec![])
+            .push(nft.token_id.clone());
+        state
+            .data
+            .tokens_list_by_owner
+            .entry(previous_owner)
+            .or_insert(vec![])
+            .retain(|id| *id != nft.token_id.clone());
     });
 
     __TOKEN_APPROVALS.with_borrow_mut(|token_approvals| {
