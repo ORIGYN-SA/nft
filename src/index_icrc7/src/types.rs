@@ -17,3 +17,28 @@ pub mod get_blocks {
         pub blocks: Vec<BlockWithId>,
     }
 }
+
+pub mod status {
+    use candid::CandidType;
+    use serde::{Deserialize, Serialize};
+
+    pub type Args = ();
+
+    #[derive(CandidType, Deserialize, Serialize)]
+    pub struct Response {
+        pub last_block_id: u64,
+    }
+}
+
+pub mod ledger_id {
+    use candid::CandidType;
+    use candid::Principal;
+    use serde::{Deserialize, Serialize};
+
+    pub type Args = ();
+
+    #[derive(CandidType, Deserialize, Serialize)]
+    pub struct Response {
+        pub ledger_id: Principal,
+    }
+}

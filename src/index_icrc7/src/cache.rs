@@ -85,7 +85,6 @@ pub fn remove_all_values_older_than(timestamp: &u64) -> bool {
 
 pub fn insert_value(key: u64, value: CustomValue) {
     let timestamp = ic_cdk::api::time();
-    ic_cdk::println!("insert_value: {:?}", (key, timestamp, value.clone()));
 
     let entry = CacheEntry { timestamp, value };
     __CACHE.with(|cache| cache.borrow_mut().insert(key, entry));

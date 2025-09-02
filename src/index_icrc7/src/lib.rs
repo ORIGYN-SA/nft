@@ -7,7 +7,7 @@ mod cache;
 mod guards;
 mod jobs;
 mod memory;
-mod queries;
+pub mod queries;
 mod utils;
 
 pub mod index;
