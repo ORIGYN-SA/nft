@@ -1395,3 +1395,321 @@ fn test_get_blocks_descending_order_with_limit() {
     println!("=== Descending order with limit test passed! ===");
     println!("Successfully verified that descending order with limit 10 starts from the end of transactions");
 }
+
+#[test]
+fn test_get_blocks_filter_by_token_id() {
+    let mut test_env: TestEnv = default_test_setup();
+    println!("test_env: {:?}", test_env);
+
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+        index_canister_id,
+    } = test_env;
+
+    let mut token_ids = Vec::new();
+
+    // Phase 1: Mint multiple NFTs to different owners
+    println!("=== Phase 1: Minting NFTs ===");
+    for i in 0..5 {
+        let owner = if i % 2 == 0 { nft_owner1 } else { nft_owner2 };
+        let mint_return = mint_nft(
+            pic,
+            Account {
+                owner,
+                subaccount: None,
+            },
+            controller,
+            collection_canister_id,
+            vec![(
+                "name".to_string(),
+                Icrc3Value::Text(format!("NFT Token {}", i).to_string()),
+            )],
+        );
+
+        match mint_return {
+            Ok(token_id) => {
+                token_ids.push(token_id.clone());
+                println!("Minted token {}: {:?} for owner {:?}", i, token_id, owner);
+            }
+            Err(e) => {
+                println!("Error minting NFT {}: {:?}", i, e);
+                assert!(false);
+            }
+        }
+
+        tick_n_blocks(pic, 5);
+        pic.advance_time(Duration::from_millis(MINUTE_IN_MS));
+    }
+
+    // Phase 2: Transfer some NFTs to create more transactions for the same token IDs
+    println!("=== Phase 2: Transferring NFTs ===");
+    for i in 0..3 {
+        let from_owner = if i % 2 == 0 { nft_owner1 } else { nft_owner2 };
+        let to_owner = if from_owner == nft_owner1 {
+            nft_owner2
+        } else {
+            nft_owner1
+        };
+
+        let transfer_args = vec![icrc7::TransferArg {
+            to: Account {
+                owner: to_owner,
+                subaccount: None,
+            },
+            token_id: token_ids[i].clone(),
+            memo: None,
+            from_subaccount: None,
+            created_at_time: None,
+        }];
+
+        let transfer_response =
+            icrc7_transfer(pic, from_owner, collection_canister_id, &transfer_args);
+
+        assert!(
+            transfer_response[0].is_some() && transfer_response[0].as_ref().unwrap().is_ok(),
+            "Transfer {} failed: {:?}",
+            i,
+            transfer_response
+        );
+
+        println!(
+            "Transferred token {} from {:?} to {:?}",
+            i, from_owner, to_owner
+        );
+
+        tick_n_blocks(pic, 5);
+        pic.advance_time(Duration::from_millis(MINUTE_IN_MS));
+    }
+
+    // Wait for indexing to complete
+    tick_n_blocks(pic, 10);
+    pic.advance_time(Duration::from_millis(MINUTE_IN_MS * 2));
+
+    // Test 1: Get all blocks without filters to verify total count
+    println!("=== Test 1: All blocks without filters ===");
+    let all_blocks = get_blocks(
+        pic,
+        controller,
+        index_canister_id,
+        &Args {
+            start: 0,
+            length: 20,
+            filters: vec![],
+            sort_by: None,
+        },
+    );
+
+    println!("All blocks: {:?}", all_blocks.blocks);
+    println!("Total blocks found: {}", all_blocks.blocks.len());
+
+    // Should have 5 mints + 3 transfers = 8 blocks
+    assert_eq!(
+        all_blocks.blocks.len(),
+        8,
+        "Expected 8 blocks (5 mints + 3 transfers)"
+    );
+
+    // Test 2: Filter by specific token ID (first token)
+    println!("=== Test 2: Filter by first token ID ===");
+    let token_0_filter = index_icrc7::index::IndexType::TokenId(
+        index_icrc7::wrapped_values::WrappedNat(token_ids[0].clone()),
+    );
+
+    let blocks_token_0 = get_blocks(
+        pic,
+        controller,
+        index_canister_id,
+        &Args {
+            start: 0,
+            length: 20,
+            filters: vec![token_0_filter],
+            sort_by: Some(index_icrc7::index::SortBy::Ascending),
+        },
+    );
+
+    println!("Blocks for token 0: {:?}", blocks_token_0.blocks);
+    println!("Blocks for token 0 count: {}", blocks_token_0.blocks.len());
+
+    // Should have 2 blocks: 1 mint + 1 transfer for token 0
+    assert_eq!(
+        blocks_token_0.blocks.len(),
+        2,
+        "Expected 2 blocks for token 0 (1 mint + 1 transfer)"
+    );
+
+    // Verify that all blocks are related to token 0
+    for block in &blocks_token_0.blocks {
+        println!("Block for token 0: {:?}", block);
+        // Verify that the block contains the correct token ID in its transaction data
+        if let icrc_ledger_types::icrc::generic_value::ICRC3Value::Map(tx_map) = &block.block {
+            if let Some(icrc_ledger_types::icrc::generic_value::ICRC3Value::Map(inner_tx)) =
+                tx_map.get("tx")
+            {
+                if let Some(icrc_ledger_types::icrc::generic_value::ICRC3Value::Nat(tid)) =
+                    inner_tx.get("tid")
+                {
+                    assert_eq!(
+                        *tid, token_ids[0],
+                        "Block should contain the correct token ID"
+                    );
+                }
+            }
+        }
+    }
+
+    // Test 3: Filter by another token ID (second token)
+    println!("=== Test 3: Filter by second token ID ===");
+    let token_1_filter = index_icrc7::index::IndexType::TokenId(
+        index_icrc7::wrapped_values::WrappedNat(token_ids[1].clone()),
+    );
+
+    let blocks_token_1 = get_blocks(
+        pic,
+        controller,
+        index_canister_id,
+        &Args {
+            start: 0,
+            length: 20,
+            filters: vec![token_1_filter],
+            sort_by: Some(index_icrc7::index::SortBy::Descending),
+        },
+    );
+
+    println!("Blocks for token 1: {:?}", blocks_token_1.blocks);
+    println!("Blocks for token 1 count: {}", blocks_token_1.blocks.len());
+
+    // Should have 2 blocks: 1 mint + 1 transfer for token 1
+    assert_eq!(
+        blocks_token_1.blocks.len(),
+        2,
+        "Expected 2 blocks for token 1 (1 mint + 1 transfer)"
+    );
+
+    // Test 4: Filter by token ID that only has mint (no transfers)
+    println!("=== Test 4: Filter by token ID with only mint ===");
+    let token_4_filter = index_icrc7::index::IndexType::TokenId(
+        index_icrc7::wrapped_values::WrappedNat(token_ids[4].clone()),
+    );
+
+    let blocks_token_4 = get_blocks(
+        pic,
+        controller,
+        index_canister_id,
+        &Args {
+            start: 0,
+            length: 20,
+            filters: vec![token_4_filter],
+            sort_by: None,
+        },
+    );
+
+    println!("Blocks for token 4: {:?}", blocks_token_4.blocks);
+    println!("Blocks for token 4 count: {}", blocks_token_4.blocks.len());
+
+    // Should have only 1 block: mint only (no transfer for token 4)
+    assert_eq!(
+        blocks_token_4.blocks.len(),
+        1,
+        "Expected 1 block for token 4 (mint only)"
+    );
+
+    // Test 5: Filter by non-existent token ID
+    println!("=== Test 5: Filter by non-existent token ID ===");
+    let non_existent_token_filter = index_icrc7::index::IndexType::TokenId(
+        index_icrc7::wrapped_values::WrappedNat(Nat::from(999u64)),
+    );
+
+    let blocks_non_existent = get_blocks(
+        pic,
+        controller,
+        index_canister_id,
+        &Args {
+            start: 0,
+            length: 20,
+            filters: vec![non_existent_token_filter],
+            sort_by: None,
+        },
+    );
+
+    println!(
+        "Blocks for non-existent token: {:?}",
+        blocks_non_existent.blocks
+    );
+    println!(
+        "Blocks for non-existent token count: {}",
+        blocks_non_existent.blocks.len()
+    );
+
+    // Should have 0 blocks for non-existent token
+    assert_eq!(
+        blocks_non_existent.blocks.len(),
+        0,
+        "Expected 0 blocks for non-existent token"
+    );
+
+    // Test 6: Combined filters - token ID + block type
+    println!("=== Test 6: Combined filters - token ID + block type ===");
+    let combined_filters = vec![
+        index_icrc7::index::IndexType::TokenId(index_icrc7::wrapped_values::WrappedNat(
+            token_ids[0].clone(),
+        )),
+        index_icrc7::index::IndexType::BlockType("7mint".to_string()),
+    ];
+
+    let blocks_combined = get_blocks(
+        pic,
+        controller,
+        index_canister_id,
+        &Args {
+            start: 0,
+            length: 20,
+            filters: combined_filters,
+            sort_by: None,
+        },
+    );
+
+    println!("Blocks for combined filter: {:?}", blocks_combined.blocks);
+    println!(
+        "Blocks for combined filter count: {}",
+        blocks_combined.blocks.len()
+    );
+
+    // Should have only 1 block: mint for token 0 only
+    assert_eq!(
+        blocks_combined.blocks.len(),
+        1,
+        "Expected 1 block for token 0 mint only"
+    );
+
+    // Verify that the block is indeed a mint block for token 0
+    let combined_block = &blocks_combined.blocks[0];
+    if let icrc_ledger_types::icrc::generic_value::ICRC3Value::Map(tx_map) = &combined_block.block {
+        // Check block type
+        if let Some(icrc_ledger_types::icrc::generic_value::ICRC3Value::Text(btype)) =
+            tx_map.get("btype")
+        {
+            assert_eq!(*btype, "7mint", "Block should be a mint block");
+        }
+
+        // Check token ID in transaction
+        if let Some(icrc_ledger_types::icrc::generic_value::ICRC3Value::Map(inner_tx)) =
+            tx_map.get("tx")
+        {
+            if let Some(icrc_ledger_types::icrc::generic_value::ICRC3Value::Nat(tid)) =
+                inner_tx.get("tid")
+            {
+                assert_eq!(
+                    *tid, token_ids[0],
+                    "Block should contain the correct token ID"
+                );
+            }
+        }
+    }
+
+    println!("=== NFT Token ID filter tests passed! ===");
+    println!("Successfully verified filtering by NFT token ID with various scenarios");
+}

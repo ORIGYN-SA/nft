@@ -193,12 +193,8 @@ impl TransactionDataExtractor for TransferBlock {
         match data {
             ICRC3Value::Map(map) => {
                 if let Some(ICRC3Value::Map(tx)) = map.get("tx") {
-                    if let Some(ICRC3Value::Text(token_id)) = tx.get("tid") {
-                        if let Ok(token_id) = WrappedNat::from_str(token_id) {
-                            Ok(Some(token_id))
-                        } else {
-                            Err("Invalid token ID".to_string())
-                        }
+                    if let Some(ICRC3Value::Nat(token_id)) = tx.get("tid") {
+                        Ok(Some(WrappedNat(token_id.clone())))
                     } else {
                         Err("Missing or invalid token ID field".to_string())
                     }
@@ -233,12 +229,8 @@ impl TransactionDataExtractor for MintBlock {
         match data {
             ICRC3Value::Map(map) => {
                 if let Some(ICRC3Value::Map(tx)) = map.get("tx") {
-                    if let Some(ICRC3Value::Text(token_id)) = tx.get("tid") {
-                        if let Ok(token_id) = WrappedNat::from_str(token_id) {
-                            Ok(Some(token_id))
-                        } else {
-                            Err("Invalid token ID".to_string())
-                        }
+                    if let Some(ICRC3Value::Nat(token_id)) = tx.get("tid") {
+                        Ok(Some(WrappedNat(token_id.clone())))
                     } else {
                         Err("Missing or invalid token ID field".to_string())
                     }
@@ -278,12 +270,8 @@ impl TransactionDataExtractor for BurnBlock {
         match data {
             ICRC3Value::Map(map) => {
                 if let Some(ICRC3Value::Map(tx)) = map.get("tx") {
-                    if let Some(ICRC3Value::Text(token_id)) = tx.get("tid") {
-                        if let Ok(token_id) = WrappedNat::from_str(token_id) {
-                            Ok(Some(token_id))
-                        } else {
-                            Err("Invalid token ID".to_string())
-                        }
+                    if let Some(ICRC3Value::Nat(token_id)) = tx.get("tid") {
+                        Ok(Some(WrappedNat(token_id.clone())))
                     } else {
                         Err("Missing or invalid token ID field".to_string())
                     }
@@ -323,12 +311,8 @@ impl TransactionDataExtractor for ApproveBlock {
         match data {
             ICRC3Value::Map(map) => {
                 if let Some(ICRC3Value::Map(tx)) = map.get("tx") {
-                    if let Some(ICRC3Value::Text(token_id)) = tx.get("tid") {
-                        if let Ok(token_id) = WrappedNat::from_str(token_id) {
-                            Ok(Some(token_id))
-                        } else {
-                            Err("Invalid token ID".to_string())
-                        }
+                    if let Some(ICRC3Value::Nat(token_id)) = tx.get("tid") {
+                        Ok(Some(WrappedNat(token_id.clone())))
                     } else {
                         Err("Missing or invalid token ID field".to_string())
                     }
@@ -396,12 +380,8 @@ impl TransactionDataExtractor for UpdateTokenMetadataBlock {
         match data {
             ICRC3Value::Map(map) => {
                 if let Some(ICRC3Value::Map(tx)) = map.get("tx") {
-                    if let Some(ICRC3Value::Text(token_id)) = tx.get("tid") {
-                        if let Ok(token_id) = WrappedNat::from_str(token_id) {
-                            Ok(Some(token_id))
-                        } else {
-                            Err("Invalid token ID".to_string())
-                        }
+                    if let Some(ICRC3Value::Nat(token_id)) = tx.get("tid") {
+                        Ok(Some(WrappedNat(token_id.clone())))
                     } else {
                         Err("Missing or invalid token ID field".to_string())
                     }
@@ -464,12 +444,8 @@ impl TransactionDataExtractor for RevokeBlock {
         match data {
             ICRC3Value::Map(map) => {
                 if let Some(ICRC3Value::Map(tx)) = map.get("tx") {
-                    if let Some(ICRC3Value::Text(token_id)) = tx.get("tid") {
-                        if let Ok(token_id) = WrappedNat::from_str(token_id) {
-                            Ok(Some(token_id))
-                        } else {
-                            Err("Invalid token ID".to_string())
-                        }
+                    if let Some(ICRC3Value::Nat(token_id)) = tx.get("tid") {
+                        Ok(Some(WrappedNat(token_id.clone())))
                     } else {
                         Err("Missing or invalid token ID field".to_string())
                     }

@@ -16,7 +16,7 @@ type ICRC3Value = variant {
   Text : text;
   Array : vec ICRC3Value;
 };
-type IndexType = variant { Account : Account; BlockType : text };
+type IndexType = variant { Account : Account; TokenId : nat; BlockType : text };
 type InitArgs = record {
   test_mode : bool;
   authorized_principals : vec principal;
@@ -24,7 +24,13 @@ type InitArgs = record {
   ledger_canister_id : principal;
   commit_hash : text;
 };
-type Response = record { blocks : vec BlockWithId };
+type Response = record { total : nat64; blocks : vec BlockWithId };
+type Response_1 = record { ledger_id : principal };
+type Response_2 = record { last_block_id : nat64 };
 type SortBy = variant { Descending; Ascending };
 type UpgradeArgs = record { version : BuildVersion; commit_hash : text };
-service : (Args_1) -> { get_blocks : (Args) -> (Response) }
+service : (Args_1) -> {
+  get_blocks : (Args) -> (Response);
+  ledger_id : () -> (Response_1) query;
+  status : () -> (Response_2) query;
+}
