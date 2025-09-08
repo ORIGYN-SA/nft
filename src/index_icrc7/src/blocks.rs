@@ -1,7 +1,7 @@
 use crate::cache::{insert_value, try_get_value};
 use crate::index::SortBy;
 use crate::state::read_state;
-use crate::wrapped_values::WrappedAccount;
+use crate::wrapped_values::{WrappedAccount, WrappedNat};
 
 use bity_ic_icrc3_archive_c2c_client::icrc3_get_blocks as archive_get_blocks;
 use bity_ic_icrc3_c2c_client::icrc3_get_blocks;
@@ -110,6 +110,7 @@ pub trait BlockIndexer {
 
 pub trait TransactionDataExtractor {
     fn extract_accounts(&self, data: &ICRC3Value) -> Result<Vec<WrappedAccount>, String>;
+    fn extract_token_id(&self, data: &ICRC3Value) -> Result<Option<WrappedNat>, String>;
 
     fn extract_block_type(&self, data: &ICRC3Value) -> Result<BlockType, String> {
         if let ICRC3Value::Map(map) = data {
@@ -187,6 +188,27 @@ impl TransactionDataExtractor for TransferBlock {
             _ => Err("Transfer transaction data must be a map".to_string()),
         }
     }
+
+    fn extract_token_id(&self, data: &ICRC3Value) -> Result<Option<WrappedNat>, String> {
+        match data {
+            ICRC3Value::Map(map) => {
+                if let Some(ICRC3Value::Map(tx)) = map.get("tx") {
+                    if let Some(ICRC3Value::Text(token_id)) = tx.get("tid") {
+                        if let Ok(token_id) = WrappedNat::from_str(token_id) {
+                            Ok(Some(token_id))
+                        } else {
+                            Err("Invalid token ID".to_string())
+                        }
+                    } else {
+                        Err("Missing or invalid token ID field".to_string())
+                    }
+                } else {
+                    Err("Invalid transaction data".to_string())
+                }
+            }
+            _ => Err("Transfer transaction data must be a map".to_string()),
+        }
+    }
 }
 
 impl TransactionDataExtractor for MintBlock {
@@ -204,6 +226,27 @@ impl TransactionDataExtractor for MintBlock {
                 Ok(accounts)
             }
             _ => Err("Mint transaction data must be a map".to_string()),
+        }
+    }
+
+    fn extract_token_id(&self, data: &ICRC3Value) -> Result<Option<WrappedNat>, String> {
+        match data {
+            ICRC3Value::Map(map) => {
+                if let Some(ICRC3Value::Map(tx)) = map.get("tx") {
+                    if let Some(ICRC3Value::Text(token_id)) = tx.get("tid") {
+                        if let Ok(token_id) = WrappedNat::from_str(token_id) {
+                            Ok(Some(token_id))
+                        } else {
+                            Err("Invalid token ID".to_string())
+                        }
+                    } else {
+                        Err("Missing or invalid token ID field".to_string())
+                    }
+                } else {
+                    Err("Invalid transaction data".to_string())
+                }
+            }
+            _ => Err("Transfer transaction data must be a map".to_string()),
         }
     }
 }
@@ -230,6 +273,27 @@ impl TransactionDataExtractor for BurnBlock {
             _ => Err("Burn transaction data must be a map".to_string()),
         }
     }
+
+    fn extract_token_id(&self, data: &ICRC3Value) -> Result<Option<WrappedNat>, String> {
+        match data {
+            ICRC3Value::Map(map) => {
+                if let Some(ICRC3Value::Map(tx)) = map.get("tx") {
+                    if let Some(ICRC3Value::Text(token_id)) = tx.get("tid") {
+                        if let Ok(token_id) = WrappedNat::from_str(token_id) {
+                            Ok(Some(token_id))
+                        } else {
+                            Err("Invalid token ID".to_string())
+                        }
+                    } else {
+                        Err("Missing or invalid token ID field".to_string())
+                    }
+                } else {
+                    Err("Invalid transaction data".to_string())
+                }
+            }
+            _ => Err("Transfer transaction data must be a map".to_string()),
+        }
+    }
 }
 
 impl TransactionDataExtractor for ApproveBlock {
@@ -252,6 +316,27 @@ impl TransactionDataExtractor for ApproveBlock {
                 Ok(accounts)
             }
             _ => Err("Approve transaction data must be a map".to_string()),
+        }
+    }
+
+    fn extract_token_id(&self, data: &ICRC3Value) -> Result<Option<WrappedNat>, String> {
+        match data {
+            ICRC3Value::Map(map) => {
+                if let Some(ICRC3Value::Map(tx)) = map.get("tx") {
+                    if let Some(ICRC3Value::Text(token_id)) = tx.get("tid") {
+                        if let Ok(token_id) = WrappedNat::from_str(token_id) {
+                            Ok(Some(token_id))
+                        } else {
+                            Err("Invalid token ID".to_string())
+                        }
+                    } else {
+                        Err("Missing or invalid token ID field".to_string())
+                    }
+                } else {
+                    Err("Invalid transaction data".to_string())
+                }
+            }
+            _ => Err("Transfer transaction data must be a map".to_string()),
         }
     }
 }
@@ -283,6 +368,10 @@ impl TransactionDataExtractor for TransferFromBlock {
             _ => Err("TransferFrom transaction data must be a map".to_string()),
         }
     }
+
+    fn extract_token_id(&self, data: &ICRC3Value) -> Result<Option<WrappedNat>, String> {
+        return Ok(None);
+    }
 }
 
 impl TransactionDataExtractor for UpdateTokenMetadataBlock {
@@ -298,6 +387,27 @@ impl TransactionDataExtractor for UpdateTokenMetadataBlock {
                     }
                 }
                 Ok(accounts)
+            }
+            _ => Err("UpdateTokenMetadata transaction data must be a map".to_string()),
+        }
+    }
+
+    fn extract_token_id(&self, data: &ICRC3Value) -> Result<Option<WrappedNat>, String> {
+        match data {
+            ICRC3Value::Map(map) => {
+                if let Some(ICRC3Value::Map(tx)) = map.get("tx") {
+                    if let Some(ICRC3Value::Text(token_id)) = tx.get("tid") {
+                        if let Ok(token_id) = WrappedNat::from_str(token_id) {
+                            Ok(Some(token_id))
+                        } else {
+                            Err("Invalid token ID".to_string())
+                        }
+                    } else {
+                        Err("Missing or invalid token ID field".to_string())
+                    }
+                } else {
+                    Err("Invalid transaction data".to_string())
+                }
             }
             _ => Err("UpdateTokenMetadata transaction data must be a map".to_string()),
         }
@@ -321,6 +431,10 @@ impl TransactionDataExtractor for CollectionApproveBlock {
             _ => Err("CollectionApprove transaction data must be a map".to_string()),
         }
     }
+
+    fn extract_token_id(&self, data: &ICRC3Value) -> Result<Option<WrappedNat>, String> {
+        return Ok(None);
+    }
 }
 
 impl TransactionDataExtractor for RevokeBlock {
@@ -341,6 +455,27 @@ impl TransactionDataExtractor for RevokeBlock {
                     }
                 }
                 Ok(accounts)
+            }
+            _ => Err("Revoke transaction data must be a map".to_string()),
+        }
+    }
+
+    fn extract_token_id(&self, data: &ICRC3Value) -> Result<Option<WrappedNat>, String> {
+        match data {
+            ICRC3Value::Map(map) => {
+                if let Some(ICRC3Value::Map(tx)) = map.get("tx") {
+                    if let Some(ICRC3Value::Text(token_id)) = tx.get("tid") {
+                        if let Ok(token_id) = WrappedNat::from_str(token_id) {
+                            Ok(Some(token_id))
+                        } else {
+                            Err("Invalid token ID".to_string())
+                        }
+                    } else {
+                        Err("Missing or invalid token ID field".to_string())
+                    }
+                } else {
+                    Err("Invalid transaction data".to_string())
+                }
             }
             _ => Err("Revoke transaction data must be a map".to_string()),
         }
@@ -368,6 +503,10 @@ impl TransactionDataExtractor for RevokeCollectionBlock {
             }
             _ => Err("RevokeCollection transaction data must be a map".to_string()),
         }
+    }
+
+    fn extract_token_id(&self, data: &ICRC3Value) -> Result<Option<WrappedNat>, String> {
+        return Ok(None);
     }
 }
 

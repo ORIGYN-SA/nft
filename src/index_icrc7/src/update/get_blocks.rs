@@ -28,7 +28,9 @@ pub async fn get_blocks(args: get_blocks::Args) -> get_blocks::Response {
         get_blocks_with_filters(&filters, start, length, &sort_by).await
     };
 
-    get_blocks::Response { blocks }
+    let total = read_state(|state| state.data.last_block_id);
+
+    get_blocks::Response { blocks, total }
 }
 
 async fn get_blocks_with_filters(

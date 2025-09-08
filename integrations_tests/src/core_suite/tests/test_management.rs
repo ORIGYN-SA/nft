@@ -10,8 +10,8 @@ use icrc_ledger_types::icrc1::account::Account;
 
 use bity_ic_storage_canister_api::types::storage::UploadState;
 use core_nft::types::management::{
-    cancel_upload, finalize_upload, grant_permission, init_upload, mint, revoke_permission,
-    store_chunk, update_collection_metadata, update_nft_metadata,
+    cancel_upload, finalize_upload, grant_permission, init_upload, mint, mint::MintRequest,
+    revoke_permission, store_chunk, update_collection_metadata, update_nft_metadata,
 };
 use ic_cdk::println;
 use sha2::{Digest, Sha256};
@@ -1091,12 +1091,14 @@ fn test_mint_unauthorized() {
         unauthorized_principal,
         collection_canister_id,
         &(mint::Args {
-            metadata: create_default_icrc97_metadata(metadata_url),
-            token_owner: Account {
-                owner: nft_owner1,
-                subaccount: None,
-            },
-            memo: None,
+            mint_requests: vec![MintRequest {
+                token_owner: Account {
+                    owner: nft_owner1,
+                    subaccount: None,
+                },
+                memo: None,
+                metadata: create_default_icrc97_metadata(metadata_url),
+            }],
         }),
     );
     assert!(false, "mint should panic");
@@ -1143,12 +1145,14 @@ fn test_mint_authorized() {
         nft_owner1,
         collection_canister_id,
         &(mint::Args {
-            metadata: create_default_icrc97_metadata(metadata_url.clone()),
-            token_owner: Account {
-                owner: nft_owner1,
-                subaccount: None,
-            },
-            memo: None,
+            mint_requests: vec![MintRequest {
+                token_owner: Account {
+                    owner: nft_owner1,
+                    subaccount: None,
+                },
+                memo: None,
+                metadata: create_default_icrc97_metadata(metadata_url.clone()),
+            }],
         }),
     );
     assert!(result.is_ok(), "Should succeed with authorized principal");
@@ -1233,12 +1237,14 @@ fn test_add_then_remove_minting_authorities_unauthorized() {
         nft_owner1,
         collection_canister_id,
         &(mint::Args {
-            metadata: create_default_icrc97_metadata(metadata_url),
-            token_owner: Account {
-                owner: nft_owner1,
-                subaccount: None,
-            },
-            memo: None,
+            mint_requests: vec![MintRequest {
+                token_owner: Account {
+                    owner: nft_owner1,
+                    subaccount: None,
+                },
+                memo: None,
+                metadata: create_default_icrc97_metadata(metadata_url),
+            }],
         }),
     );
     assert!(false, "should panic");
@@ -1283,12 +1289,14 @@ fn test_mint_with_metadata() {
         controller,
         collection_canister_id,
         &(mint::Args {
-            metadata: create_default_icrc97_metadata(metadata_url.clone()),
-            token_owner: Account {
-                owner: nft_owner1,
-                subaccount: None,
-            },
-            memo: None,
+            mint_requests: vec![MintRequest {
+                token_owner: Account {
+                    owner: nft_owner1,
+                    subaccount: None,
+                },
+                memo: None,
+                metadata: create_default_icrc97_metadata(metadata_url.clone()),
+            }],
         }),
     );
     assert!(result.is_ok(), "Should succeed with authorized principal");
@@ -1636,12 +1644,14 @@ fn test_permissions_add_and_remove_one_by_one() {
         test_principal,
         collection_canister_id,
         &(mint::Args {
-            metadata: create_default_icrc97_metadata(metadata_url),
-            token_owner: Account {
-                owner: test_principal,
-                subaccount: None,
-            },
-            memo: None,
+            mint_requests: vec![MintRequest {
+                token_owner: Account {
+                    owner: test_principal,
+                    subaccount: None,
+                },
+                memo: None,
+                metadata: create_default_icrc97_metadata(metadata_url),
+            }],
         }),
     );
     assert!(

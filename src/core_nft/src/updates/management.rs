@@ -122,14 +122,25 @@ pub async fn update_collection_metadata(
 
 #[update(guard = "caller_has_minting_permission")]
 pub fn mint(req: management::mint::Args) -> management::mint::Response {
-    trace("Minting NFT");
+    trace("Minting NFT batch");
     trace(&format!("timestamp: {:?}", ic_cdk::api::time()));
     let caller = ic_cdk::api::msg_caller();
     let _guard_principal = GuardManagement::new(caller)
         .map_err(|_| management::mint::MintError::ConcurrentManagementCall)?;
 
-    let token_id = read_state(|state| state.data.last_token_id.clone());
+    let max_batch_size = read_state(|state| {
+        state
+            .data
+            .max_update_batch_size
+            .clone()
+            .unwrap_or(Nat::from(100u64))
+    });
 
+    if req.mint_requests.len() > max_batch_size {
+        return Err(management::mint::MintError::ExceedMaxAllowedSupplyCap);
+    }
+
+    let current_token_id = read_state(|state| state.data.last_token_id.clone());
     let token_list = read_state(|state| state.data.tokens_list.clone());
     let supply_cap = read_state(|state| {
         state
@@ -139,63 +150,80 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
             .unwrap_or(Nat::from(icrc7::DEFAULT_MAX_SUPPLY_CAP))
     });
 
-    if token_list.len() >= supply_cap {
+    if token_list.len() + req.mint_requests.len() > supply_cap {
         return Err(management::mint::MintError::ExceedMaxAllowedSupplyCap);
     }
 
-    match check_memo(req.memo.clone()) {
-        Ok(_) => {}
-        Err(_) => {
-            return Err(management::mint::MintError::InvalidMemo);
-        }
-    }
-
-    match token_list.contains_key(&token_id.clone()) {
-        true => {
-            return Err(management::mint::MintError::TokenAlreadyExists);
-        }
-        false => {
-            let mut new_token = nft::Icrc7Token::new(token_id.clone(), req.token_owner);
-
-            __METADATA.with_borrow_mut(|m| new_token.add_metadata(m, req.metadata));
-
-            let transaction = ICRC7Transaction::new(
-                "7mint".to_string(),
-                ic_cdk::api::time(),
-                ICRC7TransactionData {
-                    op: "7mint".to_string(),
-                    tid: Some(token_id.clone()),
-                    from: None,
-                    to: Some(req.token_owner.clone()),
-                    meta: None,
-                    memo: req.memo.clone(),
-                    created_at_time: Some(Nat::from(ic_cdk::api::time())),
-                },
-            );
-
-            match icrc3_add_transaction(transaction) {
-                Ok(_) => {}
-                Err(e) => {
-                    return Err(management::mint::MintError::StorageCanisterError(
-                        e.to_string(),
-                    ));
-                }
+    for mint_request in &req.mint_requests {
+        match check_memo(mint_request.memo.clone()) {
+            Ok(_) => {}
+            Err(_) => {
+                return Err(management::mint::MintError::InvalidMemo);
             }
-
-            mutate_state(|state| {
-                state.data.last_token_id = token_id.clone() + Nat::from(1u64);
-                state.data.tokens_list.insert(token_id.clone(), new_token);
-                state
-                    .data
-                    .tokens_list_by_owner
-                    .entry(req.token_owner.clone())
-                    .or_insert(vec![])
-                    .push(token_id.clone());
-            });
         }
     }
 
-    Ok(token_id.clone())
+    let mut new_tokens = Vec::new();
+    let mut transactions = Vec::new();
+    let timestamp = ic_cdk::api::time();
+
+    for (i, mint_request) in req.mint_requests.iter().enumerate() {
+        let token_id = current_token_id.clone() + Nat::from(i as u64);
+
+        let mut new_token =
+            nft::Icrc7Token::new(token_id.clone(), mint_request.token_owner.clone());
+        __METADATA.with_borrow_mut(|m| new_token.add_metadata(m, mint_request.metadata.clone()));
+
+        let transaction = ICRC7Transaction::new(
+            "7mint".to_string(),
+            timestamp,
+            ICRC7TransactionData {
+                op: "7mint".to_string(),
+                tid: Some(token_id.clone()),
+                from: None,
+                to: Some(mint_request.token_owner.clone()),
+                meta: None,
+                memo: mint_request.memo.clone(),
+                created_at_time: Some(Nat::from(timestamp)),
+            },
+        );
+
+        new_tokens.push((token_id, new_token, mint_request.token_owner.clone()));
+        transactions.push(transaction);
+    }
+
+    for transaction in transactions {
+        match icrc3_add_transaction(transaction) {
+            Ok(_) => {}
+            Err(e) => {
+                return Err(management::mint::MintError::StorageCanisterError(
+                    e.to_string(),
+                ));
+            }
+        }
+    }
+
+    mutate_state(|state| {
+        let new_last_token_id =
+            current_token_id.clone() + Nat::from(req.mint_requests.len() as u64);
+        state.data.last_token_id = new_last_token_id;
+
+        for (token_id, new_token, token_owner) in new_tokens {
+            state.data.tokens_list.insert(token_id.clone(), new_token);
+            state
+                .data
+                .tokens_list_by_owner
+                .entry(token_owner)
+                .or_insert(vec![])
+                .push(token_id);
+        }
+    });
+
+    trace(&format!(
+        "Successfully minted {} NFTs",
+        req.mint_requests.len()
+    ));
+    Ok(current_token_id.clone())
 }
 
 #[update(guard = "caller_has_update_metadata_permission")]

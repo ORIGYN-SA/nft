@@ -14,6 +14,7 @@ pub mod get_blocks {
 
     #[derive(CandidType, Deserialize, Serialize)]
     pub struct Response {
+        pub total: u64,
         pub blocks: Vec<BlockWithId>,
     }
 }

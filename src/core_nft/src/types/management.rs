@@ -12,10 +12,15 @@ pub mod mint {
     use super::*;
 
     #[derive(CandidType, Serialize, Deserialize, Clone)]
-    pub struct Args {
+    pub struct MintRequest {
         pub token_owner: Account,
         pub memo: Option<serde_bytes::ByteBuf>,
         pub metadata: Vec<(String, ICRC3Value)>,
+    }
+
+    #[derive(CandidType, Serialize, Deserialize, Clone)]
+    pub struct Args {
+        pub mint_requests: Vec<MintRequest>,
     }
     #[derive(Serialize, Deserialize, CandidType, Debug)]
     pub enum MintError {

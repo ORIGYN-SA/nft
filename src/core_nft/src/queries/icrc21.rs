@@ -1,4 +1,4 @@
-use candid::{Decode, Nat};
+use candid::Decode;
 use ic_cdk::query;
 
 use crate::state::read_state;
@@ -6,7 +6,6 @@ pub use crate::types::icrc21;
 pub use crate::types::icrc37;
 pub use crate::types::icrc7;
 pub use crate::types::management;
-use bity_ic_storage_canister_api::{cancel_upload, init_upload};
 
 #[query]
 pub fn icrc21_canister_call_consent_message(
@@ -19,13 +18,6 @@ pub fn icrc21_canister_call_consent_message(
         "icrc37_revoke_token_approvals" => handle_revoke_token_approvals_consent(args),
         "icrc37_revoke_collection_approvals" => handle_revoke_collection_approvals_consent(args),
         "icrc37_transfer_from" => handle_transfer_from_consent(args),
-        "mint" => handle_mint_consent(args),
-        "update_nft_metadata" => handle_update_nft_metadata_consent(args),
-        "burn_nft" => handle_burn_nft_consent(args),
-        "init_upload" => handle_init_upload_consent(args),
-        // "store_chunk" => handle_store_chunk_consent(args), -> not necessary?
-        // "finalize_upload" => handle_finalize_upload_consent(args), -> not necessary?
-        "cancel_upload" => handle_cancel_upload_consent(args),
         _ => handle_unsupported_method(args),
     }
 }
@@ -338,206 +330,6 @@ fn handle_transfer_from_consent(
             )
         }
         Err(_) => create_error_response("Failed to decode transfer_from arguments".to_string()),
-    }
-}
-
-fn handle_mint_consent(
-    args: icrc21::icrc21_canister_call_consent_message::Args,
-) -> icrc21::icrc21_canister_call_consent_message::Response {
-    match Decode!(&args.arg, management::mint::Args) {
-        Ok(mint_args) => {
-            let mut fields = vec![
-                ("Action".to_string(), "Mint New NFT".to_string()),
-                ("Method".to_string(), "mint".to_string()),
-            ];
-
-            fields.push((
-                "Owner".to_string(),
-                format!("{}", mint_args.token_owner.owner),
-            ));
-            if let Some(memo) = &mint_args.memo {
-                fields.push(("Memo".to_string(), format!("{:?}", memo)));
-            }
-
-            create_consent_info(
-                "You are about to mint a new NFT. Method: mint".to_string(),
-                "Mint NFT".to_string(),
-                fields,
-                args.user_preferences.metadata,
-            )
-        }
-        Err(_) => create_error_response("Failed to decode mint arguments".to_string()),
-    }
-}
-
-fn handle_update_nft_metadata_consent(
-    args: icrc21::icrc21_canister_call_consent_message::Args,
-) -> icrc21::icrc21_canister_call_consent_message::Response {
-    match Decode!(&args.arg, management::update_nft_metadata::Args) {
-        Ok(update_args) => {
-            let mut fields = vec![
-                ("Action".to_string(), "Update NFT Metadata".to_string()),
-                ("Method".to_string(), "update_nft_metadata".to_string()),
-            ];
-
-            fields.push(("Token ID".to_string(), update_args.token_id.to_string()));
-
-            let generic_message = format!(
-                "You are about to update metadata for NFT {}. Method: update_nft_metadata",
-                update_args.token_id
-            );
-
-            create_consent_info(
-                generic_message,
-                "Update NFT Metadata".to_string(),
-                fields,
-                args.user_preferences.metadata,
-            )
-        }
-        Err(_) => {
-            create_error_response("Failed to decode update_nft_metadata arguments".to_string())
-        }
-    }
-}
-
-fn handle_burn_nft_consent(
-    args: icrc21::icrc21_canister_call_consent_message::Args,
-) -> icrc21::icrc21_canister_call_consent_message::Response {
-    match Decode!(&args.arg, Nat) {
-        Ok(token_id) => {
-            let mut fields = vec![
-                ("Action".to_string(), "Burn NFT".to_string()),
-                ("Method".to_string(), "burn_nft".to_string()),
-            ];
-
-            fields.push(("Token ID".to_string(), token_id.to_string()));
-
-            let generic_message = format!(
-                "You are about to burn NFT {}. This action cannot be undone. Method: burn_nft",
-                token_id
-            );
-
-            create_consent_info(
-                generic_message,
-                "Burn NFT".to_string(),
-                fields,
-                args.user_preferences.metadata,
-            )
-        }
-        Err(_) => create_error_response("Failed to decode burn_nft arguments".to_string()),
-    }
-}
-
-fn handle_init_upload_consent(
-    args: icrc21::icrc21_canister_call_consent_message::Args,
-) -> icrc21::icrc21_canister_call_consent_message::Response {
-    match Decode!(&args.arg, init_upload::Args) {
-        Ok(upload_args) => {
-            let mut fields = vec![
-                ("Action".to_string(), "Initialize File Upload".to_string()),
-                ("Method".to_string(), "init_upload".to_string()),
-            ];
-
-            fields.push(("File Path".to_string(), upload_args.file_path.clone()));
-
-            let generic_message = format!(
-                "You are about to initialize upload for file '{}'. Method: init_upload",
-                upload_args.file_path
-            );
-
-            create_consent_info(
-                generic_message,
-                "Initialize Upload".to_string(),
-                fields,
-                args.user_preferences.metadata,
-            )
-        }
-        Err(_) => create_error_response("Failed to decode init_upload arguments".to_string()),
-    }
-}
-
-// fn handle_store_chunk_consent(
-//     args: icrc21::icrc21_canister_call_consent_message::Args,
-// ) -> icrc21::icrc21_canister_call_consent_message::Response {
-//     match Decode!(&args.arg, store_chunk::Args) {
-//         Ok(chunk_args) => {
-//             let mut fields = vec![
-//                 ("Action".to_string(), "Store File Chunk".to_string()),
-//                 ("Method".to_string(), "store_chunk".to_string()),
-//             ];
-
-//             fields.push(("File Path".to_string(), chunk_args.file_path.clone()));
-//             fields.push(("Chunk ID".to_string(), chunk_args.chunk_id.to_string()));
-
-//             let generic_message = format!(
-//                 "You are about to store chunk {} for file '{}'. Method: store_chunk",
-//                 chunk_args.chunk_id, chunk_args.file_path
-//             );
-
-//             create_consent_info(
-//                 generic_message,
-//                 "Store Chunk".to_string(),
-//                 fields,
-//                 args.user_preferences.metadata,
-//             )
-//         }
-//         Err(_) => create_error_response("Failed to decode store_chunk arguments".to_string()),
-//     }
-// }
-
-// fn handle_finalize_upload_consent(
-//     args: icrc21::icrc21_canister_call_consent_message::Args,
-// ) -> icrc21::icrc21_canister_call_consent_message::Response {
-//     match Decode!(&args.arg, finalize_upload::Args) {
-//         Ok(finalize_args) => {
-//             let mut fields = vec![
-//                 ("Action".to_string(), "Finalize File Upload".to_string()),
-//                 ("Method".to_string(), "finalize_upload".to_string()),
-//             ];
-
-//             fields.push(("File Path".to_string(), finalize_args.file_path.clone()));
-
-//             let generic_message = format!(
-//                 "You are about to finalize upload for file '{}'. Method: finalize_upload",
-//                 finalize_args.file_path
-//             );
-
-//             create_consent_info(
-//                 generic_message,
-//                 "Finalize Upload".to_string(),
-//                 fields,
-//                 args.user_preferences.metadata,
-//             )
-//         }
-//         Err(_) => create_error_response("Failed to decode finalize_upload arguments".to_string()),
-//     }
-// }
-
-fn handle_cancel_upload_consent(
-    args: icrc21::icrc21_canister_call_consent_message::Args,
-) -> icrc21::icrc21_canister_call_consent_message::Response {
-    match Decode!(&args.arg, cancel_upload::Args) {
-        Ok(cancel_args) => {
-            let mut fields = vec![
-                ("Action".to_string(), "Cancel File Upload".to_string()),
-                ("Method".to_string(), "cancel_upload".to_string()),
-            ];
-
-            fields.push(("File Path".to_string(), cancel_args.file_path.clone()));
-
-            let generic_message = format!(
-                "You are about to cancel upload for file '{}'. Method: cancel_upload",
-                cancel_args.file_path
-            );
-
-            create_consent_info(
-                generic_message,
-                "Cancel Upload".to_string(),
-                fields,
-                args.user_preferences.metadata,
-            )
-        }
-        Err(_) => create_error_response("Failed to decode cancel_upload arguments".to_string()),
     }
 }
 

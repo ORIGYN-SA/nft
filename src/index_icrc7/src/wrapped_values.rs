@@ -1,4 +1,4 @@
-use candid::{CandidType, Principal};
+use candid::{CandidType, Nat, Principal};
 use ic_stable_structures::{storable::Bound, Storable};
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
 use icrc_ledger_types::icrc1::account::Account;
@@ -6,6 +6,62 @@ use minicbor::Encoder;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::str::FromStr;
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+pub struct WrappedNat(pub Nat);
+
+impl From<Nat> for WrappedNat {
+    fn from(nat: Nat) -> Self {
+        WrappedNat(nat)
+    }
+}
+
+impl Storable for WrappedNat {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        let mut buffer = Vec::new();
+        minicbor::encode(self, &mut buffer).expect("failed to encode Nat");
+        Cow::Owned(buffer)
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        minicbor::decode(&bytes).expect("failed to decode WrappedNat")
+    }
+
+    const BOUND: Bound = Bound::Unbounded;
+}
+
+impl FromStr for WrappedNat {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Ok(nat) = Nat::from_str(s) {
+            Ok(WrappedNat(nat))
+        } else {
+            Err(format!("Invalid nat string: {}", s))
+        }
+    }
+}
+
+impl<C> minicbor::Encode<C> for WrappedNat {
+    fn encode<W: minicbor::encode::Write>(
+        &self,
+        e: &mut Encoder<W>,
+        _ctx: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>> {
+        e.u64(u64::try_from(self.0 .0.clone()).unwrap())?;
+        Ok(())
+    }
+}
+
+impl<'b, C> minicbor::Decode<'b, C> for WrappedNat {
+    fn decode(
+        d: &mut minicbor::Decoder<'b>,
+        _ctx: &mut C,
+    ) -> Result<Self, minicbor::decode::Error> {
+        let nat = d.u64()?;
+        Ok(WrappedNat(Nat::from(nat)))
+    }
+}
 
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq, Hash, Ord, PartialOrd)]
 pub struct WrappedAccount(pub Account);

@@ -14,9 +14,11 @@ pub async fn mint_nft(
     memo: Option<&str>,
 ) -> Result<Nat> {
     let mint_args = mint::Args {
-        token_owner: Account { owner, subaccount },
-        memo: memo.map(|m| serde_bytes::ByteBuf::from(m.as_bytes())),
-        metadata,
+        mint_requests: vec![mint::MintRequest {
+            token_owner: Account { owner, subaccount },
+            memo: memo.map(|m| serde_bytes::ByteBuf::from(m.as_bytes())),
+            metadata,
+        }],
     };
 
     let bytes = Encode!(&mint_args)?;

@@ -1,8 +1,8 @@
 use crate::memory::{get_index_memory, VM};
-use crate::wrapped_values::WrappedAccount;
+use crate::wrapped_values::{WrappedAccount, WrappedNat};
 
 use crate::blocks::{get_block_instance, BlockType};
-use candid::{CandidType, Nat};
+use candid::CandidType;
 use ic_stable_structures::{storable::Bound, StableBTreeMap, Storable};
 use icrc_ledger_types::icrc::generic_value::ICRC3Value;
 use icrc_ledger_types::icrc3::blocks::BlockWithId;
@@ -30,6 +30,8 @@ pub enum IndexType {
     Account(#[n(0)] WrappedAccount),
     #[n(1)]
     BlockType(#[n(0)] String),
+    #[n(2)]
+    TokenId(#[n(0)] WrappedNat),
     // ....
 }
 
@@ -90,6 +92,7 @@ pub fn add_block_to_index(block: &BlockWithId) -> Result<(), String> {
 
     let block_instance = get_block_instance(&block_type);
     let accounts = block_instance.extract_accounts(data).unwrap_or_default();
+    let token_id = block_instance.extract_token_id(data).unwrap_or_default();
     let _timestamp = block_instance.extract_timestamp(data).unwrap_or_default();
 
     let block_id = block.id.0.clone().try_into().unwrap();
@@ -118,6 +121,18 @@ pub fn add_block_to_index(block: &BlockWithId) -> Result<(), String> {
         d.push_front(block_id);
         let block_type_values: Vec<_> = d.into();
         index_mut.insert(block_type_key, IndexValue(block_type_values));
+
+        if let Some(token_id) = token_id {
+            let token_id_key = IndexType::TokenId(token_id);
+            let token_id_values = index_mut
+                .get(&token_id_key)
+                .map(|v| v.0.clone())
+                .unwrap_or_default();
+            let mut d: VecDeque<_> = token_id_values.into();
+            d.push_front(block_id);
+            let token_id_values: Vec<_> = d.into();
+            index_mut.insert(token_id_key, IndexValue(token_id_values));
+        }
     });
 
     Ok(())
