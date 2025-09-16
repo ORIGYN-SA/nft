@@ -7,10 +7,12 @@ pub use crate::types::icrc37;
 pub use crate::types::icrc7;
 pub use crate::types::management;
 
+use icrc_ledger_types::icrc21::errors::{ErrorInfo, Icrc21Error};
+use icrc_ledger_types::icrc21::requests::ConsentMessageMetadata;
+use icrc_ledger_types::icrc21::responses::{ConsentInfo, ConsentMessage};
+
 #[query]
-pub fn icrc21_canister_call_consent_message(
-    args: icrc21::icrc21_canister_call_consent_message::Args,
-) -> icrc21::icrc21_canister_call_consent_message::Response {
+pub fn icrc21_canister_call_consent_message(args: icrc21::Args) -> icrc21::Response {
     match args.method.as_str() {
         "icrc7_transfer" => handle_transfer_consent(args),
         "icrc37_approve_tokens" => handle_approve_tokens_consent(args),
@@ -24,44 +26,24 @@ pub fn icrc21_canister_call_consent_message(
 
 fn create_consent_info(
     generic_message: String,
-    intent: String,
-    fields: Vec<(String, String)>,
-    metadata: icrc21::icrc21_canister_call_consent_message::icrc21_consent_message_metadata,
-) -> icrc21::icrc21_canister_call_consent_message::Response {
-    let fields_message =
-        icrc21::icrc21_canister_call_consent_message::icrc21_field_display_message {
-            intent,
-            fields,
-        };
+    metadata: ConsentMessageMetadata,
+) -> icrc21::Response {
+    let consent_message = ConsentMessage::GenericDisplayMessage(generic_message);
 
-    let consent_message = icrc21::icrc21_canister_call_consent_message::icrc21_consent_message {
-        generic_display_message: generic_message,
-        fields_display_message: fields_message,
-    };
-
-    let consent_info = icrc21::icrc21_canister_call_consent_message::icrc21_consent_info {
+    let consent_info = ConsentInfo {
         consent_message,
         metadata,
     };
 
-    icrc21::icrc21_canister_call_consent_message::Response::Ok(consent_info)
+    icrc21::Response::Ok(consent_info)
 }
 
-fn create_error_response(
-    description: String,
-) -> icrc21::icrc21_canister_call_consent_message::Response {
-    let error_info =
-        icrc21::icrc21_canister_call_consent_message::icrc21_error_info { description };
-    icrc21::icrc21_canister_call_consent_message::Response::Err(
-        icrc21::icrc21_canister_call_consent_message::icrc21_error::UnsupportedCanisterCall(
-            error_info,
-        ),
-    )
+fn create_error_response(description: String) -> icrc21::Response {
+    let error_info = ErrorInfo { description };
+    icrc21::Response::Err(Icrc21Error::UnsupportedCanisterCall(error_info))
 }
 
-fn handle_transfer_consent(
-    args: icrc21::icrc21_canister_call_consent_message::Args,
-) -> icrc21::icrc21_canister_call_consent_message::Response {
+fn handle_transfer_consent(args: icrc21::Args) -> icrc21::Response {
     match Decode!(&args.arg, icrc7::icrc7_transfer::Args) {
         Ok(transfer_args) => {
             let mut fields = vec![
@@ -89,27 +71,17 @@ fn handle_transfer_consent(
                 "You are about to transfer an NFT. Method: icrc7_transfer".to_string()
             };
 
-            create_consent_info(
-                generic_message,
-                "NFT Transfer".to_string(),
-                fields,
-                args.user_preferences.metadata,
-            )
+            create_consent_info(generic_message, args.user_preferences.metadata)
         }
         Err(_) => create_error_response("Failed to decode transfer arguments".to_string()),
     }
 }
 
-fn handle_approve_tokens_consent(
-    args: icrc21::icrc21_canister_call_consent_message::Args,
-) -> icrc21::icrc21_canister_call_consent_message::Response {
+fn handle_approve_tokens_consent(args: icrc21::Args) -> icrc21::Response {
     match Decode!(&args.arg, icrc37::icrc37_approve_tokens::Args) {
         Ok(approve_args) => {
             let mut fields = vec![
-                (
-                    "Action".to_string(),
-                    "Approve Tokens for Transfer".to_string(),
-                ),
+                ("Action".to_string(), "Approve Tokens".to_string()),
                 ("Method".to_string(), "icrc37_approve_tokens".to_string()),
             ];
 
@@ -137,27 +109,17 @@ fn handle_approve_tokens_consent(
                     .to_string()
             };
 
-            create_consent_info(
-                generic_message,
-                "Approve Tokens".to_string(),
-                fields,
-                args.user_preferences.metadata,
-            )
+            create_consent_info(generic_message, args.user_preferences.metadata)
         }
         Err(_) => create_error_response("Failed to decode approve_tokens arguments".to_string()),
     }
 }
 
-fn handle_approve_collection_consent(
-    args: icrc21::icrc21_canister_call_consent_message::Args,
-) -> icrc21::icrc21_canister_call_consent_message::Response {
+fn handle_approve_collection_consent(args: icrc21::Args) -> icrc21::Response {
     match Decode!(&args.arg, icrc37::icrc37_approve_collection::Args) {
         Ok(approve_args) => {
             let mut fields = vec![
-                (
-                    "Action".to_string(),
-                    "Approve Entire Collection".to_string(),
-                ),
+                ("Action".to_string(), "Approve Collection".to_string()),
                 (
                     "Method".to_string(),
                     "icrc37_approve_collection".to_string(),
@@ -184,12 +146,7 @@ fn handle_approve_collection_consent(
 
             let generic_message = format!("You are about to approve {} to transfer all your nft available in the collection. Method: icrc37_approve_collection", approve_args.first().unwrap().approval_info.spender.owner);
 
-            create_consent_info(
-                generic_message,
-                "Approve Collection".to_string(),
-                fields,
-                args.user_preferences.metadata,
-            )
+            create_consent_info(generic_message, args.user_preferences.metadata)
         }
         Err(_) => {
             create_error_response("Failed to decode approve_collection arguments".to_string())
@@ -197,9 +154,7 @@ fn handle_approve_collection_consent(
     }
 }
 
-fn handle_revoke_token_approvals_consent(
-    args: icrc21::icrc21_canister_call_consent_message::Args,
-) -> icrc21::icrc21_canister_call_consent_message::Response {
+fn handle_revoke_token_approvals_consent(args: icrc21::Args) -> icrc21::Response {
     match Decode!(&args.arg, icrc37::icrc37_revoke_token_approvals::Args) {
         Ok(revoke_args) => {
             let mut fields = vec![
@@ -227,12 +182,7 @@ fn handle_revoke_token_approvals_consent(
                     .to_string()
             };
 
-            create_consent_info(
-                generic_message,
-                "Revoke Token Approvals".to_string(),
-                fields,
-                args.user_preferences.metadata,
-            )
+            create_consent_info(generic_message, args.user_preferences.metadata)
         }
         Err(_) => {
             create_error_response("Failed to decode revoke_token_approvals arguments".to_string())
@@ -240,9 +190,7 @@ fn handle_revoke_token_approvals_consent(
     }
 }
 
-fn handle_revoke_collection_approvals_consent(
-    args: icrc21::icrc21_canister_call_consent_message::Args,
-) -> icrc21::icrc21_canister_call_consent_message::Response {
+fn handle_revoke_collection_approvals_consent(args: icrc21::Args) -> icrc21::Response {
     match Decode!(&args.arg, icrc37::icrc37_revoke_collection_approvals::Args) {
         Ok(revoke_args) => {
             let mut fields = vec![
@@ -280,12 +228,7 @@ fn handle_revoke_collection_approvals_consent(
 
             let generic_message = "You are about to revoke collection approvals. Method: icrc37_revoke_collection_approvals".to_string();
 
-            create_consent_info(
-                generic_message,
-                "Revoke Collection Approvals".to_string(),
-                fields,
-                args.user_preferences.metadata,
-            )
+            create_consent_info(generic_message, args.user_preferences.metadata)
         }
         Err(_) => create_error_response(
             "Failed to decode revoke_collection_approvals arguments".to_string(),
@@ -293,9 +236,7 @@ fn handle_revoke_collection_approvals_consent(
     }
 }
 
-fn handle_transfer_from_consent(
-    args: icrc21::icrc21_canister_call_consent_message::Args,
-) -> icrc21::icrc21_canister_call_consent_message::Response {
+fn handle_transfer_from_consent(args: icrc21::Args) -> icrc21::Response {
     match Decode!(&args.arg, icrc37::icrc37_transfer_from::Args) {
         Ok(transfer_args) => {
             let mut fields = vec![
@@ -322,19 +263,12 @@ fn handle_transfer_from_consent(
                     .to_string()
             };
 
-            create_consent_info(
-                generic_message,
-                "Transfer Using Approval".to_string(),
-                fields,
-                args.user_preferences.metadata,
-            )
+            create_consent_info(generic_message, args.user_preferences.metadata)
         }
         Err(_) => create_error_response("Failed to decode transfer_from arguments".to_string()),
     }
 }
 
-fn handle_unsupported_method(
-    args: icrc21::icrc21_canister_call_consent_message::Args,
-) -> icrc21::icrc21_canister_call_consent_message::Response {
+fn handle_unsupported_method(args: icrc21::Args) -> icrc21::Response {
     create_error_response(format!("Method '{}' is not supported", args.method))
 }
