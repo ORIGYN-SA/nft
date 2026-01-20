@@ -520,7 +520,30 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
         format!("/{}", media_path)
     };
 
-    let redirection_url = format!("https://{}.raw.icp0.io{}", canister_id, path.clone());
+    // Construct URLs based on base_url configuration or test_mode
+    // base_url should be a template with {canister_id} placeholder, e.g.:
+    //   - "http://{canister_id}.localhost:4943" (local)
+    //   - "https://{canister_id}.raw.icp0.io" (mainnet)
+    let (base_url_template, is_test_mode) =
+        read_state(|state| (state.data.base_url.clone(), state.env.is_test_mode()));
+
+    let construct_url = |canister_id_str: &str, file_path: &str| -> String {
+        match &base_url_template {
+            Some(template) => {
+                let base = template.replace("{canister_id}", canister_id_str);
+                format!("{}{}", base.trim_end_matches('/'), file_path)
+            }
+            None => {
+                if is_test_mode {
+                    format!("http://{}.localhost:4943{}", canister_id_str, file_path)
+                } else {
+                    format!("https://{}.raw.icp0.io{}", canister_id_str, file_path)
+                }
+            }
+        }
+    };
+
+    let redirection_url = construct_url(&canister_id.to_string(), &path);
 
     add_redirection(path.clone(), redirection_url.clone());
 
@@ -533,7 +556,7 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
         state.internal_filestorage.insert(
             data.file_path.clone(),
             InternalFilestorageData {
-                init_timestamp: init_timestamp,
+                init_timestamp,
                 state: UploadState::Finalized,
                 canister: canister_id,
                 path: media_path,
@@ -541,13 +564,10 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
         );
     });
 
-    let url = format!(
-        "https://{}.raw.icp0.io{}",
-        ic_cdk::api::canister_self().to_string(),
-        path.clone()
-    );
+    let main_canister_id = ic_cdk::api::canister_self().to_string();
+    let url = construct_url(&main_canister_id, &path);
 
-    return Ok(finalize_upload::FinalizeUploadResp { url: url });
+    Ok(finalize_upload::FinalizeUploadResp { url })
 }
 
 #[query(guard = "caller_has_manage_authorities_permission")]

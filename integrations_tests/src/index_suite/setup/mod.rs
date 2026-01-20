@@ -58,6 +58,7 @@ pub fn default_test_setup() -> TestEnv {
             max_approvals_per_token_or_collection: Some(Nat::from(10u64)),
             max_revoke_approvals: Some(Nat::from(10u64)),
         },
+        base_url: None,
     };
 
     test_env.build(init_args_index, init_args_collection)
@@ -111,6 +112,7 @@ pub fn test_setup_atomic_batch_transfers() -> TestEnv {
             max_approvals_per_token_or_collection: Some(Nat::from(10u64)),
             max_revoke_approvals: Some(Nat::from(10u64)),
         },
+        base_url: None,
     };
 
     test_env.build(init_args_index, init_args_collection)
@@ -164,6 +166,7 @@ pub fn test_setup_no_limit() -> TestEnv {
             max_approvals_per_token_or_collection: Some(Nat::from(10u64)),
             max_revoke_approvals: Some(Nat::from(10u64)),
         },
+        base_url: None,
     };
 
     test_env.build(init_args_index, init_args_collection)

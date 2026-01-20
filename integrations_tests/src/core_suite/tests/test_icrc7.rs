@@ -242,6 +242,7 @@ fn test_icrc7_token_metadata_simple() {
                 &http_gateway,
                 collection_canister_id,
                 &metadata_file_path,
+                true,
             );
             assert_eq!(
                 parsed_metadata
@@ -457,6 +458,7 @@ fn test_icrc7_token_metadata_multiple_insert() {
                 &http_gateway,
                 collection_canister_id,
                 &metadata_file_path,
+                true,
             );
             assert_eq!(
                 parsed_metadata
@@ -666,6 +668,7 @@ fn test_icrc7_token_metadata_multiple_insert_dup_name() {
                 &http_gateway,
                 collection_canister_id,
                 &metadata_file_path,
+                true,
             );
 
             assert_eq!(
@@ -940,6 +943,7 @@ fn test_icrc7_transfer_with_metadata_updates() {
                 &http_gateway,
                 collection_canister_id,
                 &metadata_file_path,
+                true,
             );
 
             assert_eq!(
