@@ -15,6 +15,7 @@ variables:
   GIT_DEPTH: 1
 
 stages:
+  - lint
   - build
   - integration_testing
   - deploy
@@ -26,9 +27,10 @@ include:
 
 build:
   stage: build
+  needs: ["rust lint"]
   extends: .rust template
   variables:
-    KUBERNETES_MEMORY_LIMIT: "6Gi"
+    KUBERNETES_MEMORY_LIMIT: "5Gi"
     KUBERNETES_MEMORY_REQUEST: "4Gi"
     KUBERNETES_CPU_LIMIT: "2"
     KUBERNETES_CPU_REQUEST: "2"
@@ -55,7 +57,7 @@ build:
     expire_in: 1 day
 
 rust lint:
-  stage: build
+  stage: lint
   extends: .rust template
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
