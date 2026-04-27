@@ -19,6 +19,9 @@ const MAX_FILE_SIZE: u128 = 2 * 1024 * 1024 * 1024; // 2 GiB
 pub const INITIAL_CYCLES_BALANCE: u128 = 5_000_000_000_000; // 5T cycles
 pub const RESERVED_CYCLES_BALANCE: u128 = 2_000_000_000_000; // 2T cycles
 
+pub const INITIAL_CYCLES_BALANCE_TEST_MODE: u128 = 1_000_000_000_000; // 1T cycles
+pub const RESERVED_CYCLES_BALANCE_TEST_MODE: u128 = 500_000_000_000; // 0.5T cycle
+
 pub use bity_ic_storage_canister_api::lifecycle::Args as ArgsStorage;
 
 #[derive(Serialize, Deserialize, Clone)]

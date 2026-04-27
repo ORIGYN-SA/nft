@@ -41,6 +41,12 @@ pub struct InitArgs {
     pub max_canister_storage_threshold: Option<Nat>,
     pub collection_metadata: HashMap<String, Value>,
     pub approval_init: InitApprovalsArg,
+    // Construct URLs based on base_url configuration or test_mode
+    // base_url should be a template with {canister_id} placeholder, e.g.:
+    //   - "http://{canister_id}.localhost:4943" (local)
+    //   - "https://{canister_id}.raw.icp0.io" (mainnet)
+    //   None for default based on test mode
+    pub base_url: Option<String>,
 }
 
 #[init]
@@ -88,6 +94,7 @@ fn init(args: Args) {
                 init_args.permitted_drift,
                 init_args.max_canister_storage_threshold,
                 init_args.approval_init.clone(),
+                init_args.base_url.clone(),
             );
 
             if env.is_test_mode() {
