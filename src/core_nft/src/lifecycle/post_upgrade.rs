@@ -15,6 +15,8 @@ use ic_cdk_macros::post_upgrade;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
+const STORAGE_WASM: &[u8] = include_bytes!("../../../../wasm/storage_canister.wasm.gz");
+
 #[derive(CandidType, Serialize, Deserialize, Debug)]
 pub struct UpgradeArgs {
     pub version: BuildVersion,
@@ -45,6 +47,10 @@ fn post_upgrade(args: Args) {
             //     Vec<LogEntry>,
             // ) = serializer::deserialize(reader).unwrap();
             // let mut state = RuntimeState::from(runtime_state_v0);
+
+            state.data.sub_canister_manager.sub_canister_manager.wasm = STORAGE_WASM.to_vec();
+            state.data.sub_canister_manager.sub_canister_manager.update_canisters(bity_ic_storage_canister_api::lifecycle::Args::Upgrade(bity_ic_storage_canister_api::post_upgrade::UpgradeArgs{version: upgrade_args.version.clone(), commit_hash: upgrade_args.commit_hash.clone()}));
+            ic_cdk::println!("Storage canister upgraded");
 
             state.env.set_version(upgrade_args.version);
             state.env.set_commit_hash(upgrade_args.commit_hash);

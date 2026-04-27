@@ -23,7 +23,7 @@ pub use bity_ic_storage_canister_api::lifecycle::Args as ArgsStorage;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct StorageSubCanisterManager {
-    sub_canister_manager: bity_ic_subcanister_manager::SubCanisterManager<StorageCanister>,
+    pub sub_canister_manager: bity_ic_subcanister_manager::SubCanisterManager<StorageCanister>,
     init_args: ArgsStorage,
     upgrade_args: ArgsStorage,
 }

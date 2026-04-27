@@ -520,6 +520,7 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
         format!("/{}", media_path)
     };
 
+    // FIXME: it's the only place where we can find the redirection url to raw with add_redirection. Is it ok?
     let redirection_url = format!("https://{}.raw.icp0.io{}", canister_id, path.clone());
 
     add_redirection(path.clone(), redirection_url.clone());

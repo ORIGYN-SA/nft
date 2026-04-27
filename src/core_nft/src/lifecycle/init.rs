@@ -18,6 +18,7 @@ use ic_cdk_macros::init;
 use icrc_ledger_types::icrc3::blocks::SupportedBlockType;
 use serde::{Deserialize, Serialize};
 use tracing::info;
+
 #[derive(CandidType, Serialize, Deserialize, Debug)]
 pub struct InitArgs {
     pub test_mode: bool,

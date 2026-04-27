@@ -1,0 +1,461 @@
+type Account = record { owner : principal; subaccount : opt blob };
+type ApprovalInfo = record {
+  memo : opt blob;
+  from_subaccount : opt blob;
+  created_at_time : nat64;
+  expires_at : opt nat64;
+  spender : Account;
+};
+type ApproveCollectionArg = record { approval_info : ApprovalInfo };
+type ApproveCollectionError = variant {
+  GenericError : record { message : text; error_code : nat };
+  InvalidSpender;
+  CreatedInFuture : record { ledger_time : nat64 };
+  GenericBatchError : record { message : text; error_code : nat };
+  TooOld;
+};
+type ApproveCollectionResult = variant {
+  Ok : nat;
+  Err : ApproveCollectionError;
+};
+type ApproveTokenArg = record { token_id : nat; approval_info : ApprovalInfo };
+type ApproveTokenError = variant {
+  GenericError : record { message : text; error_code : nat };
+  InvalidSpender;
+  NonExistingTokenId;
+  Unauthorized;
+  CreatedInFuture : record { ledger_time : nat64 };
+  GenericBatchError : record { message : text; error_code : nat };
+  TooOld;
+};
+type ApproveTokenResult = variant { Ok : nat; Err : ApproveTokenError };
+type ArchivedBlocks = record {
+  args : vec GetBlocksRequest;
+  callback : func (vec GetBlocksRequest) -> (GetBlocksResult) query;
+};
+type Args = record { file_path : text };
+type Args_1 = record { "principal" : principal };
+type Args_2 = record { permission : Permission; "principal" : principal };
+type Args_3 = record { permission : Permission; "principal" : principal };
+type Args_4 = record {
+  file_hash : text;
+  file_path : text;
+  file_size : nat64;
+  chunk_size : opt nat64;
+};
+type Args_5 = record { mint_requests : vec MintRequest };
+type Args_6 = record { chunk_id : nat; file_path : text; chunk_data : blob };
+type Args_7 = record {
+  supply_cap : opt nat;
+  tx_window : opt nat;
+  default_take_value : opt nat;
+  max_canister_storage_threshold : opt nat;
+  logo : opt text;
+  permitted_drift : opt nat;
+  name : opt text;
+  description : opt text;
+  max_take_value : opt nat;
+  max_update_batch_size : opt nat;
+  max_query_batch_size : opt nat;
+  max_memo_size : opt nat;
+  atomic_batch_transfers : opt bool;
+  collection_metadata : opt vec record { text; CustomValue };
+  symbol : opt text;
+};
+type Args_8 = record {
+  token_id : nat;
+  metadata : vec record { text; CustomValue };
+};
+type Args_9 = variant { Upgrade : UpgradeArgs; Init : InitArgs };
+type BlockWithId = record { id : nat; block : ICRC3Value };
+type BuildVersion = record { major : nat32; minor : nat32; patch : nat32 };
+type BurnNftError = variant {
+  StorageCanisterError : text;
+  TokenDoesNotExist;
+  ConcurrentManagementCall;
+  NotTokenOwner;
+};
+type CancelUploadError = variant { UploadNotInitialized };
+type ConsentInfo = record {
+  metadata : ConsentMessageMetadata;
+  consent_message : ConsentMessage;
+};
+type ConsentMessage = variant {
+  FieldsDisplayMessage : FieldsDisplay;
+  GenericDisplayMessage : text;
+};
+type ConsentMessageMetadata = record {
+  utc_offset_minutes : opt int16;
+  language : text;
+};
+type ConsentMessageRequest = record {
+  arg : blob;
+  method : text;
+  user_preferences : ConsentMessageSpec;
+};
+type ConsentMessageSpec = record {
+  metadata : ConsentMessageMetadata;
+  device_spec : opt DisplayMessageType;
+};
+type CustomValue = variant {
+  Int : int;
+  Map : vec record { text; ICRC3Value };
+  Nat : nat;
+  Blob : blob;
+  Text : text;
+  Array : vec ICRC3Value;
+};
+type DisplayMessageType = variant { GenericDisplay; FieldsDisplay };
+type Duration = record { secs : nat64; nanos : nat32 };
+type ErrorInfo = record { description : text };
+type FieldsDisplay = record {
+  fields : vec record { text; Value };
+  intent : text;
+};
+type FinalizeUploadError = variant {
+  IncompleteUpload;
+  FileSizeMismatch;
+  FileHashMismatch;
+  UploadNotStarted;
+  UploadAlreadyFinalized;
+};
+type FinalizeUploadResp = record { url : text };
+type GetAllUploadsError = variant { StorageCanisterError : text };
+type GetBlocksRequest = record { start : nat; length : nat };
+type GetBlocksResult = record {
+  log_length : nat;
+  blocks : vec BlockWithId;
+  archived_blocks : Vec;
+};
+type GetBlocksResult_1 = record {
+  log_length : nat;
+  blocks : vec BlockWithId;
+  archived_blocks : vec ArchivedBlocks;
+};
+type GetUploadStatusError = variant {
+  StorageCanisterError : text;
+  UploadNotFound;
+};
+type GetUserPermissionsError = variant { DefaultError : text; UserNotFound };
+type GrantPermissionError = variant {
+  ConcurrentManagementCall;
+  DefaultError : text;
+};
+type HasPermissionError = variant { DefaultError : text };
+type ICRC3ArchiveInfo = record {
+  end : nat;
+  canister_id : principal;
+  start : nat;
+};
+type ICRC3DataCertificate = record { certificate : blob; hash_tree : blob };
+type ICRC3Properties = record {
+  max_blocks_per_response : nat;
+  initial_cycles : nat;
+  tx_window : Duration;
+  max_tx_local_stable_memory_size_bytes : opt nat;
+  threshold_for_archiving_to_external_archive : opt nat64;
+  max_transactions_to_purge : nat;
+  max_memory_size_bytes : nat;
+  max_transactions_in_window : nat;
+  reserved_cycles : nat;
+};
+type ICRC3Value = variant {
+  Int : int;
+  Map : vec record { text; ICRC3Value };
+  Nat : nat;
+  Blob : blob;
+  Text : text;
+  Array : vec ICRC3Value;
+};
+type Icrc21Error = variant {
+  GenericError : record { description : text; error_code : nat };
+  InsufficientPayment : ErrorInfo;
+  UnsupportedCanisterCall : ErrorInfo;
+  ConsentMessageUnavailable : ErrorInfo;
+};
+type InitApprovalsArg = record {
+  max_approvals_per_token_or_collection : opt nat;
+  max_revoke_approvals : opt nat;
+};
+type InitArgs = record {
+  permissions : PermissionManager;
+  supply_cap : opt nat;
+  tx_window : opt nat;
+  test_mode : bool;
+  default_take_value : opt nat;
+  max_canister_storage_threshold : opt nat;
+  logo : opt text;
+  permitted_drift : opt nat;
+  name : text;
+  description : opt text;
+  version : BuildVersion;
+  max_take_value : opt nat;
+  max_update_batch_size : opt nat;
+  max_query_batch_size : opt nat;
+  commit_hash : text;
+  max_memo_size : opt nat;
+  atomic_batch_transfers : opt bool;
+  collection_metadata : vec record { text; CustomValue };
+  symbol : text;
+  approval_init : InitApprovalsArg;
+};
+type InitUploadError = variant {
+  NotEnoughStorage;
+  FileAlreadyExists;
+  InvalidChunkSize;
+};
+type IsApprovedArg = record {
+  token_id : nat;
+  from_subaccount : opt blob;
+  spender : Account;
+};
+type MintError = variant {
+  TokenAlreadyExists;
+  StorageCanisterError : text;
+  ExceedMaxAllowedSupplyCap;
+  InvalidMemo;
+  ConcurrentManagementCall;
+};
+type MintRequest = record {
+  metadata : vec record { text; ICRC3Value };
+  memo : opt blob;
+  token_owner : Account;
+};
+type Permission = variant {
+  UpdateMetadata;
+  Minting;
+  UpdateCollectionMetadata;
+  UpdateUploads;
+  ManageAuthorities;
+  ReadUploads;
+};
+type PermissionManager = record {
+  user_permissions : vec record { principal; vec Permission };
+};
+type Result = variant { Ok; Err : BurnNftError };
+type Result_1 = variant { Ok : record {}; Err : CancelUploadError };
+type Result_10 = variant {
+  Ok : vec opt ApproveTokenResult;
+  Err : ApproveTokenError;
+};
+type Result_11 = variant {
+  Ok : vec opt RevokeCollectionApprovalResult;
+  Err : RevokeCollectionApprovalError;
+};
+type Result_12 = variant {
+  Ok : vec opt RevokeTokenApprovalResponse;
+  Err : RevokeTokenApprovalError;
+};
+type Result_13 = variant {
+  Ok : vec opt TransferFromResult;
+  Err : TransferFromError;
+};
+type Result_14 = variant { Ok : nat; Err : TransferError };
+type Result_15 = variant { Ok : record {}; Err : InitUploadError };
+type Result_16 = variant { Ok : nat; Err : MintError };
+type Result_17 = variant { Ok : record {}; Err : StoreChunkError };
+type Result_18 = variant { Ok; Err : UpdateCollectionMetadataError };
+type Result_19 = variant { Ok : nat; Err : UpdateNftMetadataError };
+type Result_2 = variant { Ok : FinalizeUploadResp; Err : FinalizeUploadError };
+type Result_3 = variant {
+  Ok : vec record { text; UploadState };
+  Err : GetAllUploadsError;
+};
+type Result_4 = variant { Ok : UploadState; Err : GetUploadStatusError };
+type Result_5 = variant { Ok : vec Permission; Err : GetUserPermissionsError };
+type Result_6 = variant { Ok; Err : GrantPermissionError };
+type Result_7 = variant { Ok : bool; Err : HasPermissionError };
+type Result_8 = variant { Ok : ConsentInfo; Err : Icrc21Error };
+type Result_9 = variant {
+  Ok : vec opt ApproveCollectionResult;
+  Err : ApproveCollectionError;
+};
+type RevokeCollectionApprovalArg = record {
+  memo : opt blob;
+  from_subaccount : opt blob;
+  created_at_time : opt nat64;
+  spender : opt Account;
+};
+type RevokeCollectionApprovalError = variant {
+  GenericError : record { message : text; error_code : nat };
+  CreatedInFuture : record { ledger_time : nat64 };
+  ApprovalDoesNotExist;
+  GenericBatchError : record { message : text; error_code : nat };
+  TooOld;
+};
+type RevokeCollectionApprovalResult = variant {
+  Ok : nat;
+  Err : RevokeCollectionApprovalError;
+};
+type RevokeTokenApprovalArg = record {
+  token_id : nat;
+  memo : opt blob;
+  from_subaccount : opt blob;
+  created_at_time : opt nat64;
+  spender : opt Account;
+};
+type RevokeTokenApprovalError = variant {
+  GenericError : record { message : text; error_code : nat };
+  NonExistingTokenId;
+  Unauthorized;
+  CreatedInFuture : record { ledger_time : nat64 };
+  ApprovalDoesNotExist;
+  GenericBatchError : record { message : text; error_code : nat };
+  TooOld;
+};
+type RevokeTokenApprovalResponse = variant {
+  Ok : nat;
+  Err : RevokeTokenApprovalError;
+};
+type StoreChunkError = variant {
+  InvalidFileHash;
+  InvalidFilePath;
+  InvalidFileSize;
+  InvalidChunkId;
+  UploadNotInitialized;
+  InvalidChunkData;
+  InvalidFileFormat;
+  UploadAlreadyFinalized;
+};
+type SupportedBlockType = record { url : text; block_type : text };
+type SupportedStandard = record { url : text; name : text };
+type TransferArg = record {
+  to : Account;
+  token_id : nat;
+  memo : opt blob;
+  from_subaccount : opt blob;
+  created_at_time : opt nat64;
+};
+type TransferError = variant {
+  GenericError : record { message : text; error_code : nat };
+  Duplicate : record { duplicate_of : nat };
+  NonExistingTokenId;
+  Unauthorized;
+  CreatedInFuture : record { ledger_time : nat };
+  InvalidRecipient;
+  GenericBatchError : record { message : text; error_code : nat };
+  TooOld;
+};
+type TransferFromArg = record {
+  to : Account;
+  spender_subaccount : opt blob;
+  token_id : nat;
+  from : Account;
+  memo : opt blob;
+  created_at_time : opt nat64;
+};
+type TransferFromError = variant {
+  GenericError : record { message : text; error_code : nat };
+  Duplicate : record { duplicate_of : nat };
+  NonExistingTokenId;
+  Unauthorized;
+  CreatedInFuture : record { ledger_time : nat64 };
+  InvalidRecipient;
+  GenericBatchError : record { message : text; error_code : nat };
+  TooOld;
+};
+type TransferFromResult = variant { Ok : nat; Err : TransferFromError };
+type UpdateCollectionMetadataError = variant {
+  StorageCanisterError : text;
+  ConcurrentManagementCall;
+};
+type UpdateNftMetadataError = variant {
+  StorageCanisterError : text;
+  TokenDoesNotExist;
+  ConcurrentManagementCall;
+};
+type UpgradeArgs = record { version : BuildVersion; commit_hash : text };
+type UploadState = variant { Init; Finalized; InProgress };
+type Value = variant {
+  Text : record { content : text };
+  TokenAmount : record { decimals : nat8; amount : nat64; symbol : text };
+  TimestampSeconds : record { amount : nat64 };
+  DurationSeconds : record { amount : nat64 };
+};
+type Vec = vec record {
+  args : vec record { start : nat; length : nat };
+  callback : func (vec record { start : nat; length : nat }) -> (
+      record {
+        log_length : nat;
+        blocks : vec record {
+          id : nat;
+          block : variant {
+            Int : int;
+            Map : vec record { text; ICRC3Value };
+            Nat : nat;
+            Blob : blob;
+            Text : text;
+            Array : vec ICRC3Value;
+          };
+        };
+        archived_blocks : Vec;
+      },
+    ) query;
+};
+service : (Args_9) -> {
+  burn_nft : (nat) -> (Result);
+  cancel_upload : (Args) -> (Result_1);
+  finalize_upload : (Args) -> (Result_2);
+  get_all_storage_subcanisters : () -> (vec principal) query;
+  get_all_uploads : (opt nat, opt nat) -> (Result_3) query;
+  get_upload_status : (text) -> (Result_4) query;
+  get_user_permissions : (Args_1) -> (Result_5) query;
+  grant_permission : (Args_2) -> (Result_6);
+  has_permission : (Args_3) -> (Result_7) query;
+  icrc10_supported_standards : () -> (vec SupportedStandard) query;
+  icrc21_canister_call_consent_message : (ConsentMessageRequest) -> (
+      Result_8,
+    ) query;
+  icrc37_approve_collection : (vec ApproveCollectionArg) -> (Result_9);
+  icrc37_approve_tokens : (vec ApproveTokenArg) -> (Result_10);
+  icrc37_get_collection_approvals : (
+      Account,
+      opt ApproveCollectionArg,
+      opt nat,
+    ) -> (vec ApproveCollectionArg) query;
+  icrc37_get_token_approvals : (nat, opt ApproveTokenArg, opt nat) -> (
+      vec ApproveTokenArg,
+    ) query;
+  icrc37_is_approved : (vec IsApprovedArg) -> (vec bool) query;
+  icrc37_max_approvals_per_token_or_collection : () -> (opt nat) query;
+  icrc37_max_revoke_approvals : () -> (opt nat) query;
+  icrc37_revoke_collection_approvals : (vec RevokeCollectionApprovalArg) -> (
+      Result_11,
+    );
+  icrc37_revoke_token_approvals : (vec RevokeTokenApprovalArg) -> (Result_12);
+  icrc37_transfer_from : (vec TransferFromArg) -> (Result_13);
+  icrc3_get_archives : (null) -> (vec ICRC3ArchiveInfo) query;
+  icrc3_get_blocks : (vec GetBlocksRequest) -> (GetBlocksResult_1) query;
+  icrc3_get_properties : (null) -> (ICRC3Properties) query;
+  icrc3_get_tip_certificate : (null) -> (ICRC3DataCertificate) query;
+  icrc3_supported_block_types : (null) -> (vec SupportedBlockType) query;
+  icrc7_atomic_batch_transfers : () -> (opt bool) query;
+  icrc7_balance_of : (vec Account) -> (vec nat) query;
+  icrc7_collection_metadata : () -> (vec record { text; ICRC3Value }) query;
+  icrc7_default_take_value : () -> (opt nat) query;
+  icrc7_description : () -> (opt text) query;
+  icrc7_logo : () -> (opt text) query;
+  icrc7_max_memo_size : () -> (opt nat) query;
+  icrc7_max_query_batch_size : () -> (opt nat) query;
+  icrc7_max_take_value : () -> (opt nat) query;
+  icrc7_max_update_batch_size : () -> (opt nat) query;
+  icrc7_name : () -> (text) query;
+  icrc7_owner_of : (vec nat) -> (vec opt Account) query;
+  icrc7_permitted_drift : () -> (opt nat) query;
+  icrc7_supply_cap : () -> (opt nat) query;
+  icrc7_symbol : () -> (text) query;
+  icrc7_token_metadata : (vec nat) -> (
+      vec opt vec record { text; ICRC3Value },
+    ) query;
+  icrc7_tokens : (opt nat, opt nat) -> (vec nat) query;
+  icrc7_tokens_of : (Account, opt nat, opt nat) -> (vec nat) query;
+  icrc7_total_supply : () -> (nat) query;
+  icrc7_transfer : (vec TransferArg) -> (vec opt Result_14);
+  icrc7_tx_window : () -> (opt nat) query;
+  init_upload : (Args_4) -> (Result_15);
+  mint : (Args_5) -> (Result_16);
+  revoke_permission : (Args_3) -> (Result_6);
+  store_chunk : (Args_6) -> (Result_17);
+  update_collection_metadata : (Args_7) -> (Result_18);
+  update_nft_metadata : (Args_8) -> (Result_19);
+}
