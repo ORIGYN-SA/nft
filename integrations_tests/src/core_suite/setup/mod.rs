@@ -94,6 +94,7 @@ pub fn old_test_setup() -> TestEnv {
             max_approvals_per_token_or_collection: Some(Nat::from(10u64)),
             max_revoke_approvals: Some(Nat::from(10u64)),
         },
+        base_url: None,
     };
 
     test_env.build_old(init_args)
