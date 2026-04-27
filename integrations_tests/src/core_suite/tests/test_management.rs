@@ -1164,6 +1164,7 @@ fn test_mint_authorized() {
         &http_gateway,
         collection_canister_id,
         &metadata_file_path,
+        true,
     );
 
     assert_eq!(
@@ -1309,6 +1310,7 @@ fn test_mint_with_metadata() {
         &http_gateway,
         collection_canister_id,
         &metadata_file_path,
+        true,
     );
 
     println!("parsed_metadata: {:?}", parsed_metadata);

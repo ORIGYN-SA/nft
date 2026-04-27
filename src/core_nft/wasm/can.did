@@ -178,6 +178,7 @@ type InitApprovalsArg = record {
   max_revoke_approvals : opt nat;
 };
 type InitArgs = record {
+  base_url : opt text;
   permissions : PermissionManager;
   supply_cap : opt nat;
   tx_window : opt nat;
