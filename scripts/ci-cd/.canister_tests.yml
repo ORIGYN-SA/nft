@@ -25,5 +25,5 @@ integration tests:
         - "Cargo.{lock,toml}"
   needs: ["build"]
   script:
-    - bash ./scripts/run_integration_tests.sh
+    - bash ./scripts/run_tests.sh
   timeout: 45m
