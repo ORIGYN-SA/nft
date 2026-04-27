@@ -1,0 +1,13 @@
+.rust template:
+  image: dckreg.bity.com/bity/dev/runners_images/rust-dfinity-build-ci:latest
+  before_script:
+    - cargo --version
+    - rustc --version
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - api_failure
+      - runner_unsupported
+      - unknown_failure
