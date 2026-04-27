@@ -1,8 +1,7 @@
 integration tests trigger:
   stage: integration_testing
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" &&
-          $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - "{src,integrations_tests}/**/*.{rs,toml,lock,did,wasm,gz}"
         - "Cargo.{lock,toml}"
@@ -20,8 +19,7 @@ integration tests:
     KUBERNETES_CPU_REQUEST: "1"
     POCKET_IC_BIN: ./integrations_tests/pocket-ic
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" &&
-          $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
       changes:
         - "{src,integrations_tests}/**/*.{rs,toml,lock,did,wasm,gz}"
         - "Cargo.{lock,toml}"
