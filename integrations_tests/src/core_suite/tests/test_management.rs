@@ -5,11 +5,11 @@ use crate::client::core_nft::{
 use crate::utils::create_default_icrc97_metadata;
 
 use candid::{Encode, Nat, Principal};
-use core_nft::types::permissions::Permission;
+use core_nft_api::types::permissions::Permission;
 use icrc_ledger_types::icrc1::account::Account;
 
 use bity_ic_storage_canister_api::types::storage::UploadState;
-use core_nft::types::management::{
+use core_nft_api::types::management::{
     cancel_upload, finalize_upload, grant_permission, init_upload, mint, mint::MintRequest,
     revoke_permission, store_chunk, update_collection_metadata, update_nft_metadata,
 };

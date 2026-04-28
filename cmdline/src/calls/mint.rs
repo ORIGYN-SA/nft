@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use candid::{Encode, Nat, Principal};
-use core_nft::types::management::mint;
+use core_nft_api::types::management::mint;
 use ic_agent::Agent;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value;
 use icrc_ledger_types::icrc1::account::Account;

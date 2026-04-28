@@ -4,7 +4,7 @@ use crate::wasms::CORE_WASM_OLD;
 use candid::encode_one;
 use candid::types::value::IDLValue;
 use candid::Principal;
-use core_nft::lifecycle::Args;
+use core_nft_api::lifecycle::Args;
 use pocket_ic::PocketIc;
 
 #[derive(Clone, Debug, Default, candid::CandidType, candid::Deserialize)]

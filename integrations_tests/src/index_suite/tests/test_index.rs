@@ -3,15 +3,15 @@ use crate::client::indexer::get_blocks;
 use crate::index_suite::setup::setup::MINUTE_IN_MS;
 use crate::utils::{mint_nft, tick_n_blocks};
 use candid::Nat;
-use core_nft::types::icrc7;
-use core_nft::types::update_nft_metadata::Args as UpdateTokenMetadataArg;
+use core_nft_api::types::icrc7;
+use core_nft_api::types::update_nft_metadata::Args as UpdateTokenMetadataArg;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
 use icrc_ledger_types::icrc1::account::Account;
 use std::time::Duration;
 
 use crate::index_suite::setup::setup::TestEnv;
 use crate::index_suite::setup::{default_test_setup, test_setup_no_limit};
-use index_icrc7::{index::IndexType, types::get_blocks::Args};
+use index_icrc7_api::{index::IndexType, types::get_blocks::Args};
 
 #[test]
 fn test_icrc7_transfer_simple_index() {

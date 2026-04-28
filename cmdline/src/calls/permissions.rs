@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use candid::{Encode, Principal};
-use core_nft::updates::management::{get_user_permissions, grant_permission, has_permission, revoke_permission, Permission};
+use core_nft_api::{get_user_permissions, grant_permission, has_permission, revoke_permission, Permission};
 use ic_agent::Agent;
 
 pub fn parse_permission_from_str(input: &str) -> Result<Permission> {

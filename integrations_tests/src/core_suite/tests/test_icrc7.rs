@@ -10,8 +10,8 @@ use crate::utils::{
     fetch_metadata_json, mint_nft, random_principal, setup_http_client, upload_metadata,
 };
 use candid::{Encode, Nat, Principal};
-use core_nft::types::icrc7;
-use core_nft::types::update_nft_metadata;
+use core_nft_api::types::icrc7;
+use core_nft_api::types::update_nft_metadata;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
 use icrc_ledger_types::icrc1::account::Account;
 use icrc_ledger_types::icrc3::blocks::GetBlocksRequest;

@@ -25,8 +25,8 @@ sha2                           = "0.10.9"
 serde_bytes                    = { workspace = true }
 serde_json                     = { workspace = true }
 tempfile                       = "3.21.0"
-core_nft                       = { path = "../src/core_nft"}
-index_icrc7                    = { path = "../src/index_icrc7"}
+core_nft_api                   = { path = "../src/core_nft/api"}
+index_icrc7_api                = { path = "../src/index_icrc7/api"}
 ic-cdk                         = { workspace = true }
 reqwest                        = "0.12.23"
 # ic-agent                       = { version = "0.44.3"}

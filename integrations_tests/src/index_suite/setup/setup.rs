@@ -3,10 +3,10 @@ use crate::index_suite::setup::setup_index::setup_index_canister;
 use crate::utils::random_principal;
 use bity_ic_types::{CanisterId, Milliseconds};
 use candid::{CandidType, Deserialize, Principal};
-use core_nft::init::InitArgs;
-use core_nft::lifecycle::Args;
-use index_icrc7::lifecycle::Args as IndexArgs;
-use index_icrc7::lifecycle::InitArgs as IndexInitArgs;
+use core_nft_api::init::InitArgs;
+use core_nft_api::lifecycle::Args;
+use index_icrc7_api::lifecycle::Args as IndexArgs;
+use index_icrc7_api::lifecycle::InitArgs as IndexInitArgs;
 use pocket_ic::{PocketIc, PocketIcBuilder};
 
 use std::time::Duration;
