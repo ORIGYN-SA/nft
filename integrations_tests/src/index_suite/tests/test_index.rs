@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use crate::index_suite::setup::setup::TestEnv;
 use crate::index_suite::setup::{default_test_setup, test_setup_no_limit};
-use index_icrc7_api_api::{index::IndexType, types::get_blocks::Args};
+use index_icrc7_api::{index::IndexType, types::get_blocks::Args};
 
 #[test]
 fn test_icrc7_transfer_simple_index() {

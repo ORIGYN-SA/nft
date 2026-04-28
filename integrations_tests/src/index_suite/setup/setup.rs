@@ -5,8 +5,8 @@ use bity_ic_types::{CanisterId, Milliseconds};
 use candid::{CandidType, Deserialize, Principal};
 use core_nft_api::init::InitArgs;
 use core_nft_api::lifecycle::Args;
-use index_icrc7_api_api::lifecycle::Args as IndexArgs;
-use index_icrc7_api_api::lifecycle::InitArgs as IndexInitArgs;
+use index_icrc7_api::lifecycle::Args as IndexArgs;
+use index_icrc7_api::lifecycle::InitArgs as IndexInitArgs;
 use pocket_ic::{PocketIc, PocketIcBuilder};
 
 use std::time::Duration;
