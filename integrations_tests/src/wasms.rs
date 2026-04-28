@@ -16,16 +16,16 @@ lazy_static! {
     // Wasms in particular canister folder
     pub static ref CORE_WASM_OLD: CanisterWasm = get_core_wasm_old();
 
-    pub static ref CORE_WASM: CanisterWasm = get_canister_wasm_from_bin("core_nft");
-    pub static ref INDEX_WASM: CanisterWasm = get_canister_wasm_from_bin("index_icrc7");
+    pub static ref CORE_WASM: CanisterWasm = get_canister_wasm_from_bin("core_nft_api");
+    pub static ref INDEX_WASM: CanisterWasm = get_canister_wasm_from_bin("index_icrc7_api");
 }
 
 // Or change to old
 fn get_core_wasm_old() -> CanisterWasm {
-    match read_file_from_relative_bin(&format!("../wasm/core_nft_canister.wasm.gz")) {
+    match read_file_from_relative_bin(&format!("../wasm/core_nft_api_canister.wasm.gz")) {
         Ok(wasm) => wasm,
         Err(err) => {
-            println!("Failed to read core_nft_old wasm: {err}");
+            println!("Failed to read core_nft_api_old wasm: {err}");
             panic!()
         }
     }

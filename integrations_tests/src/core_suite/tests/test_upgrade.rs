@@ -1,4 +1,4 @@
-use crate::client::core_nft::{finalize_upload, init_upload, store_chunk};
+use crate::client::core_nft_api::{finalize_upload, init_upload, store_chunk};
 use crate::core_suite::setup::old_test_setup;
 use crate::core_suite::setup::setup::TestEnv;
 use crate::core_suite::setup::setup_core::upgrade_core_canister;
@@ -8,9 +8,9 @@ use crate::utils::{
 };
 use bity_ic_types::BuildVersion;
 use candid::Nat;
-use core_nft_api::lifecycle::Args;
-use core_nft_api::post_upgrade::UpgradeArgs;
-use core_nft_api::types::management::{finalize_upload, init_upload, store_chunk};
+use core_nft_api_api::lifecycle::Args;
+use core_nft_api_api::post_upgrade::UpgradeArgs;
+use core_nft_api_api::types::management::{finalize_upload, init_upload, store_chunk};
 use ic_cdk::println;
 use sha2::{Digest, Sha256};
 use std::fs::File;

@@ -3,7 +3,7 @@ use crate::wasms::INDEX_WASM;
 use candid::encode_one;
 use candid::types::value::IDLValue;
 use candid::Principal;
-use index_icrc7_api::lifecycle::Args;
+use index_icrc7_api_api::lifecycle::Args;
 use pocket_ic::PocketIc;
 
 #[derive(Clone, Debug, Default, candid::CandidType, candid::Deserialize)]

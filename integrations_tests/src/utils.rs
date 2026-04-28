@@ -1,4 +1,4 @@
-use crate::client::core_nft::mint;
+use crate::client::core_nft_api::mint;
 use crate::client::storage::{finalize_upload, init_upload, store_chunk};
 use crate::core_suite::setup::setup::MINUTE_IN_MS;
 
@@ -6,7 +6,9 @@ use bity_ic_storage_canister_api::{finalize_upload, init_upload, store_chunk};
 use bity_ic_types::Cycles;
 use bytes::Bytes;
 use candid::{Nat, Principal};
-use core_nft_api::types::management::mint::{Args as MintArgs, MintRequest, Response as MintResponse};
+use core_nft_api_api::types::management::mint::{
+    Args as MintArgs, MintRequest, Response as MintResponse,
+};
 use http::Request;
 use http_body_util::BodyExt;
 use ic_agent::Agent;

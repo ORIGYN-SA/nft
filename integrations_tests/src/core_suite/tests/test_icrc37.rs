@@ -1,4 +1,4 @@
-use crate::client::core_nft::{
+use crate::client::core_nft_api::{
     icrc37_approve_collection, icrc37_approve_tokens, icrc37_is_approved,
     icrc37_max_approvals_per_token_or_collection, icrc37_max_revoke_approvals,
     icrc37_revoke_collection_approvals, icrc37_revoke_token_approvals, icrc37_transfer_from,
@@ -12,10 +12,10 @@ use crate::utils::random_principal;
 use crate::utils::{mint_nft, tick_n_blocks};
 use bity_ic_types::BuildVersion;
 use candid::{Encode, Nat};
-use core_nft_api::icrc37_approve_tokens::ApproveTokenResult;
-use core_nft_api::lifecycle::Args;
-use core_nft_api::post_upgrade::UpgradeArgs;
-use core_nft_api::types::icrc37;
+use core_nft_api_api::icrc37_approve_tokens::ApproveTokenResult;
+use core_nft_api_api::lifecycle::Args;
+use core_nft_api_api::post_upgrade::UpgradeArgs;
+use core_nft_api_api::types::icrc37;
 use icrc_ledger_types::icrc1::account::Account;
 use serde_bytes::ByteBuf;
 use std::time::Duration;
@@ -165,7 +165,7 @@ fn test_icrc37_approve_collection() {
     }
 
     // Verify the collection approval exists
-    let approvals: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
+    let approvals: core_nft_api::types::icrc37::icrc37_get_collection_approvals::Response =
         crate::client::pocket::unwrap_response(
             pic.query_call(
                 collection_canister_id,
@@ -1120,7 +1120,7 @@ fn test_icrc37_revoke_token_approvals_max_limit() {
                     .unwrap_or(10);
 
             // Get all current approvals
-            let approvals: core_nft::types::icrc37::icrc37_get_token_approvals::Response =
+            let approvals: core_nft_api::types::icrc37::icrc37_get_token_approvals::Response =
                 crate::client::pocket::unwrap_response(pic.query_call(
                     collection_canister_id,
                     controller,
@@ -1171,7 +1171,7 @@ fn test_icrc37_revoke_token_approvals_max_limit() {
             // Try to revoke one more approval, which should fail
             let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
-            let remaining_approvals: core_nft::types::icrc37::icrc37_get_token_approvals::Response =
+            let remaining_approvals: core_nft_api::types::icrc37::icrc37_get_token_approvals::Response =
                 crate::client::pocket::unwrap_response(pic.query_call(
                     collection_canister_id,
                     controller,
@@ -1326,7 +1326,7 @@ fn test_icrc37_revoke_collection_approvals_max_limit() {
             .unwrap_or(10);
 
     // Get all current approvals
-    let approvals: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
+    let approvals: core_nft_api::types::icrc37::icrc37_get_collection_approvals::Response =
         crate::client::pocket::unwrap_response(
             pic.query_call(
                 collection_canister_id,
@@ -1386,7 +1386,7 @@ fn test_icrc37_revoke_collection_approvals_max_limit() {
     // Try to revoke one more approval, which should fail
     let current_time = pic.get_time().as_nanos_since_unix_epoch();
 
-    let remaining_approvals: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
+    let remaining_approvals: core_nft_api::types::icrc37::icrc37_get_collection_approvals::Response =
         crate::client::pocket::unwrap_response(
             pic.query_call(
                 collection_canister_id,
@@ -1504,7 +1504,7 @@ fn test_icrc37_revoke_collection_approvals_within_limit() {
     }
 
     // Get all current approvals
-    let approvals: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
+    let approvals: core_nft_api::types::icrc37::icrc37_get_collection_approvals::Response =
         crate::client::pocket::unwrap_response(
             pic.query_call(
                 collection_canister_id,
@@ -1562,7 +1562,7 @@ fn test_icrc37_revoke_collection_approvals_within_limit() {
     }
 
     // Verify all approvals have been revoked
-    let remaining_approvals: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
+    let remaining_approvals: core_nft_api::types::icrc37::icrc37_get_collection_approvals::Response =
         crate::client::pocket::unwrap_response(
             pic.query_call(
                 collection_canister_id,
@@ -1640,7 +1640,7 @@ fn test_icrc37_approve_collection_with_nft() {
             }
 
             // Verify the collection approval exists
-            let approvals: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
+            let approvals: core_nft_api::types::icrc37::icrc37_get_collection_approvals::Response =
                 crate::client::pocket::unwrap_response(
                     pic.query_call(
                         collection_canister_id,
@@ -1895,7 +1895,7 @@ fn test_icrc37_approvals_reset_after_transfer_as_owner() {
             tick_n_blocks(pic, 5);
 
             // Verify token approvals are reset
-            let token_approvals: core_nft::types::icrc37::icrc37_get_token_approvals::Response =
+            let token_approvals: core_nft_api::types::icrc37::icrc37_get_token_approvals::Response =
                 crate::client::pocket::unwrap_response(pic.query_call(
                     collection_canister_id,
                     controller,
@@ -2091,7 +2091,7 @@ fn test_icrc37_approvals_reset_after_transfer_with_approvals() {
             tick_n_blocks(pic, 5);
 
             // Verify token approvals are reset
-            let token_approvals: core_nft::types::icrc37::icrc37_get_token_approvals::Response =
+            let token_approvals: core_nft_api::types::icrc37::icrc37_get_token_approvals::Response =
                 crate::client::pocket::unwrap_response(pic.query_call(
                     collection_canister_id,
                     controller,
@@ -2104,7 +2104,7 @@ fn test_icrc37_approvals_reset_after_transfer_with_approvals() {
             tick_n_blocks(pic, 5);
 
             // Verify collection approvals are reset
-            let collection_approvals: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
+            let collection_approvals: core_nft_api::types::icrc37::icrc37_get_collection_approvals::Response =
             crate::client::pocket::unwrap_response(pic.query_call(
                 collection_canister_id,
                 controller,
@@ -2626,7 +2626,7 @@ fn test_icrc37_approvals_persistence_after_upgrade() {
             assert!(collection_approve_response.is_ok());
 
             // Verify approvals exist before upgrade
-            let token_approvals_before: core_nft::types::icrc37::icrc37_get_token_approvals::Response =
+            let token_approvals_before: core_nft_api::types::icrc37::icrc37_get_token_approvals::Response =
                 crate::client::pocket::unwrap_response(pic.query_call(
                     collection_canister_id,
                     controller,
@@ -2640,7 +2640,7 @@ fn test_icrc37_approvals_persistence_after_upgrade() {
                 nft_owner2
             );
 
-            let collection_approvals_before: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
+            let collection_approvals_before: core_nft_api::types::icrc37::icrc37_get_collection_approvals::Response =
                 crate::client::pocket::unwrap_response(
                     pic.query_call(
                         collection_canister_id,
@@ -2681,7 +2681,7 @@ fn test_icrc37_approvals_persistence_after_upgrade() {
             );
 
             // Verify approvals still exist after upgrade
-            let token_approvals_after: core_nft::types::icrc37::icrc37_get_token_approvals::Response =
+            let token_approvals_after: core_nft_api::types::icrc37::icrc37_get_token_approvals::Response =
                 crate::client::pocket::unwrap_response(pic.query_call(
                     collection_canister_id,
                     controller,
@@ -2696,7 +2696,7 @@ fn test_icrc37_approvals_persistence_after_upgrade() {
             );
             assert_eq!(token_approvals_after.len(), token_approvals_before.len());
 
-            let collection_approvals_after: core_nft::types::icrc37::icrc37_get_collection_approvals::Response =
+            let collection_approvals_after: core_nft_api::types::icrc37::icrc37_get_collection_approvals::Response =
                 crate::client::pocket::unwrap_response(
                     pic.query_call(
                         collection_canister_id,

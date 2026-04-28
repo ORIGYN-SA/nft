@@ -1,8 +1,8 @@
 use self::setup::{TestEnv, TestEnvBuilder};
 use bity_ic_types::{BuildVersion, CanisterId, Milliseconds};
 use candid::Nat;
-use core_nft_api::lifecycle::init::{InitApprovalsArg, InitArgs};
-use core_nft_api::types::permissions::{Permission, PermissionManager};
+use core_nft_api_api::lifecycle::init::{InitApprovalsArg, InitArgs};
+use core_nft_api_api::types::permissions::{Permission, PermissionManager};
 use std::collections::HashMap;
 
 pub mod setup;

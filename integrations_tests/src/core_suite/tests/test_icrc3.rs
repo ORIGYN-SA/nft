@@ -1,10 +1,10 @@
-use crate::client::core_nft::{
+use crate::client::core_nft_api::{
     icrc3_get_archives, icrc3_get_blocks, icrc3_get_properties, icrc3_get_tip_certificate,
     icrc3_supported_block_types, icrc7_owner_of, icrc7_transfer,
 };
 use crate::utils::{mint_nft, tick_n_blocks};
 use candid::Nat;
-use core_nft_api::types::icrc7;
+use core_nft_api_api::types::icrc7;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
 use icrc_ledger_types::icrc1::account::Account;
 use icrc_ledger_types::icrc3::blocks::GetBlocksRequest;

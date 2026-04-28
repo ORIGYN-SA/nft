@@ -1,8 +1,8 @@
 pub mod init;
 
 use candid::CandidType;
-use serde::{Deserialize, Serialize};
 use init::{InitArgs, UpgradeArgs};
+use serde::{Deserialize, Serialize};
 
 #[derive(CandidType, Serialize, Deserialize, Debug)]
 pub enum Args {

@@ -3,7 +3,7 @@ use crate::wasms::CORE_WASM;
 use candid::encode_one;
 use candid::types::value::IDLValue;
 use candid::Principal;
-use core_nft_api::lifecycle::Args;
+use core_nft_api_api::lifecycle::Args;
 use pocket_ic::PocketIc;
 
 #[derive(Clone, Debug, Default, candid::CandidType, candid::Deserialize)]
@@ -18,7 +18,7 @@ pub fn setup_core_canister(
     args: Args,
     controller: Principal,
 ) -> Principal {
-    let core_nft_wasm = CORE_WASM.clone();
+    let core_nft_api_wasm = CORE_WASM.clone();
     pic.add_cycles(core_canister_id, 100_000_000_000_000_000_000);
 
     pic.set_controllers(
@@ -36,7 +36,7 @@ pub fn setup_core_canister(
 
     pic.install_canister(
         core_canister_id,
-        core_nft_wasm,
+        core_nft_api_wasm,
         encode_one(args).unwrap(),
         Some(controller.clone()),
     );
@@ -50,7 +50,7 @@ pub fn upgrade_core_canister(
     args: Args,
     controller: Principal,
 ) {
-    let core_nft_wasm = CORE_WASM.clone();
+    let core_nft_api_wasm = CORE_WASM.clone();
     pic.add_cycles(core_canister_id, 100_000_000_000_000_000_000);
 
     pic.set_controllers(
@@ -63,7 +63,7 @@ pub fn upgrade_core_canister(
 
     pic.upgrade_canister(
         core_canister_id,
-        core_nft_wasm,
+        core_nft_api_wasm,
         encode_one(args).unwrap(),
         Some(controller.clone()),
     )
