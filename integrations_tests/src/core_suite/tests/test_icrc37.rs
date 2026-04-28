@@ -1,4 +1,4 @@
-use crate::client::core_nft_api::{
+use crate::client::core_nft::{
     icrc37_approve_collection, icrc37_approve_tokens, icrc37_is_approved,
     icrc37_max_approvals_per_token_or_collection, icrc37_max_revoke_approvals,
     icrc37_revoke_collection_approvals, icrc37_revoke_token_approvals, icrc37_transfer_from,

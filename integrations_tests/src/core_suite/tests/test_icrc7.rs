@@ -1,4 +1,4 @@
-use crate::client::core_nft_api::{
+use crate::client::core_nft::{
     icrc3_get_blocks, icrc7_atomic_batch_transfers, icrc7_balance_of, icrc7_collection_metadata,
     icrc7_description, icrc7_logo, icrc7_max_memo_size, icrc7_max_take_value, icrc7_name,
     icrc7_owner_of, icrc7_permitted_drift, icrc7_supply_cap, icrc7_symbol, icrc7_token_metadata,
@@ -3378,7 +3378,7 @@ fn test_icrc7_balance_of_comprehensive() {
                 },
             ];
 
-            let approve_response = crate::client::core_nft_api::icrc37_approve_tokens(
+            let approve_response = crate::client::core_nft::icrc37_approve_tokens(
                 pic,
                 nft_owner2,
                 collection_canister_id,
@@ -3407,7 +3407,7 @@ fn test_icrc7_balance_of_comprehensive() {
                 },
             ];
 
-            let transfer_from_response = crate::client::core_nft_api::icrc37_transfer_from(
+            let transfer_from_response = crate::client::core_nft::icrc37_transfer_from(
                 pic,
                 nft_owner1,
                 collection_canister_id,

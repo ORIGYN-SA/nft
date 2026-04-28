@@ -1,4 +1,4 @@
-use crate::client::core_nft_api::mint;
+use crate::client::core_nft::mint;
 use crate::client::storage::{finalize_upload, init_upload, store_chunk};
 use crate::core_suite::setup::setup::MINUTE_IN_MS;
 

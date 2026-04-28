@@ -1,4 +1,4 @@
-use crate::client::core_nft_api::{
+use crate::client::core_nft::{
     cancel_upload, finalize_upload, get_upload_status, grant_permission, init_upload, mint,
     revoke_permission, store_chunk, update_collection_metadata, update_nft_metadata,
 };

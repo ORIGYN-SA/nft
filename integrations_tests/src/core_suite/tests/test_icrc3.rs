@@ -1,4 +1,4 @@
-use crate::client::core_nft_api::{
+use crate::client::core_nft::{
     icrc3_get_archives, icrc3_get_blocks, icrc3_get_properties, icrc3_get_tip_certificate,
     icrc3_supported_block_types, icrc7_owner_of, icrc7_transfer,
 };

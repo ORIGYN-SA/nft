@@ -1,4 +1,4 @@
-pub mod core_nft_api;
+pub mod core_nft;
 pub mod indexer;
 pub mod macros;
 pub mod pocket;

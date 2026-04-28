@@ -1,4 +1,4 @@
-use crate::client::core_nft_api::{finalize_upload, init_upload, store_chunk};
+use crate::client::core_nft::{finalize_upload, init_upload, store_chunk};
 use crate::core_suite::setup::old_test_setup;
 use crate::core_suite::setup::setup::TestEnv;
 use crate::core_suite::setup::setup_core::upgrade_core_canister;
