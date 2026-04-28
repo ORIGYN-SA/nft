@@ -1,23 +1,23 @@
 use crate::{generate_pocket_query_call, generate_pocket_update_call};
 
-use core_nft_api_api::types::icrc3::{
+use core_nft_api::types::icrc3::{
     icrc3_get_archives, icrc3_get_blocks, icrc3_get_properties, icrc3_get_tip_certificate,
     icrc3_supported_block_types,
 };
-use core_nft_api_api::types::icrc37::{
+use core_nft_api::types::icrc37::{
     icrc37_approve_collection, icrc37_approve_tokens, icrc37_get_collection_approvals,
     icrc37_get_token_approvals, icrc37_is_approved, icrc37_max_approvals_per_token_or_collection,
     icrc37_max_revoke_approvals, icrc37_revoke_collection_approvals, icrc37_revoke_token_approvals,
     icrc37_transfer_from,
 };
-use core_nft_api_api::types::icrc7::{
+use core_nft_api::types::icrc7::{
     icrc7_atomic_batch_transfers, icrc7_balance_of, icrc7_collection_metadata,
     icrc7_default_take_value, icrc7_description, icrc7_logo, icrc7_max_memo_size,
     icrc7_max_query_batch_size, icrc7_max_take_value, icrc7_max_update_batch_size, icrc7_name,
     icrc7_owner_of, icrc7_permitted_drift, icrc7_supply_cap, icrc7_symbol, icrc7_token_metadata,
     icrc7_tokens, icrc7_tokens_of, icrc7_total_supply, icrc7_transfer, icrc7_tx_window,
 };
-use core_nft_api_api::types::management::{
+use core_nft_api::types::management::{
     cancel_upload, finalize_upload, get_all_uploads, get_upload_status, get_user_permissions,
     grant_permission, has_permission, init_upload, mint, revoke_permission, store_chunk,
     update_collection_metadata, update_nft_metadata,

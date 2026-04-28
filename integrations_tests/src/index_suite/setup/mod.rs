@@ -1,8 +1,8 @@
 use self::setup::{TestEnv, TestEnvBuilder};
 use bity_ic_types::BuildVersion;
 use candid::{Nat, Principal};
-use core_nft_api_api::init::{InitApprovalsArg, InitArgs};
-use core_nft_api_api::types::permissions::{Permission, PermissionManager};
+use core_nft_api::init::{InitApprovalsArg, InitArgs};
+use core_nft_api::types::permissions::{Permission, PermissionManager};
 use index_icrc7_api_api::lifecycle::InitArgs as IndexInitArgs;
 use std::collections::HashMap;
 
