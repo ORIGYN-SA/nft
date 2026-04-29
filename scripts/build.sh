@@ -1,28 +1,31 @@
 #!/bin/bash
 
 BASE_CANISTER_PATH="./src"
-CANISTERS=("core_nft" "index_icrc7")
+CANISTERS=("core_nft_impl" "index_icrc7_impl")
+CANISTER_NAMES=("core_nft" "index_icrc7")
 
 mkdir -p "./wasm"
 curl -L -o "./wasm/storage_canister.wasm" "https://github.com/BitySA/ic-storage-canister/releases/latest/download/storage_canister.wasm"
 curl -L -o "./wasm/storage_canister.wasm.gz" "https://github.com/BitySA/ic-storage-canister/releases/latest/download/storage_canister.wasm.gz"
 
 # Build each canister
-for CANISTER in "${CANISTERS[@]}"; do
+for i in "${!CANISTERS[@]}"; do
+    CANISTER="${CANISTERS[$i]}"
+    CANISTER_NAME="${CANISTER_NAMES[$i]}"
     echo "Building canister: $CANISTER"
 
     # Define paths variables to make the script readable and less error-prone
-    TARGET_WASM="$BASE_CANISTER_PATH/$CANISTER/target/wasm32-unknown-unknown/release/$CANISTER.wasm"
-    FINAL_WASM_DIR="$BASE_CANISTER_PATH/$CANISTER/wasm"
-    FINAL_WASM="$FINAL_WASM_DIR/$CANISTER.wasm"
+    TARGET_WASM="$BASE_CANISTER_PATH/$CANISTER_NAME/impl/target/wasm32-unknown-unknown/release/$CANISTER.wasm"
+    FINAL_WASM_DIR="$BASE_CANISTER_PATH/$CANISTER_NAME/wasm"
+    FINAL_WASM="$FINAL_WASM_DIR/$CANISTER_NAME.wasm"
     DID_FILE="$FINAL_WASM_DIR/can.did"
-    FINAL_GZIP="$FINAL_WASM_DIR/${CANISTER}_canister.wasm.gz"
+    FINAL_GZIP="$FINAL_WASM_DIR/${CANISTER_NAME}_canister.wasm.gz"
 
     # Ensure destination directory exists
     mkdir -p "$FINAL_WASM_DIR"
 
     # 1. Compile
-    cargo rustc --crate-type=cdylib --target wasm32-unknown-unknown --target-dir "$BASE_CANISTER_PATH/$CANISTER/target" --release --locked -p $CANISTER &&
+    cargo rustc --crate-type=cdylib --target wasm32-unknown-unknown --target-dir "$BASE_CANISTER_PATH/$CANISTER_NAME/impl/target" --release --locked -p $CANISTER &&
     
     # 2. Shrink & Optimize
     ic-wasm "$TARGET_WASM" -o "$TARGET_WASM" shrink &&

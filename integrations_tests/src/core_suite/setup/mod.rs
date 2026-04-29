@@ -1,8 +1,8 @@
 use self::setup::{TestEnv, TestEnvBuilder};
 use bity_ic_types::{BuildVersion, CanisterId, Milliseconds};
 use candid::Nat;
-use core_nft::init::{InitApprovalsArg, InitArgs};
-use core_nft::types::permissions::{Permission, PermissionManager};
+use core_nft_api::lifecycle::init::{InitApprovalsArg, InitArgs};
+use core_nft_api::types::permissions::{Permission, PermissionManager};
 use std::collections::HashMap;
 
 pub mod setup;
@@ -94,6 +94,7 @@ pub fn old_test_setup() -> TestEnv {
             max_approvals_per_token_or_collection: Some(Nat::from(10u64)),
             max_revoke_approvals: Some(Nat::from(10u64)),
         },
+        base_url: None,
     };
 
     test_env.build_old(init_args)

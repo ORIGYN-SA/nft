@@ -14,7 +14,7 @@ use crate::metadata::{
     create_icrc97_metadata, create_icrc97_metadata_from_url, create_metadata_interactive,
     create_metadata_interactive_hashmap, validate_icrc97_metadata,
 };
-use core_nft::updates::management::Permission;
+use core_nft_api::Permission;
 
 pub async fn handle_upload_file(
     agent: &Agent,
@@ -247,7 +247,7 @@ pub async fn handle_permissions(
         Some(("list", sm)) => {
             let principal_text = sm.get_one::<String>("principal").unwrap();
             let target = Principal::from_text(principal_text)?;
-            let permissions = calls_permissions::list(agent, canister_id, target).await?;
+            let permissions: Vec<Permission> = calls_permissions::list(agent, canister_id, target).await?;
             if permissions.is_empty() {
                 println!("No permissions");
             } else {

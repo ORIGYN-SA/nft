@@ -1,0 +1,1 @@
+// No update functions for index canister currently

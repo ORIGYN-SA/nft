@@ -15,7 +15,7 @@ use ic_cdk_macros::post_upgrade;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-const STORAGE_WASM: &[u8] = include_bytes!("../../../../wasm/storage_canister.wasm.gz");
+const STORAGE_WASM: &[u8] = include_bytes!("../../../../../wasm/storage_canister.wasm.gz");
 
 #[derive(CandidType, Serialize, Deserialize, Debug)]
 pub struct UpgradeArgs {

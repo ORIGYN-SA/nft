@@ -6,7 +6,9 @@ use bity_ic_storage_canister_api::{finalize_upload, init_upload, store_chunk};
 use bity_ic_types::Cycles;
 use bytes::Bytes;
 use candid::{Nat, Principal};
-use core_nft::types::management::mint::{Args as MintArgs, MintRequest, Response as MintResponse};
+use core_nft_api::types::management::mint::{
+    Args as MintArgs, MintRequest, Response as MintResponse,
+};
 use http::Request;
 use http_body_util::BodyExt;
 use ic_agent::Agent;

@@ -3,8 +3,8 @@ use crate::core_suite::setup::setup_core::setup_old_core_canister;
 use crate::utils::random_principal;
 use bity_ic_types::{CanisterId, Milliseconds};
 use candid::{CandidType, Deserialize, Principal};
-use core_nft::init::InitArgs;
-use core_nft::lifecycle::Args;
+use core_nft_api::init::InitArgs;
+use core_nft_api::lifecycle::Args;
 use pocket_ic::{common::rest::BlobCompression, PocketIc, PocketIcBuilder};
 use std::time::Duration;
 

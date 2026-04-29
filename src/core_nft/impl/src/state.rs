@@ -23,7 +23,7 @@ use std::collections::{BTreeSet, HashMap};
 
 pub use bity_ic_storage_canister_api::lifecycle::{init::InitArgs, post_upgrade::UpgradeArgs};
 
-const STORAGE_WASM: &[u8] = include_bytes!("../../../wasm/storage_canister.wasm.gz");
+const STORAGE_WASM: &[u8] = include_bytes!("../../../../wasm/storage_canister.wasm.gz");
 
 icrc3_state!();
 canister_state!(RuntimeState);

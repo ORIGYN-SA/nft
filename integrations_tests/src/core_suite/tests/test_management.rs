@@ -5,11 +5,11 @@ use crate::client::core_nft::{
 use crate::utils::create_default_icrc97_metadata;
 
 use candid::{Encode, Nat, Principal};
-use core_nft::types::permissions::Permission;
+use core_nft_api::types::permissions::Permission;
 use icrc_ledger_types::icrc1::account::Account;
 
 use bity_ic_storage_canister_api::types::storage::UploadState;
-use core_nft::types::management::{
+use core_nft_api::types::management::{
     cancel_upload, finalize_upload, grant_permission, init_upload, mint, mint::MintRequest,
     revoke_permission, store_chunk, update_collection_metadata, update_nft_metadata,
 };
@@ -119,7 +119,7 @@ fn test_storage_simple() {
                     .split('.')
                     .next()
                     .unwrap()
-                    .replace("https://", "")
+                    .replace("http://", "")
                     .as_str(),
             )
             .unwrap();
@@ -610,7 +610,7 @@ fn test_management_file_distribution() {
                     .split('.')
                     .next()
                     .unwrap()
-                    .replace("https://", "")
+                    .replace("http://", "")
                     .as_str(),
             )
             .unwrap();
@@ -726,7 +726,7 @@ fn test_management_upload_resilience() {
                 .split('.')
                 .next()
                 .unwrap()
-                .replace("https://", "")
+                .replace("http://", "")
                 .as_str(),
         )
         .unwrap();
@@ -755,7 +755,7 @@ fn test_management_upload_resilience() {
                 .split('.')
                 .next()
                 .unwrap()
-                .replace("https://", "")
+                .replace("http://", "")
                 .as_str(),
         )
         .unwrap();
@@ -833,12 +833,13 @@ fn test_management_cycles() {
 
     if let Some(location) = response.canister_response.headers().get("location") {
         let location_str = location.to_str().unwrap();
+        println!("location_str: {:?}", location_str);
         let first_storage_canister = Principal::from_str(
             location_str
                 .split('.')
                 .next()
                 .unwrap()
-                .replace("https://", "")
+                .replace("http://", "")
                 .as_str(),
         )
         .unwrap();
@@ -881,7 +882,7 @@ fn test_management_cycles() {
                     .split('.')
                     .next()
                     .unwrap()
-                    .replace("https://", "")
+                    .replace("http://", "")
                     .as_str(),
             )
             .unwrap();
@@ -1396,7 +1397,7 @@ fn test_get_upload_status() {
     assert!(
         matches!(
             status_before,
-            Err(core_nft::types::management::get_upload_status::GetUploadStatusError::UploadNotFound)
+            Err(core_nft_api::types::management::get_upload_status::GetUploadStatusError::UploadNotFound)
         ),
         "Should return error for non-existent upload"
     );
@@ -1473,7 +1474,7 @@ fn test_get_all_uploads() {
         upload_paths.push(upload_path);
     }
 
-    let all_uploads: core_nft::types::management::get_all_uploads::Response =
+    let all_uploads: core_nft_api::types::management::get_all_uploads::Response =
         crate::client::pocket::unwrap_response(pic.query_call(
             collection_canister_id,
             controller,
@@ -1484,7 +1485,7 @@ fn test_get_all_uploads() {
     assert_eq!(all_uploads.unwrap().len(), 3, "Should return all 3 uploads");
 
     // Test pagination
-    let first_page: core_nft::types::management::get_all_uploads::Response =
+    let first_page: core_nft_api::types::management::get_all_uploads::Response =
         crate::client::pocket::unwrap_response(pic.query_call(
             collection_canister_id,
             controller,
@@ -1498,7 +1499,7 @@ fn test_get_all_uploads() {
         "Should return 2 uploads for first page"
     );
 
-    let second_page: core_nft::types::management::get_all_uploads::Response =
+    let second_page: core_nft_api::types::management::get_all_uploads::Response =
         crate::client::pocket::unwrap_response(pic.query_call(
             collection_canister_id,
             controller,
@@ -1591,7 +1592,7 @@ fn test_update_collection_metadata_unauthorized() {
     assert!(
         matches!(
             unauthorized_result,
-            Err(core_nft::types::management::update_collection_metadata::UpdateCollectionMetadataError::ConcurrentManagementCall)
+            Err(core_nft_api::types::management::update_collection_metadata::UpdateCollectionMetadataError::ConcurrentManagementCall)
         ),
         "Should fail for unauthorized principal"
     );

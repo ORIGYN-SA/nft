@@ -1,6 +1,6 @@
 use anyhow::Result;
 use candid::{Encode, Nat, Principal};
-use core_nft::updates::management::{finalize_upload, init_upload, store_chunk};
+use core_nft_api::{finalize_upload, init_upload, store_chunk};
 use ic_agent::Agent;
 use sha2::{Digest, Sha256};
 use std::fs::File;

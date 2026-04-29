@@ -799,7 +799,30 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "773648b94d0e5d620f64f280777445740e61fe701025087ec8b57f45c791888b"
 
 [[package]]
-name = "core_nft"
+name = "core_nft_api"
+version = "0.1.0"
+dependencies = [
+ "bity-ic-icrc3 0.6.1",
+ "bity-ic-storage-canister-api",
+ "bity-ic-storage-canister-c2c",
+ "bity-ic-subcanister-manager",
+ "bity-ic-types",
+ "bity-ic-utils",
+ "candid",
+ "canfund",
+ "ic-asset-certification",
+ "ic-cdk",
+ "ic-http-certification",
+ "ic-ledger-types",
+ "ic-stable-structures 0.7.2",
+ "icrc-ledger-types",
+ "minicbor 1.0.0",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
+name = "core_nft_impl"
 version = "0.1.0"
 dependencies = [
  "async-trait",
@@ -818,6 +841,7 @@ dependencies = [
  "bity-ic-utils",
  "candid",
  "canfund",
+ "core_nft_api",
  "futures",
  "ic-asset-certification",
  "ic-cdk",
@@ -2093,7 +2117,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "index_icrc7"
+name = "index_icrc7_api"
+version = "0.1.0"
+dependencies = [
+ "bity-ic-types",
+ "candid",
+ "ic-ledger-types",
+ "icrc-ledger-types",
+ "minicbor 1.0.0",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
+name = "index_icrc7_impl"
 version = "0.1.0"
 dependencies = [
  "bity-ic-canister-logger",
@@ -2117,6 +2154,7 @@ dependencies = [
  "ic-stable-structures 0.7.2",
  "ic0 1.0.1",
  "icrc-ledger-types",
+ "index_icrc7_api",
  "lazy_static",
  "minicbor 1.0.0",
  "num-bigint",
@@ -2160,7 +2198,7 @@ dependencies = [
  "bity-ic-utils",
  "bytes",
  "candid",
- "core_nft",
+ "core_nft_api",
  "hex",
  "http",
  "http-body-util",
@@ -2169,7 +2207,7 @@ dependencies = [
  "ic-http-gateway",
  "ic-ledger-types",
  "icrc-ledger-types",
- "index_icrc7",
+ "index_icrc7_api",
  "lazy_static",
  "pocket-ic",
  "rand 0.9.2",
@@ -2555,7 +2593,7 @@ dependencies = [
  "base64 0.21.7",
  "candid",
  "clap",
- "core_nft",
+ "core_nft_api",
  "hex",
  "ic-agent",
  "icrc-ledger-types",

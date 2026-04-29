@@ -1,0 +1,47 @@
+[package]
+name = "core_nft_impl"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+core_nft_api = { path = "../api" }
+
+candid = { workspace = true }
+ic-cdk = { workspace = true }
+ic-cdk-macros = { workspace = true }
+ic-cdk-timers = { workspace = true }
+ic-ledger-types = { workspace = true }
+ic-stable-structures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_bytes = { workspace = true }
+serde_cbor = { workspace = true }
+tracing = { workspace = true }
+futures = { workspace = true }
+icrc-ledger-types = { workspace = true }
+async-trait = { workspace = true }
+ic0 = { workspace = true }
+canfund = { workspace = true }
+ic-asset-certification = { workspace = true }
+ic-http-certification = { workspace = true }
+lazy_static = { workspace = true }
+sha2 = { workspace = true }
+url = { workspace = true }
+minicbor = { workspace = true }
+
+bity-ic-canister-logger = { workspace = true }
+bity-ic-canister-state-macros = { workspace = true }
+bity-ic-canister-tracing-macros = { workspace = true }
+bity-ic-canister-time = { workspace = true }
+bity-ic-serializer = { workspace = true }
+bity-ic-stable-memory = { workspace = true }
+bity-ic-types = { workspace = true }
+bity-ic-utils = { workspace = true }
+bity-ic-subcanister-manager = { workspace = true }
+bity-ic-icrc3 = { workspace = true }
+bity-ic-icrc3-macros = { workspace = true }
+bity-ic-storage-canister-c2c = { workspace = true }
+bity-ic-storage-canister-api = { workspace = true }

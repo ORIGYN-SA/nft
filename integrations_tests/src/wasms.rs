@@ -25,7 +25,7 @@ fn get_core_wasm_old() -> CanisterWasm {
     match read_file_from_relative_bin(&format!("../wasm/core_nft_canister.wasm.gz")) {
         Ok(wasm) => wasm,
         Err(err) => {
-            println!("Failed to read core_nft_old wasm: {err}");
+            println!("Failed to read core_nft_api_old wasm: {err}");
             panic!()
         }
     }

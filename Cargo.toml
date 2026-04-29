@@ -1,8 +1,10 @@
 [workspace]
 members = [
     "integrations_tests",
-    "src/core_nft",
-    "src/index_icrc7",
+    "src/core_nft/api",
+    "src/core_nft/impl",
+    "src/index_icrc7/api",
+    "src/index_icrc7/impl",
     "cmdline"
 ]
 resolver = "2"
