@@ -22,7 +22,6 @@ stages:
 
 include:
   - local: scripts/ci-cd/.rust_template.yml
-
   - local: scripts/ci-cd/.canister_tests.yml
 
 build:

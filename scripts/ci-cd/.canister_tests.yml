@@ -23,7 +23,11 @@ integration tests:
       changes:
         - "{src,integrations_tests}/**/*.{rs,toml,lock,did,wasm,gz}"
         - "Cargo.{lock,toml}"
-  needs: ["build"]
+  needs:
+    [
+      "build",
+      "integration tests trigger",
+    ]
   script:
     - bash ./scripts/run_integration_tests.sh
   timeout: 45m
