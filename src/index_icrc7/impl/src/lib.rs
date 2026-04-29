@@ -21,5 +21,4 @@ use lifecycle::*;
 pub use queries::*;
 pub use update::*;
 
-#[cfg(target_arch = "wasm32")]
 export_candid!();
