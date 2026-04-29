@@ -119,7 +119,7 @@ fn test_storage_simple() {
                     .split('.')
                     .next()
                     .unwrap()
-                    .replace("https://", "")
+                    .replace("http://", "")
                     .as_str(),
             )
             .unwrap();
@@ -610,7 +610,7 @@ fn test_management_file_distribution() {
                     .split('.')
                     .next()
                     .unwrap()
-                    .replace("https://", "")
+                    .replace("http://", "")
                     .as_str(),
             )
             .unwrap();
@@ -726,7 +726,7 @@ fn test_management_upload_resilience() {
                 .split('.')
                 .next()
                 .unwrap()
-                .replace("https://", "")
+                .replace("http://", "")
                 .as_str(),
         )
         .unwrap();
@@ -755,7 +755,7 @@ fn test_management_upload_resilience() {
                 .split('.')
                 .next()
                 .unwrap()
-                .replace("https://", "")
+                .replace("http://", "")
                 .as_str(),
         )
         .unwrap();
@@ -833,12 +833,13 @@ fn test_management_cycles() {
 
     if let Some(location) = response.canister_response.headers().get("location") {
         let location_str = location.to_str().unwrap();
+        println!("location_str: {:?}", location_str);
         let first_storage_canister = Principal::from_str(
             location_str
                 .split('.')
                 .next()
                 .unwrap()
-                .replace("https://", "")
+                .replace("http://", "")
                 .as_str(),
         )
         .unwrap();
@@ -881,7 +882,7 @@ fn test_management_cycles() {
                     .split('.')
                     .next()
                     .unwrap()
-                    .replace("https://", "")
+                    .replace("http://", "")
                     .as_str(),
             )
             .unwrap();
