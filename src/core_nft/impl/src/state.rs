@@ -108,8 +108,8 @@ impl Data {
         max_memo_size: Option<Nat>,
         atomic_batch_transfers: Option<bool>,
         tx_window: Option<Nat>,
-        max_canister_storage_threshold: Option<Nat>,
         permitted_drift: Option<Nat>,
+        max_canister_storage_threshold: Option<Nat>,
         approval_init: InitApprovalsArg,
         base_url: Option<String>,
     ) -> Self {
