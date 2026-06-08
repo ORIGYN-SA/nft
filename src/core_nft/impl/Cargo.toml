@@ -8,6 +8,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 core_nft_api = { path = "../api" }
+core_nft_common = { path = "../common" }
 
 candid = { workspace = true }
 ic-cdk = { workspace = true }

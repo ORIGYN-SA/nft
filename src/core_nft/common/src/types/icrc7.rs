@@ -22,6 +22,7 @@ pub struct TransferArg {
     pub from_subaccount: Option<serde_bytes::ByteBuf>,
     pub created_at_time: Option<u64>,
 }
+
 #[derive(CandidType, Deserialize)]
 pub enum TransferError {
     GenericError {

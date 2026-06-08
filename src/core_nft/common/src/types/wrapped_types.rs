@@ -1,5 +1,4 @@
 use crate::types::icrc37::{Approval, TokenApprovalValue};
-
 use candid::{CandidType, Nat, Principal};
 use ic_stable_structures::{storable::Bound, Storable};
 use icrc_ledger_types::icrc1::account::Account;

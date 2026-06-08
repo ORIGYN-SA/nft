@@ -1,8 +1,8 @@
 use crate::lifecycle::init_canister;
 use crate::memory::get_upgrades_memory;
 use crate::state::{read_state, replace_icrc3, start_default_archive_job, RuntimeState};
-use crate::types::http::add_redirection;
 use crate::Args;
+use core_nft_common::types::http::add_redirection;
 
 use bity_ic_canister_logger::LogEntry;
 use bity_ic_canister_tracing_macros::trace;

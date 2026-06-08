@@ -1,12 +1,12 @@
 use crate::state::read_state;
-pub use crate::types::icrc37::{
+use crate::types::icrc37::__COLLECTION_APPROVALS;
+use crate::types::icrc37::__TOKEN_APPROVALS;
+use bity_ic_icrc3::utils::trace;
+pub use core_nft_common::types::icrc37::{
     icrc37_get_collection_approvals, icrc37_get_token_approvals, icrc37_is_approved,
     icrc37_max_approvals_per_token_or_collection, icrc37_max_revoke_approvals,
 };
-use crate::types::{WrappedAccount, WrappedNat};
-use crate::types::{__COLLECTION_APPROVALS, __TOKEN_APPROVALS};
-
-use bity_ic_icrc3::utils::trace;
+use core_nft_common::types::{WrappedAccount, WrappedNat};
 use ic_cdk_macros::query;
 pub use icrc_ledger_types::icrc1::account::Account;
 use std::collections::HashMap;
@@ -32,7 +32,7 @@ fn icrc37_get_token_approvals(
             .map(
                 |(account, approval)| icrc37_get_token_approvals::TokenApproval {
                     token_id: token_id.clone(),
-                    approval_info: crate::types::icrc37::ApprovalInfo {
+                    approval_info: core_nft_common::types::icrc37::ApprovalInfo {
                         spender: approval.spender.0.clone(),
                         from_subaccount: account.0.subaccount,
                         expires_at: approval.expires_at,
@@ -95,7 +95,7 @@ fn icrc37_get_collection_approvals(
             .iter()
             .map(
                 |(account, approval)| icrc37_get_collection_approvals::CollectionApproval {
-                    approval_info: crate::types::icrc37::ApprovalInfo {
+                    approval_info: core_nft_common::types::icrc37::ApprovalInfo {
                         spender: approval.spender.0.clone(),
                         from_subaccount: account.0.subaccount,
                         expires_at: approval.expires_at,

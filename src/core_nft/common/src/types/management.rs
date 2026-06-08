@@ -9,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub mod mint {
+    use crate::PrivateEntry;
+
     use super::*;
 
     #[derive(CandidType, Serialize, Deserialize, Clone)]
@@ -16,6 +18,7 @@ pub mod mint {
         pub token_owner: Account,
         pub memo: Option<serde_bytes::ByteBuf>,
         pub metadata: Vec<(String, ICRC3Value)>,
+        pub private_content: Option<PrivateEntry>,
     }
 
     #[derive(CandidType, Serialize, Deserialize, Clone)]

@@ -4,20 +4,26 @@ use crate::guards::{
     caller_has_update_metadata_permission, caller_has_update_uploads_permission, GuardManagement,
 };
 use crate::state::{icrc3_add_transaction, mutate_state, read_state, InternalFilestorageData};
-use crate::types::http::add_redirection;
 use crate::types::metadata::__METADATA;
-use crate::types::sub_canister::StorageCanister;
-use crate::types::{icrc7, management, nft};
-use crate::utils::{check_memo, trace};
+use crate::types::nft::Icrc7Token;
+use crate::utils::check_memo;
+use core_nft_common::types::http::add_redirection;
+use core_nft_common::types::sub_canister::StorageCanister;
+use core_nft_common::types::{icrc7, management};
+use core_nft_common::utils::trace;
+use core_nft_common::MAX_PRIVATE_CONTENT_SIZE;
 
-pub use crate::types::management::{
-    cancel_upload, finalize_upload, get_user_permissions, grant_permission, has_permission,
-    init_upload, migration_icrc3_add_transaction, revoke_permission, store_chunk,
-};
-pub use crate::types::permissions::Permission;
 use bity_ic_icrc3::transaction::{ICRC7Transaction, ICRC7TransactionData};
 use bity_ic_storage_canister_api::types::storage::UploadState;
 pub use candid::{Nat, Principal};
+pub use core_nft_common::types::management::{
+    cancel_upload, finalize_upload, get_user_permissions, grant_permission, has_permission,
+    init_upload, migration_icrc3_add_transaction, revoke_permission, store_chunk,
+};
+pub use core_nft_common::types::permissions::Permission;
+use core_nft_common::{
+    construct_canonical_identity, NftPrivateRecord, PrivateContentStatus, PrivateEntry,
+};
 pub use ic_cdk::call::RejectCode;
 use ic_cdk_macros::{query, update};
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
@@ -120,6 +126,54 @@ pub async fn update_collection_metadata(
     Ok(())
 }
 
+const DEFAULT_PRIVATE_CONTENT_ENTRY_NAME: &str = "default";
+
+fn validate_private_content_entry(
+    private_content: &PrivateEntry,
+    token_owner: &Account,
+) -> Result<NftPrivateRecord, String> {
+    if private_content.status != PrivateContentStatus::Active {
+        return Err("Private content must be Active when minting".to_string());
+    }
+
+    if private_content.pending_upload.is_some() {
+        return Err("Private content must be finalized before minting".to_string());
+    }
+
+    if private_content.plaintext_size > MAX_PRIVATE_CONTENT_SIZE {
+        return Err("Private content exceeds maximum permitted size".to_string());
+    }
+
+    if private_content.storage_path.is_empty() {
+        return Err("Private content storage path cannot be empty".to_string());
+    }
+
+    if private_content.readers.contains_key(&token_owner.owner) {
+        return Err("NFT owner cannot be a private content reader".to_string());
+    }
+
+    let canonical_identity = construct_canonical_identity(&private_content.readers);
+    if canonical_identity != private_content.canonical_identity {
+        return Err("Private content canonical identity does not match reader list".to_string());
+    }
+
+    let mut record = NftPrivateRecord::new();
+    record.default_readers = private_content.readers.clone();
+
+    let mut entry = private_content.clone();
+    entry.readers = private_content.readers.clone();
+    entry.canonical_identity = canonical_identity;
+    entry.previous_canonical_identity = None;
+    entry.pending_upload = None;
+    entry.status = PrivateContentStatus::Active;
+
+    record
+        .entries
+        .insert(DEFAULT_PRIVATE_CONTENT_ENTRY_NAME.to_string(), entry);
+
+    Ok(record)
+}
+
 #[update(guard = "caller_has_minting_permission")]
 pub fn mint(req: management::mint::Args) -> management::mint::Response {
     trace("Minting NFT batch");
@@ -164,14 +218,45 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
     }
 
     let mut new_tokens = Vec::new();
+    let mut new_private_content_records = Vec::new();
     let mut transactions = Vec::new();
     let timestamp = ic_cdk::api::time();
 
     for (i, mint_request) in req.mint_requests.iter().enumerate() {
         let token_id = current_token_id.clone() + Nat::from(i as u64);
 
-        let mut new_token =
-            nft::Icrc7Token::new(token_id.clone(), mint_request.token_owner.clone());
+        if let Some(private_content) = mint_request.private_content.clone() {
+            match private_content.status {
+                PrivateContentStatus::PendingMinting => {
+                    let hash = private_content.plaintext_hash;
+                    let result = mutate_state(|state| {
+                        state
+                            .data
+                            .private_content_system
+                            .mint_private_content(&hash, token_id.clone())
+                    });
+                    if let Err(e) = result {
+                        return Err(management::mint::MintError::StorageCanisterError(format!(
+                            "Failed to mint private content: {:?}",
+                            e
+                        )));
+                    }
+                }
+                PrivateContentStatus::Active => {
+                    let private_record =
+                        validate_private_content_entry(&private_content, &mint_request.token_owner)
+                            .map_err(|e| management::mint::MintError::StorageCanisterError(e))?;
+                    new_private_content_records.push((token_id.clone(), private_record));
+                }
+                _ => {
+                    return Err(management::mint::MintError::StorageCanisterError(
+                        "Private content must be PendingMinting or Active when minting".to_string(),
+                    ));
+                }
+            }
+        }
+
+        let mut new_token = Icrc7Token::new(token_id.clone(), mint_request.token_owner.clone());
         __METADATA.with_borrow_mut(|m| new_token.add_metadata(m, mint_request.metadata.clone()));
 
         let transaction = ICRC7Transaction::new(
@@ -215,7 +300,15 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
                 .tokens_list_by_owner
                 .entry(token_owner)
                 .or_insert(vec![])
-                .push(token_id);
+                .push(token_id.clone());
+        }
+
+        for (token_id, private_record) in new_private_content_records {
+            state
+                .data
+                .private_content_system
+                .nft_private
+                .insert(token_id.clone(), private_record);
         }
     });
 

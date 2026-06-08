@@ -2,6 +2,7 @@
 members = [
     "integrations_tests",
     "src/core_nft/api",
+    "src/core_nft/common",
     "src/core_nft/impl",
     "src/index_icrc7/api",
     "src/index_icrc7/impl",
@@ -40,7 +41,7 @@ serde_json = "1.0.143"
 serde_with = "3.7.0"
 serde_yaml = "0.9.33"
 serde_tokenstream = "0.2.2"
-sha2 = "0.10.9"
+sha2 = "0.11.0"
 syn = "2.0.110"
 tracing = "0.1.40"
 tracing-attributes = "0.1.30"
@@ -62,6 +63,8 @@ ic-asset-certification = "3.0.3"
 ic-http-certification = "3.0.3"
 lazy_static = "1.4.0"
 url = "2.5.4"
+strum = "0.28.0"
+strum_macros = "0.28.0"
 
 bity-ic-canister-client         = "0.2.5"
 bity-ic-canister-logger         = "0.2.1"

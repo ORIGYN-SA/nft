@@ -26,6 +26,7 @@ serde_bytes                    = { workspace = true }
 serde_json                     = { workspace = true }
 tempfile                       = "3.21.0"
 core_nft_api                   = { path = "../src/core_nft/api"}
+core_nft_common                   = { path = "../src/core_nft/common"}
 index_icrc7_api                = { path = "../src/index_icrc7/api"}
 ic-cdk                         = { workspace = true }
 reqwest                        = "0.12.23"

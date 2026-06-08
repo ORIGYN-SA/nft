@@ -1,6 +1,6 @@
 use ic_cdk::query;
 
-pub use crate::types::icrc10;
+pub use core_nft_api::types::icrc10;
 
 #[query]
 pub fn icrc10_supported_standards() -> icrc10::icrc10_supported_standards::Response {

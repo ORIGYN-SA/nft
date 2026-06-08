@@ -1,8 +1,8 @@
 use crate::state::mutate_state;
 use crate::state::read_state;
-use crate::types::permissions::Permission;
 use bity_ic_types::TimestampNanos;
 use candid::Principal;
+use core_nft_common::types::permissions::Permission;
 use std::marker::PhantomData;
 use std::time::Duration;
 
@@ -123,3 +123,100 @@ create_permission_guard!(
     Permission::UpdateUploads,
     "Caller does not have update uploads permission"
 );
+
+pub fn caller_is_nft_owner(nft_id: &candid::Nat) -> Result<(), String> {
+    let caller = ic_cdk::api::msg_caller();
+    read_state(|s| {
+        let token = s.data.get_token_by_id(nft_id).ok_or("NFT not found")?;
+        if token.token_owner.owner == caller {
+            Ok(())
+        } else {
+            Err("Caller is not the NFT owner".to_string())
+        }
+    })
+}
+
+pub fn caller_is_owner_or_any_reader(nft_id: &candid::Nat) -> Result<(), String> {
+    let caller = ic_cdk::api::msg_caller();
+    read_state(|s| {
+        let token = s.data.get_token_by_id(nft_id).ok_or("NFT not found")?;
+
+        if token.token_owner.owner == caller {
+            return Ok(());
+        }
+
+        if let Some(private_record) = s.data.private_content_system.nft_private.get(nft_id) {
+            for entry in private_record.entries.values() {
+                if entry.readers.contains_key(&caller) {
+                    return Ok(());
+                }
+            }
+        }
+
+        Err("Caller is not authorized".to_string())
+    })
+}
+
+pub fn caller_is_owner_or_entry_reader(
+    nft_id: &candid::Nat,
+    entry_name: &str,
+) -> Result<(), String> {
+    let caller = ic_cdk::api::msg_caller();
+    read_state(|s| {
+        let token = s.data.get_token_by_id(nft_id).ok_or("NFT not found")?;
+
+        if token.token_owner.owner == caller {
+            return Ok(());
+        }
+
+        let private_record = s
+            .data
+            .private_content_system
+            .nft_private
+            .get(nft_id)
+            .ok_or("Private content not found")?;
+        let entry = private_record
+            .entries
+            .get(entry_name)
+            .ok_or("Entry not found")?;
+
+        if entry.readers.contains_key(&caller) {
+            return Ok(());
+        }
+
+        Err("Caller is not authorized for this entry".to_string())
+    })
+}
+
+use core_nft_common::PrivateContentStatus;
+pub fn entry_content_is_accessible(nft_id: &candid::Nat, entry_name: &str) -> Result<(), String> {
+    let caller = ic_cdk::api::msg_caller();
+    read_state(|s| {
+        let token = s.data.get_token_by_id(nft_id).ok_or("NFT not found")?;
+        let is_owner = token.token_owner.owner == caller;
+
+        let private_record = s
+            .data
+            .private_content_system
+            .nft_private
+            .get(nft_id)
+            .ok_or("Private content not found")?;
+        let entry = private_record
+            .entries
+            .get(entry_name)
+            .ok_or("Entry not found")?;
+
+        match &entry.status {
+            PrivateContentStatus::Active => Ok(()),
+            PrivateContentStatus::PendingUpload => Err("Content is pending upload".to_string()),
+            PrivateContentStatus::PendingMinting => Err("Content is pending minting".to_string()),
+            PrivateContentStatus::PendingReencryption => {
+                if is_owner {
+                    Ok(())
+                } else {
+                    Err("Content is pending re-encryption".to_string())
+                }
+            }
+        }
+    })
+}

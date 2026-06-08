@@ -1,5 +1,4 @@
 use crate::state::read_state;
-use core_nft_api::types::icrc7;
 use crate::types::metadata::__METADATA;
 
 use candid::Nat;
@@ -160,7 +159,8 @@ pub fn icrc7_max_memo_size() -> core_nft_api::queries::icrc7::MaxMemoSizeRespons
 }
 
 #[query]
-pub fn icrc7_atomic_batch_transfers() -> core_nft_api::queries::icrc7::AtomicBatchTransfersResponse {
+pub fn icrc7_atomic_batch_transfers() -> core_nft_api::queries::icrc7::AtomicBatchTransfersResponse
+{
     read_state(|state| state.data.atomic_batch_transfers.clone())
 }
 
@@ -179,12 +179,13 @@ pub fn icrc7_token_metadata(
     token_ids: core_nft_api::queries::icrc7::TokenMetadataArgs,
 ) -> core_nft_api::queries::icrc7::TokenMetadataResponse {
     let icrc7_max_query_batch_size = read_state(|state| state.data.max_query_batch_size.clone());
-    let max_query_batch_size =
-        icrc7_max_query_batch_size.unwrap_or(Nat::from(core_nft_api::types::icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE));
+    let max_query_batch_size = icrc7_max_query_batch_size.unwrap_or(Nat::from(
+        core_nft_common::types::icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE,
+    ));
 
     if token_ids.len()
         > usize::try_from(max_query_batch_size.0.clone())
-            .unwrap_or(core_nft_api::types::icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE as usize)
+            .unwrap_or(core_nft_common::types::icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE as usize)
     {
         ic_cdk::trap(format!(
             "max_query_batch_size exceeded. Limit is {}. Retry with a smaller batch size.",
@@ -211,14 +212,17 @@ pub fn icrc7_token_metadata(
 }
 
 #[query]
-pub fn icrc7_owner_of(token_ids: core_nft_api::queries::icrc7::OwnerOfArgs) -> core_nft_api::queries::icrc7::OwnerOfResponse {
+pub fn icrc7_owner_of(
+    token_ids: core_nft_api::queries::icrc7::OwnerOfArgs,
+) -> core_nft_api::queries::icrc7::OwnerOfResponse {
     let icrc7_max_query_batch_size = read_state(|state| state.data.max_query_batch_size.clone());
-    let max_query_batch_size =
-        icrc7_max_query_batch_size.unwrap_or(Nat::from(core_nft_api::types::icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE));
+    let max_query_batch_size = icrc7_max_query_batch_size.unwrap_or(Nat::from(
+        core_nft_common::types::icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE,
+    ));
 
     if token_ids.len()
         > usize::try_from(max_query_batch_size.0.clone())
-            .unwrap_or(core_nft_api::types::icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE as usize)
+            .unwrap_or(core_nft_common::types::icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE as usize)
     {
         ic_cdk::trap(format!(
             "max_query_batch_size exceeded. Limit is {}. Retry with a smaller batch size.",
@@ -239,12 +243,13 @@ pub fn icrc7_balance_of(
     accounts: core_nft_api::queries::icrc7::BalanceOfArgs,
 ) -> core_nft_api::queries::icrc7::BalanceOfResponse {
     let icrc7_max_query_batch_size = read_state(|state| state.data.max_query_batch_size.clone());
-    let max_query_batch_size =
-        icrc7_max_query_batch_size.unwrap_or(Nat::from(core_nft_api::types::icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE));
+    let max_query_batch_size = icrc7_max_query_batch_size.unwrap_or(Nat::from(
+        core_nft_common::types::icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE,
+    ));
 
     if accounts.len()
         > usize::try_from(max_query_batch_size.0.clone())
-            .unwrap_or(core_nft_api::types::icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE as usize)
+            .unwrap_or(core_nft_common::types::icrc7::DEFAULT_MAX_QUERY_BATCH_SIZE as usize)
     {
         ic_cdk::trap(format!(
             "max_query_batch_size exceeded. Limit is {}. Retry with a smaller batch size.",
@@ -267,8 +272,9 @@ pub fn icrc7_tokens(
 ) -> core_nft_api::queries::icrc7::TokensResponse {
     if take.is_some() {
         let icrc7_max_take_value = read_state(|state| state.data.max_take_value.clone());
-        let max_take_value =
-            icrc7_max_take_value.unwrap_or(Nat::from(core_nft_api::types::icrc7::DEFAULT_MAX_TAKE_VALUE));
+        let max_take_value = icrc7_max_take_value.unwrap_or(Nat::from(
+            core_nft_common::types::icrc7::DEFAULT_MAX_TAKE_VALUE,
+        ));
 
         if take.clone().unwrap().0 > max_take_value.0 {
             ic_cdk::trap(format!(
@@ -286,11 +292,11 @@ pub fn icrc7_tokens(
                     .data
                     .default_take_value
                     .clone()
-                    .unwrap_or(Nat::from(core_nft_api::types::icrc7::DEFAULT_TAKE_VALUE))
+                    .unwrap_or(Nat::from(core_nft_common::types::icrc7::DEFAULT_TAKE_VALUE))
             })
             .0,
         )
-        .unwrap_or(core_nft_api::types::icrc7::DEFAULT_TAKE_VALUE);
+        .unwrap_or(core_nft_common::types::icrc7::DEFAULT_TAKE_VALUE);
 
         let mut tokens: Vec<_> = state.data.tokens_list.keys().cloned().collect();
         tokens.sort();
@@ -310,8 +316,9 @@ pub fn icrc7_tokens_of(
 ) -> core_nft_api::queries::icrc7::TokensOfResponse {
     if take.is_some() {
         let icrc7_max_take_value = read_state(|state| state.data.max_take_value.clone());
-        let max_take_value =
-            icrc7_max_take_value.unwrap_or(Nat::from(core_nft_api::types::icrc7::DEFAULT_MAX_TAKE_VALUE));
+        let max_take_value = icrc7_max_take_value.unwrap_or(Nat::from(
+            core_nft_common::types::icrc7::DEFAULT_MAX_TAKE_VALUE,
+        ));
 
         if take.clone().unwrap().0 > max_take_value.0 {
             ic_cdk::trap(format!(
@@ -329,11 +336,11 @@ pub fn icrc7_tokens_of(
                     .data
                     .default_take_value
                     .clone()
-                    .unwrap_or(Nat::from(core_nft_api::types::icrc7::DEFAULT_TAKE_VALUE))
+                    .unwrap_or(Nat::from(core_nft_common::types::icrc7::DEFAULT_TAKE_VALUE))
             })
             .0,
         )
-        .unwrap_or(core_nft_api::types::icrc7::DEFAULT_TAKE_VALUE);
+        .unwrap_or(core_nft_common::types::icrc7::DEFAULT_TAKE_VALUE);
 
         let mut tokens: Vec<Nat> = state.data.tokens_ids_of_account(&account);
         tokens.sort();

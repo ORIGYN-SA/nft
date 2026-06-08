@@ -6,8 +6,8 @@ use crate::lifecycle::Args;
 pub use crate::state::InitApprovalsArg;
 use crate::state::{init_icrc3, start_default_archive_job, Data, RuntimeState};
 use crate::types::http::certify_all_assets;
-use crate::types::permissions::{Permission, PermissionManager};
-use crate::types::value_custom::CustomValue as Value;
+use core_nft_common::types::permissions::{Permission, PermissionManager};
+use core_nft_common::types::value_custom::CustomValue as Value;
 
 use bity_ic_canister_tracing_macros::trace;
 use bity_ic_icrc3::config::{ICRC3Config, ICRC3Properties};
@@ -47,6 +47,8 @@ pub struct InitArgs {
     //   - "https://{canister_id}.raw.icp0.io" (mainnet)
     //   None for default based on test mode
     pub base_url: Option<String>,
+    pub vetkd_key_name: String,
+    pub vetkd_context: String,
 }
 
 #[init]
@@ -95,6 +97,8 @@ fn init(args: Args) {
                 init_args.max_canister_storage_threshold,
                 init_args.approval_init.clone(),
                 init_args.base_url.clone(),
+                init_args.vetkd_key_name.clone(),
+                init_args.vetkd_context.clone(),
             );
 
             if env.is_test_mode() {

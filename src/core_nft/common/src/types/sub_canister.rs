@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::types::management::{cancel_upload, finalize_upload, init_upload, store_chunk};
 use crate::utils::trace;
 use bity_ic_storage_canister_c2c::{
@@ -12,6 +10,7 @@ use candid::{CandidType, Principal};
 use canfund::manager::options::{CyclesThreshold, FundManagerOptions, FundStrategy};
 use ic_cdk::management_canister::{canister_status, CanisterStatusArgs};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 const MAX_STORAGE_SIZE: u128 = 500 * 1024 * 1024 * 1024; // 500 GiB TODO maybe we should put a be less here ?
 const MAX_FILE_SIZE: u128 = 2 * 1024 * 1024 * 1024; // 2 GiB

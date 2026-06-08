@@ -1,8 +1,7 @@
-use crate::types::Metadata;
-use crate::utils::trace;
-
-use crate::types::value_custom::CustomValue as Value;
+use crate::types::metadata::Metadata;
 use candid::{CandidType, Nat};
+use core_nft_common::types::value_custom::CustomValue as Value;
+use core_nft_common::utils::trace;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
 use icrc_ledger_types::icrc1::account::Account;
 use serde::{Deserialize, Serialize};
