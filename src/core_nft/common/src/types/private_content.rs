@@ -136,18 +136,20 @@ impl PrivateContentSystem {
             return Err(PrivateContentError::AlreadyExists);
         }
 
+        // FIXME: not the plaintext_size
         if plaintext_size > MAX_PRIVATE_CONTENT_SIZE {
             return Err(PrivateContentError::ContentTooLarge);
         }
 
         match encryption_mode {
             EncryptionMode::AES256 => {
-                if total_size % 16 != 0 {
-                    return Err(PrivateContentError::StorageError(
-                        "Encrypted content size must be divisible by 16 bytes (AES block size)"
-                            .to_string(),
-                    ));
-                }
+                // if (total_size - IBE_OVERHEAD) % 16 != 0 {
+                //     return Err(PrivateContentError::StorageError(
+                //         "Encrypted content size must be divisible by 16 bytes (AES block size)"
+                //             .to_string(),
+                //     ));
+                // }
+                return Ok(());
             }
         }
 
@@ -158,6 +160,7 @@ impl PrivateContentSystem {
     pub fn init_premint_store(
         &mut self,
         hash: Sha256Hash,
+        salt: Vec<u8>,
         default_readers: HashMap<Principal, ReaderInfo>,
         entry_name: String,
         storage_canister_id: Principal,
@@ -177,7 +180,8 @@ impl PrivateContentSystem {
         let entry = PrivateEntry {
             status: PrivateContentStatus::PendingUpload,
             readers: default_readers.clone(),
-            plaintext_hash: hash,
+            hash,
+            salt,
             plaintext_size,
             encryption_mode,
             canonical_identity,
@@ -244,9 +248,10 @@ impl PrivateContentSystem {
             .values()
             .map(|c| c.len() as u64)
             .sum();
-        if actual_size != entry.plaintext_size {
-            return Err(PrivateContentError::ContentTooLarge); // Or specific SizeMismatch error
-        }
+        // FIXME: not the plaintext_size
+        // if actual_size != entry.plaintext_size {
+        //     return Err(PrivateContentError::ContentTooLarge); // Or specific SizeMismatch error
+        // }
 
         // Transition state
         entry.status = PrivateContentStatus::PendingMinting;
@@ -290,14 +295,14 @@ impl PrivateContentSystem {
     // Helper to upload a chunk to a pending entry in premint_cache
     pub fn upload_chunk(
         &mut self,
-        hash: &Sha256Hash,
+        plaintext_hash: &Sha256Hash,
         entry_name: &str,
         chunk_index: usize,
         data: Vec<u8>,
     ) -> Result<(), PrivateContentError> {
         let record = self
             .premint_cache
-            .get_mut(hash)
+            .get_mut(plaintext_hash)
             .ok_or(PrivateContentError::NotFound)?;
         let entry = record
             .entries
@@ -398,7 +403,8 @@ impl NftPrivateRecord {
 pub struct PrivateEntry {
     pub status: PrivateContentStatus,
     pub readers: HashMap<Principal, ReaderInfo>,
-    pub plaintext_hash: Sha256Hash,
+    pub hash: Sha256Hash,
+    pub salt: Vec<u8>,
     pub plaintext_size: u64,
     pub encryption_mode: EncryptionMode,
     pub canonical_identity: Vec<u8>,

@@ -34,4 +34,6 @@ pub struct InitArgs {
     pub collection_metadata: HashMap<String, Value>,
     pub approval_init: InitApprovalsArg,
     pub base_url: Option<String>,
+    pub vetkd_key_name: String,
+    pub vetkd_context: String,
 }

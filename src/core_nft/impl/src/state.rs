@@ -1,4 +1,13 @@
 use crate::types::nft::Icrc7Token;
+use bity_ic_canister_state_macros::canister_state;
+use bity_ic_icrc3::transaction::TransactionType;
+use bity_ic_icrc3_macros::icrc3_state;
+use bity_ic_storage_canister_api::types::storage::UploadState;
+use bity_ic_types::{BuildVersion, TimestampNanos};
+use bity_ic_types::{Cycles, TimestampMillis};
+use bity_ic_utils::env::{CanisterEnv, Environment};
+use bity_ic_utils::memory::MemorySize;
+use core_nft_api::init::InitApprovalsArg;
 use core_nft_common::types::permissions::{Permission, PermissionManager};
 use core_nft_common::types::sub_canister::{
     StorageSubCanisterManager, INITIAL_CYCLES_BALANCE, RESERVED_CYCLES_BALANCE,
@@ -8,15 +17,6 @@ use core_nft_common::types::{
 };
 use core_nft_common::PrivateContentConfig;
 use core_nft_common::PrivateContentSystem;
-
-use bity_ic_canister_state_macros::canister_state;
-use bity_ic_icrc3::transaction::TransactionType;
-use bity_ic_icrc3_macros::icrc3_state;
-use bity_ic_storage_canister_api::types::storage::UploadState;
-use bity_ic_types::{BuildVersion, TimestampNanos};
-use bity_ic_types::{Cycles, TimestampMillis};
-use bity_ic_utils::env::{CanisterEnv, Environment};
-use bity_ic_utils::memory::MemorySize;
 
 use candid::{CandidType, Nat, Principal};
 use icrc_ledger_types::icrc1::account::Account;
@@ -282,12 +282,6 @@ impl Clone for Data {
             base_url: self.base_url.clone(),
         }
     }
-}
-
-#[derive(CandidType, Deserialize, Serialize, Debug, Clone)]
-pub struct InitApprovalsArg {
-    pub max_approvals_per_token_or_collection: Option<Nat>,
-    pub max_revoke_approvals: Option<Nat>,
 }
 
 #[derive(CandidType, Serialize)]

@@ -1,55 +1,16 @@
-use std::collections::HashMap;
-use std::time::Duration;
-
 use crate::lifecycle::init_canister;
-use crate::lifecycle::Args;
-pub use crate::state::InitApprovalsArg;
 use crate::state::{init_icrc3, start_default_archive_job, Data, RuntimeState};
 use crate::types::http::certify_all_assets;
-use core_nft_common::types::permissions::{Permission, PermissionManager};
-use core_nft_common::types::value_custom::CustomValue as Value;
-
 use bity_ic_canister_tracing_macros::trace;
 use bity_ic_icrc3::config::{ICRC3Config, ICRC3Properties};
-use bity_ic_types::BuildVersion;
 use bity_ic_utils::env::{CanisterEnv, Environment};
-use candid::{CandidType, Nat};
+use candid::Nat;
+pub use core_nft_api::lifecycle::Args;
+use core_nft_common::types::permissions::Permission;
 use ic_cdk_macros::init;
 use icrc_ledger_types::icrc3::blocks::SupportedBlockType;
-use serde::{Deserialize, Serialize};
+use std::time::Duration;
 use tracing::info;
-
-#[derive(CandidType, Serialize, Deserialize, Debug)]
-pub struct InitArgs {
-    pub test_mode: bool,
-    pub version: BuildVersion,
-    pub commit_hash: String,
-    pub permissions: PermissionManager,
-    pub description: Option<String>,
-    pub symbol: String,
-    pub name: String,
-    pub logo: Option<String>,
-    pub supply_cap: Option<Nat>,
-    pub max_query_batch_size: Option<Nat>,
-    pub max_update_batch_size: Option<Nat>,
-    pub max_take_value: Option<Nat>,
-    pub default_take_value: Option<Nat>,
-    pub max_memo_size: Option<Nat>,
-    pub atomic_batch_transfers: Option<bool>,
-    pub tx_window: Option<Nat>,
-    pub permitted_drift: Option<Nat>,
-    pub max_canister_storage_threshold: Option<Nat>,
-    pub collection_metadata: HashMap<String, Value>,
-    pub approval_init: InitApprovalsArg,
-    // Construct URLs based on base_url configuration or test_mode
-    // base_url should be a template with {canister_id} placeholder, e.g.:
-    //   - "http://{canister_id}.localhost:4943" (local)
-    //   - "https://{canister_id}.raw.icp0.io" (mainnet)
-    //   None for default based on test mode
-    pub base_url: Option<String>,
-    pub vetkd_key_name: String,
-    pub vetkd_context: String,
-}
 
 #[init]
 #[trace]

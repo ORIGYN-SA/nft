@@ -52,8 +52,10 @@ pub mod init_private_content_upload {
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct Args {
-        pub hash: Sha256Hash,
+        pub plaintext_hash: Sha256Hash,
+        pub salt: Vec<u8>,
         pub entry_name: String,
+        pub file_hash: Sha256Hash,
         pub default_readers: HashMap<Principal, ReaderInfo>,
         pub storage_canister_id: Principal,
         pub storage_path: String,
@@ -64,37 +66,8 @@ pub mod init_private_content_upload {
         pub encryption_mode: EncryptionMode,
     }
 
-    #[derive(Serialize, Deserialize, CandidType, Debug)]
-    pub enum InitPrivateContentUploadError {
-        ConcurrentManagementCall,
-        AlreadyExists,
-        ContentTooLarge,
-        InvalidChunkSize,
-        StorageCanisterError(String),
-    }
-
-    pub type Response = Result<(), InitPrivateContentUploadError>;
-}
-
-use core_nft_common::types::init_upload;
-impl From<init_upload::InitUploadError>
-    for init_private_content_upload::InitPrivateContentUploadError
-{
-    fn from(error: init_upload::InitUploadError) -> Self {
-        match error {
-            init_upload::InitUploadError::ConcurrentManagementCall => {
-                init_private_content_upload::InitPrivateContentUploadError::ConcurrentManagementCall
-            }
-            init_upload::InitUploadError::FileAlreadyExists => {
-                init_private_content_upload::InitPrivateContentUploadError::AlreadyExists
-            }
-            init_upload::InitUploadError::StorageCanisterError(msg) => {
-                init_private_content_upload::InitPrivateContentUploadError::StorageCanisterError(
-                    msg,
-                )
-            }
-        }
-    }
+    use core_nft_common::PrivateContentError;
+    pub type Response = Result<(), PrivateContentError>;
 }
 
 pub mod store_private_content_chunk {
@@ -106,6 +79,7 @@ pub mod store_private_content_chunk {
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct Args {
+        pub plaintext_hash: Sha256Hash,
         pub hash: Sha256Hash,
         pub entry_name: String,
         pub chunk_index: Nat,
@@ -252,12 +226,13 @@ impl From<cancel_upload::CancelUploadError>
 }
 
 // 1. From init_private_content_upload::Args -> init_upload::Args
+use core_nft_common::types::init_upload;
 impl From<init_private_content_upload::Args> for init_upload::Args {
     fn from(args: init_private_content_upload::Args) -> Self {
         init_upload::Args {
             file_path: args.entry_name,
-            file_hash: hex::encode(args.hash), // FIXME
-            file_size: args.plaintext_size,
+            file_hash: hex::encode(args.file_hash), // FIXME
+            file_size: args.total_size,
             chunk_size: args.chunk_size,
         }
     }

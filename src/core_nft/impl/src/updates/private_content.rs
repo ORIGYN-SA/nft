@@ -9,17 +9,18 @@ pub use core_nft_common::types::management::{
     cancel_upload, finalize_upload, get_user_permissions, grant_permission, has_permission,
     init_upload, migration_icrc3_add_transaction, revoke_permission, store_chunk,
 };
+pub use core_nft_common::PrivateContentError;
 use ic_cdk::update;
 use serde_bytes::ByteBuf;
 
 #[update(guard = "caller_has_update_uploads_permission")]
-pub async fn init_private_upload(
+pub async fn init_private_content_upload(
     args: init_private_content_upload::Args,
 ) -> init_private_content_upload::Response {
     // Step 1: Validate parameters (AES block alignment, size checks, cache conflicts)
     let validate_result = mutate_state(|state| {
         state.data.private_content_system.init_premint_validate(
-            &args.hash,
+            &args.plaintext_hash,
             args.encryption_mode.clone(),
             args.plaintext_size,
             args.total_size,
@@ -29,44 +30,30 @@ pub async fn init_private_upload(
     if let Err(err) = validate_result {
         return Err(match err {
             core_nft_common::types::private_content::PrivateContentError::AlreadyExists => {
-                init_private_content_upload::InitPrivateContentUploadError::AlreadyExists
+                PrivateContentError::AlreadyExists
             }
             core_nft_common::types::private_content::PrivateContentError::ContentTooLarge => {
-                init_private_content_upload::InitPrivateContentUploadError::ContentTooLarge
+                PrivateContentError::ContentTooLarge
             }
             core_nft_common::types::private_content::PrivateContentError::StorageError(msg) => {
-                init_private_content_upload::InitPrivateContentUploadError::StorageCanisterError(
-                    msg,
-                )
+                PrivateContentError::StorageError(msg)
             }
-            _ => init_private_content_upload::InitPrivateContentUploadError::StorageCanisterError(
-                format!("{:?}", err),
-            ),
+            other => PrivateContentError::StorageError(format!("{:?}", other)),
         });
     }
 
     // Step 2: Initialize storage upload on remote canister
     let args_cloned = args.clone();
-    let storage_result = crate::updates::management::init_upload(args_cloned.clone().into()).await;
-
-    if let Err(err) = storage_result {
-        return Err(match err {
-            core_nft_common::types::management::init_upload::InitUploadError::FileAlreadyExists => {
-                init_private_content_upload::InitPrivateContentUploadError::AlreadyExists
-            }
-            core_nft_common::types::management::init_upload::InitUploadError::StorageCanisterError(msg) => {
-                init_private_content_upload::InitPrivateContentUploadError::StorageCanisterError(msg)
-            }
-            _ => init_private_content_upload::InitPrivateContentUploadError::StorageCanisterError(
-                format!("{:?}", err),
-            ),
-        });
-    }
+    crate::updates::management::init_upload(args_cloned.into())
+        .await
+        .map(|_| ())
+        .map_err(|err| PrivateContentError::StorageError(format!("{:?}", err)))?;
 
     // Step 3: Store the entry in local premint cache
-    let store_result = mutate_state(|state| {
+    mutate_state(|state| {
         state.data.private_content_system.init_premint_store(
-            args.hash,
+            args.plaintext_hash,
+            args.salt,
             args.default_readers,
             args.entry_name,
             args.storage_canister_id,
@@ -76,16 +63,11 @@ pub async fn init_private_upload(
             args.expected_chunks,
             args.total_size,
         )
-    });
-
-    crate::updates::management::init_upload(args_cloned.into())
-        .await
-        .map(|_| ())
-        .map_err(Into::into)
+    })
 }
 
 #[update(guard = "caller_has_update_uploads_permission")]
-pub async fn store_private_chunk(
+pub async fn store_private_content_chunk(
     args: store_private_content_chunk::Args,
 ) -> store_private_content_chunk::Response {
     let hash = args.hash;
@@ -105,10 +87,12 @@ pub async fn store_private_chunk(
     }
 
     let result = mutate_state(|state| {
-        state
-            .data
-            .private_content_system
-            .upload_chunk(&hash, &entry_name, chunk_index, chunk_data)
+        state.data.private_content_system.upload_chunk(
+            &args.plaintext_hash,
+            &entry_name,
+            chunk_index,
+            chunk_data,
+        )
     });
 
     match result {
@@ -131,7 +115,7 @@ pub async fn store_private_chunk(
 }
 
 #[update(guard = "caller_has_update_uploads_permission")]
-pub async fn finalize_private_upload(
+pub async fn finalize_private_content_upload(
     args: finalize_private_content_upload::Args,
 ) -> finalize_private_content_upload::Response {
     // Step 1: Finalize upload on remote storage canister
@@ -172,7 +156,7 @@ pub async fn finalize_private_upload(
 }
 
 #[update(guard = "caller_has_update_uploads_permission")]
-pub async fn cancel_private_upload(
+pub async fn cancel_private_content_upload(
     args: cancel_private_content_upload::Args,
 ) -> cancel_private_content_upload::Response {
     // Step 1: Cancel upload on remote storage canister

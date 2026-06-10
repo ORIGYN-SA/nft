@@ -65,6 +65,7 @@ lazy_static = "1.4.0"
 url = "2.5.4"
 strum = "0.28.0"
 strum_macros = "0.28.0"
+ic-vetkeys = "0.5.0"
 
 bity-ic-canister-client         = "0.2.5"
 bity-ic-canister-logger         = "0.2.1"

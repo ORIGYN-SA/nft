@@ -1,16 +1,14 @@
 use crate::lifecycle::init_canister;
 use crate::memory::get_upgrades_memory;
 use crate::state::{read_state, replace_icrc3, start_default_archive_job, RuntimeState};
-use crate::Args;
-use core_nft_common::types::http::add_redirection;
-
 use bity_ic_canister_logger::LogEntry;
 use bity_ic_canister_tracing_macros::trace;
 use bity_ic_icrc3::icrc3::ICRC3;
 use bity_ic_stable_memory::get_reader;
 use bity_ic_types::BuildVersion;
-
 use candid::CandidType;
+use core_nft_api::lifecycle::Args;
+use core_nft_common::types::http::add_redirection;
 use ic_cdk_macros::post_upgrade;
 use serde::{Deserialize, Serialize};
 use tracing::info;

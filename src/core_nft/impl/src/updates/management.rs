@@ -228,7 +228,7 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
         if let Some(private_content) = mint_request.private_content.clone() {
             match private_content.status {
                 PrivateContentStatus::PendingMinting => {
-                    let hash = private_content.plaintext_hash;
+                    let hash = private_content.hash;
                     let result = mutate_state(|state| {
                         state
                             .data
