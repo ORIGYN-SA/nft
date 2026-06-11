@@ -37,15 +37,20 @@ type ArchivedBlocks = record {
 type Args = record { entry_name : text };
 type Args_1 = record { file_path : text };
 type Args_10 = record { mint_requests : vec MintRequest };
-type Args_11 = record { chunk_id : nat; file_path : text; chunk_data : blob };
-type Args_12 = record {
+type Args_11 = record {
+  readers : vec record { principal; ReaderInfo };
+  token_id : nat;
+  entry_name : text;
+};
+type Args_12 = record { chunk_id : nat; file_path : text; chunk_data : blob };
+type Args_13 = record {
   chunk_index : nat;
-  hash : blob;
+  token_id_opt : opt nat;
   entry_name : text;
   chunk_data : blob;
   plaintext_hash : blob;
 };
-type Args_13 = record {
+type Args_14 = record {
   supply_cap : opt nat;
   tx_window : opt nat;
   default_take_value : opt nat;
@@ -62,30 +67,31 @@ type Args_13 = record {
   collection_metadata : opt vec record { text; CustomValue };
   symbol : opt text;
 };
-type Args_14 = record {
+type Args_15 = record {
   token_id : nat;
   metadata : vec record { text; CustomValue };
 };
-type Args_15 = variant { Upgrade : UpgradeArgs; Init : InitArgs };
-type Args_2 = record {
-  context : blob;
-  input : blob;
+type Args_16 = variant { Upgrade : UpgradeArgs; Init : InitArgs };
+type Args_2 = record { input : blob; transport_public_key : blob };
+type Args_3 = record {
+  token_id : nat;
+  entry_name : text;
   transport_public_key : blob;
 };
-type Args_3 = record { context : blob };
-type Args_4 = record { hash : blob; entry_name : text };
+type Args_4 = record { token_id_opt : opt nat; hash : blob; entry_name : text };
 type Args_5 = record { "principal" : principal };
 type Args_6 = record { permission : Permission; "principal" : principal };
 type Args_7 = record { permission : Permission; "principal" : principal };
 type Args_8 = record {
   plaintext_size : nat64;
   storage_path : text;
+  token_id_opt : opt nat;
   storage_canister_id : principal;
   expected_chunks : nat64;
   salt : blob;
   entry_name : text;
   file_hash : blob;
-  total_size : nat64;
+  file_size : nat64;
   default_readers : vec record { principal; ReaderInfo };
   encryption_mode : EncryptionMode;
   chunk_size : opt nat64;
@@ -275,7 +281,6 @@ type PendingUpload = record {
   timestamp_ns : nat64;
   expected_chunks : nat64;
   received_chunks : vec record { nat64; blob };
-  total_size : nat64;
   chunk_size : nat64;
 };
 type Permission = variant {
@@ -319,6 +324,7 @@ type PrivateEntry = record {
   previous_canonical_identity : opt blob;
   hash : blob;
   salt : blob;
+  file_size : nat64;
   canonical_identity : blob;
   encryption_mode : EncryptionMode;
   pending_upload : opt PendingUpload;
@@ -354,10 +360,11 @@ type Result_19 = variant { Ok; Err : PrivateContentError };
 type Result_2 = variant { Ok : record {}; Err : CancelUploadError };
 type Result_20 = variant { Ok : record {}; Err : InitUploadError };
 type Result_21 = variant { Ok : nat; Err : MintError };
-type Result_22 = variant { Ok : record {}; Err : StoreChunkError };
-type Result_23 = variant { Ok; Err : StorePrivateContentChunkError };
-type Result_24 = variant { Ok; Err : UpdateCollectionMetadataError };
-type Result_25 = variant { Ok : nat; Err : UpdateNftMetadataError };
+type Result_22 = variant { Ok; Err : text };
+type Result_23 = variant { Ok : record {}; Err : StoreChunkError };
+type Result_24 = variant { Ok; Err : StorePrivateContentChunkError };
+type Result_25 = variant { Ok; Err : UpdateCollectionMetadataError };
+type Result_26 = variant { Ok : nat; Err : UpdateNftMetadataError };
 type Result_3 = variant { Ok : DeriveVetkeyResp; Err : text };
 type Result_4 = variant { Ok : DeriveVetkeyPublicKeyResp; Err : text };
 type Result_5 = variant { Ok; Err : FinalizePrivateContentUploadError };
@@ -497,14 +504,13 @@ type Vec = vec record {
       },
     ) query;
 };
-service : (Args_15) -> {
+service : (Args_16) -> {
   burn_nft : (nat) -> (Result);
   cancel_private_content_upload : (Args) -> (Result_1);
   cancel_upload : (Args_1) -> (Result_2);
   derive_vetkey : (Args_2) -> (Result_3);
-  // Retrieves the vetKD verification key for this canister.
-  // This key is used to verify the authenticity of derived vetKeys.
-  derive_vetkey_public_key : (Args_3) -> (Result_4);
+  derive_vetkey_by_entry : (Args_3) -> (Result_3);
+  derive_vetkey_public_key : (null) -> (Result_4);
   finalize_private_content_upload : (Args_4) -> (Result_5);
   finalize_upload : (Args_1) -> (Result_6);
   get_all_storage_subcanisters : () -> (vec principal) query;
@@ -567,8 +573,9 @@ service : (Args_15) -> {
   init_upload : (Args_9) -> (Result_20);
   mint : (Args_10) -> (Result_21);
   revoke_permission : (Args_7) -> (Result_10);
-  store_chunk : (Args_11) -> (Result_22);
-  store_private_content_chunk : (Args_12) -> (Result_23);
-  update_collection_metadata : (Args_13) -> (Result_24);
-  update_nft_metadata : (Args_14) -> (Result_25);
+  set_readers : (Args_11) -> (Result_22);
+  store_chunk : (Args_12) -> (Result_23);
+  store_private_content_chunk : (Args_13) -> (Result_24);
+  update_collection_metadata : (Args_14) -> (Result_25);
+  update_nft_metadata : (Args_15) -> (Result_26);
 }

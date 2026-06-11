@@ -8,10 +8,7 @@ pub mod derive_vetkey_public_key {
     use serde::{Deserialize, Serialize};
     use serde_bytes::ByteBuf;
 
-    #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
-    pub struct Args {
-        pub context: ByteBuf,
-    }
+    pub type Args = ();
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct DeriveVetkeyPublicKeyResp {
@@ -28,8 +25,28 @@ pub mod derive_vetkey {
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct Args {
-        pub context: ByteBuf,
         pub input: ByteBuf,
+        pub transport_public_key: ByteBuf,
+    }
+
+    #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+    pub struct DeriveVetkeyResp {
+        pub encrypted_key: ByteBuf,
+    }
+
+    pub type Response = Result<DeriveVetkeyResp, String>;
+}
+
+pub mod derive_vetkey_by_entry {
+    use candid::CandidType;
+    use candid::Nat;
+    use serde::{Deserialize, Serialize};
+    use serde_bytes::ByteBuf;
+
+    #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+    pub struct Args {
+        pub token_id: Nat,
+        pub entry_name: String,
         pub transport_public_key: ByteBuf,
     }
 
@@ -43,6 +60,7 @@ pub mod derive_vetkey {
 
 pub mod init_private_content_upload {
     use candid::CandidType;
+    use candid::Nat;
     use candid::Principal;
     use core_nft_common::types::private_content::EncryptionMode;
     use core_nft_common::ReaderInfo;
@@ -52,6 +70,7 @@ pub mod init_private_content_upload {
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct Args {
+        pub token_id_opt: Option<Nat>, // NOTE: can be used if reuploading reencrypted content
         pub plaintext_hash: Sha256Hash,
         pub salt: Vec<u8>,
         pub entry_name: String,
@@ -62,7 +81,7 @@ pub mod init_private_content_upload {
         pub plaintext_size: u64,
         pub expected_chunks: usize,
         pub chunk_size: Option<u64>,
-        pub total_size: u64,
+        pub file_size: u64,
         pub encryption_mode: EncryptionMode,
     }
 
@@ -79,8 +98,8 @@ pub mod store_private_content_chunk {
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct Args {
+        pub token_id_opt: Option<Nat>, // NOTE: can be used if reuploading reencrypted content
         pub plaintext_hash: Sha256Hash,
-        pub hash: Sha256Hash,
         pub entry_name: String,
         pub chunk_index: Nat,
         pub chunk_data: ByteBuf,
@@ -128,11 +147,13 @@ impl From<store_chunk::StoreChunkError>
 
 pub mod finalize_private_content_upload {
     use candid::CandidType;
+    use candid::Nat;
     use core_nft_common::Sha256Hash;
     use serde::{Deserialize, Serialize};
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct Args {
+        pub token_id_opt: Option<Nat>, // NOTE: can be used if reuploading reencrypted content
         pub hash: Sha256Hash,
         pub entry_name: String,
     }
@@ -230,9 +251,9 @@ use core_nft_common::types::init_upload;
 impl From<init_private_content_upload::Args> for init_upload::Args {
     fn from(args: init_private_content_upload::Args) -> Self {
         init_upload::Args {
-            file_path: args.entry_name,
-            file_hash: hex::encode(args.file_hash), // FIXME
-            file_size: args.total_size,
+            file_path: args.entry_name, //FIXME: check that everything is ok
+            file_hash: hex::encode(args.file_hash),
+            file_size: args.file_size,
             chunk_size: args.chunk_size,
         }
     }
@@ -265,4 +286,23 @@ impl From<cancel_private_content_upload::Args> for cancel_upload::Args {
             file_path: args.entry_name,
         }
     }
+}
+
+pub mod set_readers {
+
+    use candid::CandidType;
+    use candid::Nat;
+    use candid::Principal;
+    use core_nft_common::ReaderInfo;
+    use serde::{Deserialize, Serialize};
+    use std::collections::HashMap;
+
+    #[derive(Serialize, Deserialize, CandidType, Clone, Debug)]
+    pub struct Args {
+        pub token_id: Nat,
+        pub readers: HashMap<Principal, ReaderInfo>,
+        pub entry_name: String,
+    }
+
+    pub type Response = Result<(), String>;
 }
