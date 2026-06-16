@@ -24,7 +24,7 @@ pub enum PrivateContentStatus {
     PendingReencryption,
 }
 
-#[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(CandidType, Serialize, Deserialize, Copy, Clone, Debug, PartialEq)]
 pub enum EncryptionMode {
     AES256,
 }
@@ -65,7 +65,7 @@ pub struct ReaderDetail {
 pub struct EntryDetailResp {
     pub name: String,
     pub status: PrivateContentStatus,
-    pub readers: Option<Vec<ReaderDetail>>,
+    pub readers: Vec<ReaderDetail>,
     pub plaintext_hash: Sha256Hash,
     pub plaintext_size: u64,
     pub storage_canister_id: Principal,
@@ -73,9 +73,16 @@ pub struct EntryDetailResp {
 }
 
 // Helper functions
-pub fn construct_canonical_identity(readers: &HashMap<Principal, ReaderInfo>) -> Vec<u8> {
-    let mut principals: Vec<_> = readers.keys().collect();
+pub fn construct_canonical_identity(
+    owner: Principal,
+    readers: &HashMap<Principal, ReaderInfo>,
+) -> Vec<u8> {
+    let mut principals: Vec<Principal> = readers.keys().cloned().collect();
+    if !principals.contains(&owner) {
+        principals.push(owner);
+    }
     principals.sort();
+
     let joined = principals
         .iter()
         .map(|p| p.to_text())
@@ -116,7 +123,7 @@ use ic_cdk::management_canister::VetKDPublicKeyArgs;
 #[derive(Serialize, Deserialize, Clone)]
 pub struct PrivateContentSystem {
     pub nft_private: HashMap<Nat, NftPrivateRecord>,
-    pub premint_cache: HashMap<Sha256Hash, NftPrivateRecord>, // NOTE: indexing happens by plaintext_hash. Can be changed to file_hash
+    pub premint_cache: HashMap<Sha256Hash, PrivateEntry>,
     pub config: PrivateContentConfig,
 }
 
@@ -135,9 +142,6 @@ impl PrivateContentSystem {
             .ok_or_else(|| format!("Private entry '{entry_name}' not found for NFT {token_id}"))
     }
 
-    // NOTE: full file size (should stay the same for reencrypted content), not just chunk size
-    // Validate parameters for private content upload initialization.
-    // Checks content size, AES block alignment, and cache conflicts.
     pub fn init_premint_validate(
         &self,
         hash: &Sha256Hash,
@@ -166,13 +170,12 @@ impl PrivateContentSystem {
         Ok(())
     }
 
-    // Store a validated private content entry in the premint cache.
     pub fn init_premint_store(
         &mut self,
         hash: Sha256Hash,
         salt: Vec<u8>,
-        default_readers: HashMap<Principal, ReaderInfo>,
-        entry_name: String,
+        owner_to_be: Principal,
+        readers: HashMap<Principal, ReaderInfo>,
         storage_canister_id: Principal,
         storage_path: String,
         encryption_mode: EncryptionMode,
@@ -180,17 +183,16 @@ impl PrivateContentSystem {
         expected_chunks: usize,
         file_size: u64,
     ) -> Result<(), PrivateContentError> {
-        // Re-check existence as a safety measure
         if self.premint_cache.contains_key(&hash) {
             return Err(PrivateContentError::AlreadyExists);
         }
 
-        // FIXME: not only default readers
-        let canonical_identity = construct_canonical_identity(&default_readers);
+        let effective_readers = resolve_readers(&readers, &HashMap::new());
+        let canonical_identity = construct_canonical_identity(owner_to_be, &effective_readers);
 
         let entry = PrivateEntry {
             status: PrivateContentStatus::PendingUpload,
-            readers: default_readers.clone(),
+            readers,
             hash,
             salt,
             plaintext_size,
@@ -209,29 +211,20 @@ impl PrivateContentSystem {
             format_version: 1,
         };
 
-        let mut record = NftPrivateRecord::new();
-        record.default_readers = default_readers;
-        record.entries.insert(entry_name, entry);
-
-        self.premint_cache.insert(hash, record);
+        self.premint_cache.insert(hash, entry);
         Ok(())
     }
 
-    // Helper to upload a chunk to a pending entry in premint_cache
+    // Removed unused entry_name parameter
     pub fn upload_chunk(
         &mut self,
         plaintext_hash: &Sha256Hash,
-        entry_name: &str,
         chunk_index: usize,
         data: Vec<u8>,
     ) -> Result<(), PrivateContentError> {
-        let record = self
+        let entry = self
             .premint_cache
             .get_mut(plaintext_hash)
-            .ok_or(PrivateContentError::NotFound)?;
-        let entry = record
-            .entries
-            .get_mut(entry_name)
             .ok_or(PrivateContentError::NotFound)?;
 
         if entry.status != PrivateContentStatus::PendingUpload {
@@ -256,19 +249,10 @@ impl PrivateContentSystem {
         Ok(())
     }
 
-    // Finalize the upload process. Transitions status from PendingUpload to PendingMinting.
-    pub fn finalize_upload(
-        &mut self,
-        hash: &Sha256Hash,
-        entry_name: &str,
-    ) -> Result<(), PrivateContentError> {
-        let record = self
+    pub fn finalize_upload(&mut self, hash: &Sha256Hash) -> Result<(), PrivateContentError> {
+        let entry = self
             .premint_cache
             .get_mut(hash)
-            .ok_or(PrivateContentError::NotFound)?;
-        let entry = record
-            .entries
-            .get_mut(entry_name)
             .ok_or(PrivateContentError::NotFound)?;
 
         if entry.status != PrivateContentStatus::PendingUpload {
@@ -284,7 +268,6 @@ impl PrivateContentSystem {
             return Err(PrivateContentError::InvalidChunk);
         }
 
-        // Verify total size matches expectation
         let actual_size: u64 = pending
             .received_chunks
             .values()
@@ -292,56 +275,54 @@ impl PrivateContentSystem {
             .sum();
 
         if actual_size != entry.file_size {
-            return Err(PrivateContentError::ContentTooLarge); // Or specific SizeMismatch error
+            return Err(PrivateContentError::ContentTooLarge);
         }
 
-        // Transition state
         entry.status = PrivateContentStatus::PendingMinting;
-        entry.pending_upload = None; // Clear upload buffer to save memory
+        entry.pending_upload = None;
 
         Ok(())
     }
 
-    // Cancel an ongoing upload. Removes the entry from premint_cache.
-    pub fn cancel_upload(&mut self, entry_name: &str) -> Result<(), PrivateContentError> {
-        self.premint_cache
-            .retain(|_, record| !record.entries.contains_key(entry_name));
+    pub fn cancel_upload(&mut self, entry_hash: &Sha256Hash) -> Result<(), PrivateContentError> {
+        self.premint_cache.remove(entry_hash);
         Ok(())
     }
 
-    // Mint the private content. Moves the record from premint_cache to nft_private.
     pub fn mint_private_content(
         &mut self,
-        hash: &Sha256Hash,
+        default_readers: HashMap<Principal, ReaderInfo>,
+        entries_to_mint_hashs: HashMap<String, Sha256Hash>,
         token_id: Nat,
     ) -> Result<(), PrivateContentError> {
         if self.nft_private.contains_key(&token_id) {
             return Err(PrivateContentError::AlreadyExists);
         }
 
-        let record = self
-            .premint_cache
-            .remove(hash)
-            .ok_or(PrivateContentError::NotFound)?;
+        let mut private_record = NftPrivateRecord {
+            default_readers,
+            entries: HashMap::new(),
+        };
 
-        // Verify all entries are in PendingMinting or Active state (if re-encryption happened)
-        for (_, entry) in record.entries.iter() {
+        for (entry_name, entry_hash) in entries_to_mint_hashs {
+            let mut entry = self
+                .premint_cache
+                .remove(&entry_hash)
+                .ok_or(PrivateContentError::NotFound)?;
             if entry.status != PrivateContentStatus::PendingMinting
                 && entry.status != PrivateContentStatus::Active
             {
-                // Allow Active if it was re-encrypted during upload phase, though typically it should be PendingMinting
-                // For strict flow, enforce PendingMinting:
-                if entry.status != PrivateContentStatus::PendingMinting {
-                    return Err(PrivateContentError::InvalidStateTransition);
-                }
+                return Err(PrivateContentError::InvalidStateTransition);
+            } else {
+                entry.status = PrivateContentStatus::Active;
+                private_record.entries.insert(entry_name, entry);
             }
         }
 
-        self.nft_private.insert(token_id, record);
+        self.nft_private.insert(token_id, private_record);
         Ok(())
     }
 
-    // No duplicates and no nft_owner can be added into readers
     pub fn set_readers(
         &mut self,
         token_id: Nat,
@@ -359,7 +340,7 @@ impl PrivateContentSystem {
             .get_mut(entry_name)
             .ok_or("No private entry was found for given NFT")?;
 
-        entry.set_readers(nft_owner, readers)?;
+        entry.set_readers(nft_owner, readers, &record.default_readers)?;
 
         Ok(())
     }
@@ -371,6 +352,7 @@ impl PrivateContentSystem {
         plaintext_hash: &Sha256Hash,
         plaintext_size: u64,
         file_size: u64,
+        encryption_mode: EncryptionMode,
     ) -> Result<(), PrivateContentError> {
         let record = self
             .nft_private
@@ -411,12 +393,12 @@ impl PrivateContentSystem {
         Ok(())
     }
 
-    // Store a validated private content entry in the premint cache.
     pub fn init_reencryption_store(
         &mut self,
         token_id: &Nat,
         entry_name: &str,
         expected_chunks: usize,
+        encryption_mode: EncryptionMode,
     ) -> Result<(), PrivateContentError> {
         let record = self
             .nft_private
@@ -434,11 +416,11 @@ impl PrivateContentSystem {
             chunk_size: CHUNK_SIZE,
             timestamp_ns: ic_cdk::api::time(),
         });
+        entry.encryption_mode = encryption_mode;
 
         Ok(())
     }
 
-    // Helper to upload a chunk to a pending entry in premint_cache
     pub fn reupload_chunk(
         &mut self,
         token_id: &Nat,
@@ -477,16 +459,18 @@ impl PrivateContentSystem {
         Ok(())
     }
 
-    // Finalize the reupload process. Transitions status from PendingReencryption to PendingMinting.
+    // FIXED: Fetch from nft_private instead of premint_cache.
+    // Uses token_id and entry_name, and transitions to Active.
     pub fn finalize_reupload(
         &mut self,
-        hash: &Sha256Hash,
+        token_id: &Nat,
         entry_name: &str,
     ) -> Result<(), PrivateContentError> {
         let record = self
-            .premint_cache
-            .get_mut(hash)
+            .nft_private
+            .get_mut(token_id)
             .ok_or(PrivateContentError::NotFound)?;
+
         let entry = record
             .entries
             .get_mut(entry_name)
@@ -505,7 +489,6 @@ impl PrivateContentSystem {
             return Err(PrivateContentError::InvalidChunk);
         }
 
-        // Verify total size matches expectation
         let actual_size: u64 = pending
             .received_chunks
             .values()
@@ -513,12 +496,12 @@ impl PrivateContentSystem {
             .sum();
 
         if actual_size != entry.file_size {
-            return Err(PrivateContentError::ContentTooLarge); // Or specific SizeMismatch error
+            return Err(PrivateContentError::ContentTooLarge);
         }
 
-        // Transition state
-        entry.status = PrivateContentStatus::PendingMinting;
-        entry.pending_upload = None; // Clear upload buffer to save memory
+        // Transition back to active
+        entry.status = PrivateContentStatus::Active;
+        entry.pending_upload = None;
 
         Ok(())
     }
@@ -538,7 +521,6 @@ impl PrivateContentConfig {
         }
     }
 
-    /// Derives the master public key for IBE encryption.
     pub async fn derive_public_key(&self) -> Result<Vec<u8>, String> {
         let request = VetKDPublicKeyArgs {
             canister_id: None,
@@ -553,8 +535,6 @@ impl PrivateContentConfig {
         Ok(reply.public_key)
     }
 
-    /// Derives a vetkey for a caller-provided identity `input`, encrypted with
-    /// `transport_public_key`.
     pub async fn derive_vetkey(
         &self,
         input: Vec<u8>,
@@ -578,7 +558,7 @@ impl PrivateContentConfig {
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct NftPrivateRecord {
     pub default_readers: HashMap<Principal, ReaderInfo>,
-    pub entries: HashMap<String, PrivateEntry>, // TODO: add Merkle tree with all the entries
+    pub entries: HashMap<String, PrivateEntry>,
 }
 
 impl NftPrivateRecord {
@@ -609,11 +589,11 @@ pub struct PrivateEntry {
 }
 
 impl PrivateEntry {
-    // No duplicates and no nft_owner can be added into readers
     pub fn set_readers(
         &mut self,
         nft_owner: Principal,
         readers: HashMap<Principal, ReaderInfo>,
+        default_readers: &HashMap<Principal, ReaderInfo>,
     ) -> Result<(), String> {
         let new_readers: HashMap<_, _> = readers
             .into_iter()
@@ -627,10 +607,16 @@ impl PrivateEntry {
             ));
         }
 
-        if self.readers != new_readers {
-            self.previous_canonical_identity = Some(self.canonical_identity.clone());
+        let effective_new_readers = resolve_readers(&new_readers, default_readers);
+        let new_identity = construct_canonical_identity(nft_owner, &effective_new_readers);
+
+        if self.readers != new_readers || self.canonical_identity != new_identity {
+            if self.status != PrivateContentStatus::PendingReencryption {
+                self.previous_canonical_identity = Some(self.canonical_identity.clone());
+            }
+
             self.readers = new_readers;
-            self.canonical_identity = construct_canonical_identity(&self.readers);
+            self.canonical_identity = new_identity;
 
             if self.status != PrivateContentStatus::PendingUpload {
                 self.status = PrivateContentStatus::PendingReencryption;

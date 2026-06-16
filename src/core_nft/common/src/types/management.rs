@@ -9,16 +9,22 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub mod mint {
-    use crate::PrivateEntry;
-
     use super::*;
+    use crate::ReaderInfo;
+    use crate::Sha256Hash;
 
     #[derive(CandidType, Serialize, Deserialize, Clone)]
     pub struct MintRequest {
         pub token_owner: Account,
         pub memo: Option<serde_bytes::ByteBuf>,
         pub metadata: Vec<(String, ICRC3Value)>,
-        pub private_content: Option<PrivateEntry>,
+        pub private_content: Option<NftPrivateRecordMint>,
+    }
+
+    #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+    pub struct NftPrivateRecordMint {
+        pub default_readers: HashMap<Principal, ReaderInfo>,
+        pub entries: HashMap<String, Sha256Hash>, // TODO: add Merkle tree with all the entries
     }
 
     #[derive(CandidType, Serialize, Deserialize, Clone)]

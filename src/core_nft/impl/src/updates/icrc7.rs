@@ -16,14 +16,12 @@ fn transfer_nft(arg: &icrc7::TransferArg) -> Result<Nat, icrc7::icrc7_transfer::
         }
     })?;
 
-    let mut nft = mutate_state(|state| state.data.tokens_list.get(&arg.token_id).cloned())
+    let mut nft = read_state(|state| state.data.tokens_list.get(&arg.token_id).cloned())
         .ok_or(icrc7::icrc7_transfer::TransferError::NonExistingTokenId)?;
 
-    check_memo(arg.memo.clone()).map_err(|e| {
-        icrc7::icrc7_transfer::TransferError::GenericError {
-            error_code: Nat::from(0u64),
-            message: e,
-        }
+    check_memo(&arg.memo).map_err(|e| icrc7::icrc7_transfer::TransferError::GenericError {
+        error_code: Nat::from(0u64),
+        message: e,
     })?;
 
     if nft.token_owner.owner != ic_cdk::api::msg_caller()
@@ -103,9 +101,14 @@ fn transfer_nft(arg: &icrc7::TransferArg) -> Result<Nat, icrc7::icrc7_transfer::
                     .nft_private
                     .get_mut(&arg.token_id)
                 {
-                    let default_readers = private_record.default_readers.clone();
+                    private_record.default_readers.clear();
+                    let empty_defaults = std::collections::HashMap::new();
                     for entry in private_record.entries.values_mut() {
-                        if let Err(err) = entry.set_readers(arg.to.owner, default_readers.clone()) {
+                        if let Err(err) = entry.set_readers(
+                            arg.to.owner,
+                            std::collections::HashMap::new(),
+                            &empty_defaults,
+                        ) {
                             trace(&format!(
                                 "Failed to reset private content readers for token {:?}: {}",
                                 arg.token_id, err

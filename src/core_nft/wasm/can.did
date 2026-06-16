@@ -34,23 +34,45 @@ type ArchivedBlocks = record {
   args : vec GetBlocksRequest;
   callback : func (vec GetBlocksRequest) -> (GetBlocksResult) query;
 };
-type Args = record { entry_name : text };
-type Args_1 = record { file_path : text };
-type Args_10 = record { mint_requests : vec MintRequest };
+type Args = record { hash : blob };
+type Args_1 = record { token_id : nat; entry_name : text };
+type Args_10 = record {
+  plaintext_size : nat64;
+  storage_path : text;
+  token_id_opt : opt nat;
+  storage_canister_id : principal;
+  expected_chunks : nat64;
+  salt : blob;
+  entry_name : opt text;
+  file_hash : blob;
+  file_size : nat64;
+  default_readers : vec record { principal; ReaderInfo };
+  encryption_mode : EncryptionMode;
+  chunk_size : opt nat64;
+  plaintext_hash : blob;
+};
 type Args_11 = record {
+  file_hash : text;
+  file_path : text;
+  file_size : nat64;
+  chunk_size : opt nat64;
+};
+type Args_12 = record { mint_requests : vec MintRequest };
+type Args_13 = record {
   readers : vec record { principal; ReaderInfo };
   token_id : nat;
   entry_name : text;
 };
-type Args_12 = record { chunk_id : nat; file_path : text; chunk_data : blob };
-type Args_13 = record {
+type Args_14 = record { chunk_id : nat; file_path : text; chunk_data : blob };
+type Args_15 = record {
+  storage_path : text;
   chunk_index : nat;
   token_id_opt : opt nat;
-  entry_name : text;
+  entry_name : opt text;
   chunk_data : blob;
   plaintext_hash : blob;
 };
-type Args_14 = record {
+type Args_16 = record {
   supply_cap : opt nat;
   tx_window : opt nat;
   default_take_value : opt nat;
@@ -67,42 +89,28 @@ type Args_14 = record {
   collection_metadata : opt vec record { text; CustomValue };
   symbol : opt text;
 };
-type Args_15 = record {
+type Args_17 = record {
   token_id : nat;
   metadata : vec record { text; CustomValue };
 };
-type Args_16 = variant { Upgrade : UpgradeArgs; Init : InitArgs };
-type Args_2 = record { input : blob; transport_public_key : blob };
-type Args_3 = record {
+type Args_18 = variant { Upgrade : UpgradeArgs; Init : InitArgs };
+type Args_2 = record { storage_path : text; entry_hash : blob };
+type Args_3 = record { file_path : text };
+type Args_4 = record { input : blob; transport_public_key : blob };
+type Args_5 = record {
   token_id : nat;
   entry_name : text;
   transport_public_key : blob;
 };
-type Args_4 = record { token_id_opt : opt nat; hash : blob; entry_name : text };
-type Args_5 = record { "principal" : principal };
-type Args_6 = record { permission : Permission; "principal" : principal };
-type Args_7 = record { permission : Permission; "principal" : principal };
-type Args_8 = record {
-  plaintext_size : nat64;
+type Args_6 = record {
   storage_path : text;
   token_id_opt : opt nat;
-  storage_canister_id : principal;
-  expected_chunks : nat64;
-  salt : blob;
-  entry_name : text;
-  file_hash : blob;
-  file_size : nat64;
-  default_readers : vec record { principal; ReaderInfo };
-  encryption_mode : EncryptionMode;
-  chunk_size : opt nat64;
-  plaintext_hash : blob;
+  hash : blob;
+  entry_name : opt text;
 };
-type Args_9 = record {
-  file_hash : text;
-  file_path : text;
-  file_size : nat64;
-  chunk_size : opt nat64;
-};
+type Args_7 = record { "principal" : principal };
+type Args_8 = record { permission : Permission; "principal" : principal };
+type Args_9 = record { permission : Permission; "principal" : principal };
 type BlockWithId = record { id : nat; block : ICRC3Value };
 type BuildVersion = record { major : nat32; minor : nat32; patch : nat32 };
 type BurnNftError = variant {
@@ -274,8 +282,12 @@ type MintError = variant {
 type MintRequest = record {
   metadata : vec record { text; ICRC3Value };
   memo : opt blob;
-  private_content : opt PrivateEntry;
+  private_content : opt NftPrivateRecordMint;
   token_owner : Account;
+};
+type NftPrivateRecordMint = record {
+  entries : vec record { text; blob };
+  default_readers : vec record { principal; ReaderInfo };
 };
 type PendingUpload = record {
   timestamp_ns : nat64;
@@ -330,51 +342,52 @@ type PrivateEntry = record {
   pending_upload : opt PendingUpload;
 };
 type ReaderInfo = record { alias : opt text; rights : AccessRights };
-type Result = variant { Ok; Err : BurnNftError };
-type Result_1 = variant { Ok; Err : CancelPrivateContentUploadError };
-type Result_10 = variant { Ok; Err : GrantPermissionError };
-type Result_11 = variant { Ok : bool; Err : HasPermissionError };
-type Result_12 = variant { Ok : ConsentInfo; Err : Icrc21Error };
-type Result_13 = variant {
+type Result = variant { Ok : PrivateEntry; Err : text };
+type Result_1 = variant { Ok; Err : BurnNftError };
+type Result_10 = variant { Ok : vec Permission; Err : GetUserPermissionsError };
+type Result_11 = variant { Ok; Err : GrantPermissionError };
+type Result_12 = variant { Ok : bool; Err : HasPermissionError };
+type Result_13 = variant { Ok : ConsentInfo; Err : Icrc21Error };
+type Result_14 = variant {
   Ok : vec opt ApproveCollectionResult;
   Err : ApproveCollectionError;
 };
-type Result_14 = variant {
+type Result_15 = variant {
   Ok : vec opt ApproveTokenResult;
   Err : ApproveTokenError;
 };
-type Result_15 = variant {
+type Result_16 = variant {
   Ok : vec opt RevokeCollectionApprovalResult;
   Err : RevokeCollectionApprovalError;
 };
-type Result_16 = variant {
+type Result_17 = variant {
   Ok : vec opt RevokeTokenApprovalResponse;
   Err : RevokeTokenApprovalError;
 };
-type Result_17 = variant {
+type Result_18 = variant {
   Ok : vec opt TransferFromResult;
   Err : TransferFromError;
 };
-type Result_18 = variant { Ok : nat; Err : TransferError };
-type Result_19 = variant { Ok; Err : PrivateContentError };
-type Result_2 = variant { Ok : record {}; Err : CancelUploadError };
-type Result_20 = variant { Ok : record {}; Err : InitUploadError };
-type Result_21 = variant { Ok : nat; Err : MintError };
-type Result_22 = variant { Ok; Err : text };
-type Result_23 = variant { Ok : record {}; Err : StoreChunkError };
-type Result_24 = variant { Ok; Err : StorePrivateContentChunkError };
-type Result_25 = variant { Ok; Err : UpdateCollectionMetadataError };
-type Result_26 = variant { Ok : nat; Err : UpdateNftMetadataError };
-type Result_3 = variant { Ok : DeriveVetkeyResp; Err : text };
-type Result_4 = variant { Ok : DeriveVetkeyPublicKeyResp; Err : text };
-type Result_5 = variant { Ok; Err : FinalizePrivateContentUploadError };
-type Result_6 = variant { Ok : FinalizeUploadResp; Err : FinalizeUploadError };
-type Result_7 = variant {
+type Result_19 = variant { Ok : nat; Err : TransferError };
+type Result_2 = variant { Ok; Err : CancelPrivateContentUploadError };
+type Result_20 = variant { Ok; Err : PrivateContentError };
+type Result_21 = variant { Ok : record {}; Err : InitUploadError };
+type Result_22 = variant { Ok : nat; Err : MintError };
+type Result_23 = variant { Ok; Err : text };
+type Result_24 = variant { Ok : record {}; Err : StoreChunkError };
+type Result_25 = variant { Ok; Err : StorePrivateContentChunkError };
+type Result_26 = variant { Ok; Err : UpdateCollectionMetadataError };
+type Result_27 = variant { Ok : nat; Err : UpdateNftMetadataError };
+type Result_3 = variant { Ok : record {}; Err : CancelUploadError };
+type Result_4 = variant { Ok : DeriveVetkeyResp; Err : text };
+type Result_5 = variant { Ok : DeriveVetkeyPublicKeyResp; Err : text };
+type Result_6 = variant { Ok; Err : FinalizePrivateContentUploadError };
+type Result_7 = variant { Ok : FinalizeUploadResp; Err : FinalizeUploadError };
+type Result_8 = variant {
   Ok : vec record { text; UploadState };
   Err : GetAllUploadsError;
 };
-type Result_8 = variant { Ok : UploadState; Err : GetUploadStatusError };
-type Result_9 = variant { Ok : vec Permission; Err : GetUserPermissionsError };
+type Result_9 = variant { Ok : UploadState; Err : GetUploadStatusError };
 type RevokeCollectionApprovalArg = record {
   memo : opt blob;
   from_subaccount : opt blob;
@@ -504,27 +517,29 @@ type Vec = vec record {
       },
     ) query;
 };
-service : (Args_16) -> {
-  burn_nft : (nat) -> (Result);
-  cancel_private_content_upload : (Args) -> (Result_1);
-  cancel_upload : (Args_1) -> (Result_2);
-  derive_vetkey : (Args_2) -> (Result_3);
-  derive_vetkey_by_entry : (Args_3) -> (Result_3);
-  derive_vetkey_public_key : (null) -> (Result_4);
-  finalize_private_content_upload : (Args_4) -> (Result_5);
-  finalize_upload : (Args_1) -> (Result_6);
+service : (Args_18) -> {
+  __get_premint_entry_test : (Args) -> (Result) query;
+  __get_private_entry_test : (Args_1) -> (Result) query;
+  burn_nft : (nat) -> (Result_1);
+  cancel_private_content_upload : (Args_2) -> (Result_2);
+  cancel_upload : (Args_3) -> (Result_3);
+  derive_vetkey : (Args_4) -> (Result_4);
+  derive_vetkey_by_entry : (Args_5) -> (Result_4);
+  derive_vetkey_public_key : (null) -> (Result_5);
+  finalize_private_content_upload : (Args_6) -> (Result_6);
+  finalize_upload : (Args_3) -> (Result_7);
   get_all_storage_subcanisters : () -> (vec principal) query;
-  get_all_uploads : (opt nat, opt nat) -> (Result_7) query;
-  get_upload_status : (text) -> (Result_8) query;
-  get_user_permissions : (Args_5) -> (Result_9) query;
-  grant_permission : (Args_6) -> (Result_10);
-  has_permission : (Args_7) -> (Result_11) query;
+  get_all_uploads : (opt nat, opt nat) -> (Result_8) query;
+  get_upload_status : (text) -> (Result_9) query;
+  get_user_permissions : (Args_7) -> (Result_10) query;
+  grant_permission : (Args_8) -> (Result_11);
+  has_permission : (Args_9) -> (Result_12) query;
   icrc10_supported_standards : () -> (vec SupportedStandard) query;
   icrc21_canister_call_consent_message : (ConsentMessageRequest) -> (
-      Result_12,
+      Result_13,
     ) query;
-  icrc37_approve_collection : (vec ApproveCollectionArg) -> (Result_13);
-  icrc37_approve_tokens : (vec ApproveTokenArg) -> (Result_14);
+  icrc37_approve_collection : (vec ApproveCollectionArg) -> (Result_14);
+  icrc37_approve_tokens : (vec ApproveTokenArg) -> (Result_15);
   icrc37_get_collection_approvals : (
       Account,
       opt ApproveCollectionArg,
@@ -537,10 +552,10 @@ service : (Args_16) -> {
   icrc37_max_approvals_per_token_or_collection : () -> (opt nat) query;
   icrc37_max_revoke_approvals : () -> (opt nat) query;
   icrc37_revoke_collection_approvals : (vec RevokeCollectionApprovalArg) -> (
-      Result_15,
+      Result_16,
     );
-  icrc37_revoke_token_approvals : (vec RevokeTokenApprovalArg) -> (Result_16);
-  icrc37_transfer_from : (vec TransferFromArg) -> (Result_17);
+  icrc37_revoke_token_approvals : (vec RevokeTokenApprovalArg) -> (Result_17);
+  icrc37_transfer_from : (vec TransferFromArg) -> (Result_18);
   icrc3_get_archives : (null) -> (vec ICRC3ArchiveInfo) query;
   icrc3_get_blocks : (vec GetBlocksRequest) -> (GetBlocksResult_1) query;
   icrc3_get_properties : (null) -> (ICRC3Properties) query;
@@ -567,15 +582,15 @@ service : (Args_16) -> {
   icrc7_tokens : (opt nat, opt nat) -> (vec nat) query;
   icrc7_tokens_of : (Account, opt nat, opt nat) -> (vec nat) query;
   icrc7_total_supply : () -> (nat) query;
-  icrc7_transfer : (vec TransferArg) -> (vec opt Result_18);
+  icrc7_transfer : (vec TransferArg) -> (vec opt Result_19);
   icrc7_tx_window : () -> (opt nat) query;
-  init_private_content_upload : (Args_8) -> (Result_19);
-  init_upload : (Args_9) -> (Result_20);
-  mint : (Args_10) -> (Result_21);
-  revoke_permission : (Args_7) -> (Result_10);
-  set_readers : (Args_11) -> (Result_22);
-  store_chunk : (Args_12) -> (Result_23);
-  store_private_content_chunk : (Args_13) -> (Result_24);
-  update_collection_metadata : (Args_14) -> (Result_25);
-  update_nft_metadata : (Args_15) -> (Result_26);
+  init_private_content_upload : (Args_10) -> (Result_20);
+  init_upload : (Args_11) -> (Result_21);
+  mint : (Args_12) -> (Result_22);
+  revoke_permission : (Args_9) -> (Result_11);
+  set_readers : (Args_13) -> (Result_23);
+  store_chunk : (Args_14) -> (Result_24);
+  store_private_content_chunk : (Args_15) -> (Result_25);
+  update_collection_metadata : (Args_16) -> (Result_26);
+  update_nft_metadata : (Args_17) -> (Result_27);
 }

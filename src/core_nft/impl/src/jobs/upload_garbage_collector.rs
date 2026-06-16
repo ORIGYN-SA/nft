@@ -51,12 +51,11 @@ async fn upload_garbage_collector() {
             .private_content_system
             .premint_cache
             .iter()
-            .filter_map(|(hash, record)| {
-                for entry in record.entries.values() {
-                    if let Some(pending) = &entry.pending_upload {
-                        if pending.timestamp_ns + stale_threshold < now {
-                            return Some(*hash);
-                        }
+            .filter_map(|(hash, entry)| {
+                // Directly check the entry since there is no nested map here
+                if let Some(pending) = &entry.pending_upload {
+                    if pending.timestamp_ns + stale_threshold < now {
+                        return Some(hash.clone()); // .clone() is safer here depending on if your hash is a String or [u8; 32]
                     }
                 }
                 None

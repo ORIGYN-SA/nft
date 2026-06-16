@@ -70,15 +70,18 @@ pub mod init_private_content_upload {
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct Args {
-        pub token_id_opt: Option<Nat>, // NOTE: can be used if reuploading reencrypted content
+        // is used for reuploading reencrypted content
+        pub token_id_opt: Option<Nat>,
+        pub entry_name: Option<String>,
+        // should always stay the same if reencrypted
         pub plaintext_hash: Sha256Hash,
+        pub plaintext_size: u64,
+        // used to generate a plaintext_hash to obscure the plaintext file
         pub salt: Vec<u8>,
-        pub entry_name: String,
         pub file_hash: Sha256Hash,
         pub default_readers: HashMap<Principal, ReaderInfo>,
         pub storage_canister_id: Principal,
         pub storage_path: String,
-        pub plaintext_size: u64,
         pub expected_chunks: usize,
         pub chunk_size: Option<u64>,
         pub file_size: u64,
@@ -98,9 +101,10 @@ pub mod store_private_content_chunk {
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct Args {
-        pub token_id_opt: Option<Nat>, // NOTE: can be used if reuploading reencrypted content
+        pub token_id_opt: Option<Nat>,
+        pub entry_name: Option<String>,
         pub plaintext_hash: Sha256Hash,
-        pub entry_name: String,
+        pub storage_path: String,
         pub chunk_index: Nat,
         pub chunk_data: ByteBuf,
     }
@@ -153,9 +157,10 @@ pub mod finalize_private_content_upload {
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct Args {
-        pub token_id_opt: Option<Nat>, // NOTE: can be used if reuploading reencrypted content
+        pub token_id_opt: Option<Nat>,
+        pub entry_name: Option<String>,
         pub hash: Sha256Hash,
-        pub entry_name: String,
+        pub storage_path: String,
     }
 
     #[derive(Serialize, Deserialize, CandidType, Debug)]
@@ -206,11 +211,13 @@ impl From<finalize_upload::FinalizeUploadError>
 pub mod cancel_private_content_upload {
 
     use candid::CandidType;
+    use core_nft_common::Sha256Hash;
     use serde::{Deserialize, Serialize};
 
     #[derive(Serialize, Deserialize, CandidType, Clone, Debug)]
     pub struct Args {
-        pub entry_name: String,
+        pub storage_path: String,
+        pub entry_hash: Sha256Hash,
     }
 
     pub type Response = Result<(), CancelPrivateContentUploadError>;
@@ -251,7 +258,7 @@ use core_nft_common::types::init_upload;
 impl From<init_private_content_upload::Args> for init_upload::Args {
     fn from(args: init_private_content_upload::Args) -> Self {
         init_upload::Args {
-            file_path: args.entry_name, //FIXME: check that everything is ok
+            file_path: args.storage_path,
             file_hash: hex::encode(args.file_hash),
             file_size: args.file_size,
             chunk_size: args.chunk_size,
@@ -264,7 +271,7 @@ impl From<store_private_content_chunk::Args> for store_chunk::Args {
     fn from(args: store_private_content_chunk::Args) -> Self {
         store_chunk::Args {
             chunk_id: args.chunk_index,
-            file_path: args.entry_name,
+            file_path: args.storage_path,
             chunk_data: args.chunk_data.to_vec(),
         }
     }
@@ -274,7 +281,7 @@ impl From<store_private_content_chunk::Args> for store_chunk::Args {
 impl From<finalize_private_content_upload::Args> for finalize_upload::Args {
     fn from(args: finalize_private_content_upload::Args) -> Self {
         finalize_upload::Args {
-            file_path: args.entry_name,
+            file_path: args.storage_path,
         }
     }
 }
@@ -283,7 +290,7 @@ impl From<finalize_private_content_upload::Args> for finalize_upload::Args {
 impl From<cancel_private_content_upload::Args> for cancel_upload::Args {
     fn from(args: cancel_private_content_upload::Args) -> Self {
         cancel_upload::Args {
-            file_path: args.entry_name,
+            file_path: args.storage_path,
         }
     }
 }
@@ -300,9 +307,36 @@ pub mod set_readers {
     #[derive(Serialize, Deserialize, CandidType, Clone, Debug)]
     pub struct Args {
         pub token_id: Nat,
-        pub readers: HashMap<Principal, ReaderInfo>,
         pub entry_name: String,
+        pub readers: HashMap<Principal, ReaderInfo>,
     }
 
     pub type Response = Result<(), String>;
+}
+
+pub mod __get_private_entry_test {
+    use candid::{CandidType, Nat};
+    use core_nft_common::PrivateEntry;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+    pub struct Args {
+        pub token_id: Nat,
+        pub entry_name: String,
+    }
+
+    pub type Response = Result<PrivateEntry, String>;
+}
+
+pub mod __get_premint_entry_test {
+    use candid::CandidType;
+    use core_nft_common::{PrivateEntry, Sha256Hash};
+    use serde::{Deserialize, Serialize};
+
+    #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+    pub struct Args {
+        pub hash: Sha256Hash,
+    }
+
+    pub type Response = Result<PrivateEntry, String>;
 }

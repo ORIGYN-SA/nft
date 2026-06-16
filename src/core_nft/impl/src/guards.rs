@@ -2,6 +2,7 @@ use crate::state::mutate_state;
 use crate::state::read_state;
 use bity_ic_types::TimestampNanos;
 use candid::Principal;
+use core_nft_common::resolve_readers;
 use core_nft_common::types::permissions::Permission;
 use std::marker::PhantomData;
 use std::time::Duration;
@@ -147,7 +148,9 @@ pub fn caller_is_owner_or_any_reader(nft_id: &candid::Nat) -> Result<(), String>
 
         if let Some(private_record) = s.data.private_content_system.nft_private.get(nft_id) {
             for entry in private_record.entries.values() {
-                if entry.readers.contains_key(&caller) {
+                let effective_readers =
+                    resolve_readers(&entry.readers, &private_record.default_readers);
+                if effective_readers.contains_key(&caller) {
                     return Ok(());
                 }
             }
@@ -180,7 +183,8 @@ pub fn caller_is_owner_or_entry_reader(
             .get(entry_name)
             .ok_or("Entry not found")?;
 
-        if entry.readers.contains_key(&caller) {
+        let effective_readers = resolve_readers(&entry.readers, &private_record.default_readers);
+        if effective_readers.contains_key(&caller) {
             return Ok(());
         }
 

@@ -1,6 +1,10 @@
 use crate::{generate_pocket_query_call, generate_pocket_update_call};
 
+use core_nft_api::__get_premint_entry_test;
+use core_nft_api::__get_private_entry_test;
+use core_nft_api::derive_vetkey_by_entry;
 use core_nft_api::queries::get_caller_nft_private_content_access;
+use core_nft_api::set_readers;
 use core_nft_api::types::icrc3::{
     icrc3_get_archives, icrc3_get_blocks, icrc3_get_properties, icrc3_get_tip_certificate,
     icrc3_supported_block_types,
@@ -78,10 +82,15 @@ generate_pocket_update_call!(icrc37_revoke_collection_approvals);
 generate_pocket_update_call!(icrc37_revoke_token_approvals);
 generate_pocket_update_call!(icrc37_transfer_from);
 
+generate_pocket_update_call!(__get_private_entry_test);
+generate_pocket_update_call!(__get_premint_entry_test);
+
+generate_pocket_update_call!(set_readers);
 generate_pocket_update_call!(init_private_content_upload);
 generate_pocket_update_call!(store_private_content_chunk);
 generate_pocket_update_call!(finalize_private_content_upload);
 generate_pocket_update_call!(cancel_private_content_upload);
 generate_pocket_update_call!(derive_vetkey);
 generate_pocket_update_call!(derive_vetkey_public_key);
+generate_pocket_update_call!(derive_vetkey_by_entry);
 generate_pocket_query_call!(get_caller_nft_private_content_access);

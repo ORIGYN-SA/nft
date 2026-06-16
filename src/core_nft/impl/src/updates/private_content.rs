@@ -1,6 +1,8 @@
 use crate::guards::caller_has_update_uploads_permission;
 use crate::state::mutate_state;
 use crate::state::read_state;
+pub use core_nft_api::__get_premint_entry_test;
+pub use core_nft_api::__get_private_entry_test;
 pub use core_nft_api::cancel_private_content_upload;
 pub use core_nft_api::derive_vetkey_by_entry;
 pub use core_nft_api::finalize_private_content_upload;
@@ -8,11 +10,13 @@ pub use core_nft_api::init_private_content_upload;
 pub use core_nft_api::set_readers;
 pub use core_nft_api::store_private_content_chunk;
 pub use core_nft_api::{derive_vetkey, derive_vetkey_public_key};
+use core_nft_common::resolve_readers;
 pub use core_nft_common::types::management::{
     cancel_upload, finalize_upload, get_user_permissions, grant_permission, has_permission,
     init_upload, migration_icrc3_add_transaction, revoke_permission, store_chunk,
 };
 pub use core_nft_common::PrivateContentError;
+use ic_cdk::query;
 use ic_cdk::update;
 use serde_bytes::ByteBuf;
 
@@ -20,62 +24,64 @@ use serde_bytes::ByteBuf;
 pub async fn init_private_content_upload(
     args: init_private_content_upload::Args,
 ) -> init_private_content_upload::Response {
-    // Step 0: Check whether it's an initial upload or a reupload and validate inputs(AES block alignment, size checks, cache conflicts)
     match args.token_id_opt.as_ref() {
         Some(token_id) => {
-            // Step 1: Validate reencrypt parameters
+            let entry_name = args
+                .entry_name
+                .as_deref()
+                .ok_or(core_nft_common::types::private_content::PrivateContentError::NotFound)?;
+
             mutate_state(|state| {
                 state.data.private_content_system.reencryption_validate(
                     token_id,
-                    &args.entry_name,
+                    &entry_name,
                     &args.plaintext_hash,
                     args.plaintext_size,
                     args.file_size,
+                    args.encryption_mode, // user can select with which algorithm to reencrypt
                 )
             })?;
 
-            // Step 2: Initialize storage upload on remote canister
             let args_cloned = args.clone();
             crate::updates::management::init_upload(args_cloned.into())
                 .await
                 .map(|_| ())
                 .map_err(|err| PrivateContentError::StorageError(format!("{:?}", err)))?;
 
-            // Step 3: Store the entry in local premint cache
             mutate_state(|state| {
                 state.data.private_content_system.init_reencryption_store(
                     token_id,
-                    &args.entry_name,
+                    &entry_name,
                     args.expected_chunks,
+                    args.encryption_mode,
                 )
             })
         }
         None => {
-            // Step 1: Validate init parameters
             mutate_state(|state| {
                 state.data.private_content_system.init_premint_validate(
                     &args.plaintext_hash,
-                    args.encryption_mode.clone(),
+                    args.encryption_mode,
                     args.file_size,
                 )
             })?;
-            // Step 2: Initialize storage upload on remote canister
+
             let args_cloned = args.clone();
             crate::updates::management::init_upload(args_cloned.into())
                 .await
                 .map(|_| ())
                 .map_err(|err| PrivateContentError::StorageError(format!("{:?}", err)))?;
 
-            // Step 3: Store the entry in local premint cache
             mutate_state(|state| {
+                let caller = ic_cdk::api::msg_caller();
                 state.data.private_content_system.init_premint_store(
                     args.plaintext_hash,
                     args.salt,
+                    caller,
                     args.default_readers,
-                    args.entry_name,
                     args.storage_canister_id,
                     args.storage_path,
-                    args.encryption_mode.clone(),
+                    args.encryption_mode,
                     args.plaintext_size,
                     args.expected_chunks,
                     args.file_size,
@@ -89,7 +95,6 @@ pub async fn init_private_content_upload(
 pub async fn store_private_content_chunk(
     args: store_private_content_chunk::Args,
 ) -> store_private_content_chunk::Response {
-    let entry_name = args.entry_name.clone();
     let chunk_index_nat = args.chunk_index.clone();
     let chunk_index = usize::try_from(chunk_index_nat.0)
         .map_err(|_| store_private_content_chunk::StorePrivateContentChunkError::InvalidChunk)?;
@@ -105,12 +110,26 @@ pub async fn store_private_content_chunk(
     }
 
     let result = mutate_state(|state| {
-        state.data.private_content_system.upload_chunk(
-            &args.plaintext_hash,
-            &entry_name,
-            chunk_index,
-            chunk_data,
-        )
+        if let Some(token_id) = args.token_id_opt.as_ref() {
+            let entry_name = args
+                .entry_name
+                .as_deref()
+                .ok_or(core_nft_common::types::private_content::PrivateContentError::NotFound)?;
+
+            state.data.private_content_system.reupload_chunk(
+                token_id,
+                &entry_name,
+                chunk_index,
+                chunk_data,
+            )
+        } else {
+            // entry_name removed from upload_chunk as per previous fix
+            state.data.private_content_system.upload_chunk(
+                &args.plaintext_hash,
+                chunk_index,
+                chunk_data,
+            )
+        }
     });
 
     match result {
@@ -136,7 +155,6 @@ pub async fn store_private_content_chunk(
 pub async fn finalize_private_content_upload(
     args: finalize_private_content_upload::Args,
 ) -> finalize_private_content_upload::Response {
-    // Step 1: Finalize upload on remote storage canister
     let storage_result = crate::updates::management::finalize_upload(args.clone().into())
         .await
         .map(|_| ())
@@ -146,12 +164,23 @@ pub async fn finalize_private_content_upload(
         return Err(err);
     }
 
-    // Step 2: Transition status from PendingUpload to PendingMinting in local cache
     let result = mutate_state(|state| {
-        state
-            .data
-            .private_content_system
-            .finalize_upload(&args.hash, &args.entry_name)
+        if let Some(token_id) = args.token_id_opt.as_ref() {
+            let entry_name = args
+                .entry_name
+                .as_deref()
+                .ok_or(core_nft_common::types::private_content::PrivateContentError::NotFound)?;
+
+            state
+                .data
+                .private_content_system
+                .finalize_reupload(token_id, &entry_name)
+        } else {
+            state
+                .data
+                .private_content_system
+                .finalize_upload(&args.hash)
+        }
     });
 
     match result {
@@ -177,7 +206,6 @@ pub async fn finalize_private_content_upload(
 pub async fn cancel_private_content_upload(
     args: cancel_private_content_upload::Args,
 ) -> cancel_private_content_upload::Response {
-    // Step 1: Cancel upload on remote storage canister
     let storage_result = crate::updates::management::cancel_upload(args.clone().into())
         .await
         .map(|_| ())
@@ -187,24 +215,22 @@ pub async fn cancel_private_content_upload(
         return Err(err);
     }
 
-    // Step 2: Remove from local premint cache
     mutate_state(|state| {
         let _ = state
             .data
             .private_content_system
-            .cancel_upload(&args.entry_name);
+            .cancel_upload(&args.entry_hash);
     });
 
     Ok(())
 }
 
-// Retrieves the vetKD verification key for this canister.
-// This key is used to verify the authenticity of derived vetKeys.
 #[update(guard = "caller_has_update_uploads_permission")]
 pub async fn derive_vetkey_public_key(
     _args: derive_vetkey_public_key::Args,
 ) -> derive_vetkey_public_key::Response {
-    let config = mutate_state(|state| state.data.private_content_system.config.clone());
+    // FIXED: Use read_state instead of mutate_state
+    let config = read_state(|state| state.data.private_content_system.config.clone());
     let pk = config.derive_public_key().await?;
     Ok(derive_vetkey_public_key::DeriveVetkeyPublicKeyResp {
         public_key: ByteBuf::from(pk),
@@ -249,17 +275,35 @@ pub async fn derive_vetkey_by_entry(
     let caller = ic_cdk::api::msg_caller();
 
     let (canonical_identity, transport_key) = read_state(|state| {
+        let token = state
+            .data
+            .get_token_by_id(&args.token_id)
+            .ok_or_else(|| "NFT not found".to_string())?;
+
         let private_entry = state
             .data
             .private_content_system
-            .get_nft_private_entry(args.token_id, &args.entry_name)?;
+            .get_nft_private_entry(args.token_id.clone(), &args.entry_name)?;
 
-        if !private_entry.readers.contains_key(&caller) {
+        // FIXED: Make sure the NFT owner can actually derive the key!
+        let is_owner = token.token_owner.owner == caller;
+
+        let record = state
+            .data
+            .private_content_system
+            .nft_private
+            .get(&args.token_id)
+            .ok_or("Private content record not found")?;
+
+        let effective_readers = resolve_readers(&private_entry.readers, &record.default_readers);
+        let has_read_access = effective_readers.contains_key(&caller);
+
+        if !is_owner && !has_read_access {
             return Err("The user does not have permission to derive a key".to_string());
         }
 
         Ok((
-            private_entry.canonical_identity,
+            private_entry.canonical_identity.clone(),
             args.transport_public_key.clone().into_vec(),
         ))
     })?;
@@ -293,5 +337,34 @@ pub fn set_readers(args: set_readers::Args) -> set_readers::Response {
             nft_owner,
             args.readers,
         )
+    })
+}
+
+#[cfg(feature = "inttest")]
+#[query]
+pub fn __get_private_entry_test(
+    args: __get_private_entry_test::Args,
+) -> __get_private_entry_test::Response {
+    read_state(|state| {
+        state
+            .data
+            .private_content_system
+            .get_nft_private_entry(args.token_id, &args.entry_name)
+    })
+}
+
+#[cfg(feature = "inttest")]
+#[query]
+pub fn __get_premint_entry_test(
+    args: __get_premint_entry_test::Args,
+) -> __get_premint_entry_test::Response {
+    read_state(|state| {
+        state
+            .data
+            .private_content_system
+            .premint_cache
+            .get(&args.hash)
+            .cloned()
+            .ok_or_else(|| "Not found".to_string())
     })
 }

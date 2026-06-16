@@ -25,8 +25,10 @@ for i in "${!CANISTERS[@]}"; do
     mkdir -p "$FINAL_WASM_DIR"
 
     # 1. Compile
-    cargo rustc --crate-type=cdylib --target wasm32-unknown-unknown --target-dir "$BASE_CANISTER_PATH/$CANISTER_NAME/impl/target" --release --locked -p $CANISTER &&
-    
+    cargo rustc --crate-type=cdylib --target wasm32-unknown-unknown --features inttest --target-dir "$BASE_CANISTER_PATH/$CANISTER_NAME/impl/target" --release --locked -p $CANISTER &&
+    # cargo rustc --crate-type=cdylib --target wasm32-unknown-unknown --target-dir "$BASE_CANISTER_PATH/$CANISTER_NAME/impl/target" --release --locked -p $CANISTER &&
+
+
     # 2. Shrink & Optimize
     ic-wasm "$TARGET_WASM" -o "$TARGET_WASM" shrink &&
     ic-wasm "$TARGET_WASM" -o "$TARGET_WASM" optimize --inline-functions-with-loops O3 &&
