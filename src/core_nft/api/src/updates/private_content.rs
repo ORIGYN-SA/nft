@@ -79,6 +79,7 @@ pub mod init_private_content_upload {
         // used to generate a plaintext_hash to obscure the plaintext file
         pub salt: Vec<u8>,
         pub file_hash: Sha256Hash,
+        pub readers: HashMap<Principal, ReaderInfo>,
         pub default_readers: HashMap<Principal, ReaderInfo>,
         pub storage_canister_id: Principal,
         pub storage_path: String,

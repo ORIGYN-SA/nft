@@ -933,6 +933,7 @@ dependencies = [
  "core_nft_api",
  "core_nft_common",
  "futures",
+ "hex",
  "ic-asset-certification",
  "ic-cdk",
  "ic-cdk-macros",

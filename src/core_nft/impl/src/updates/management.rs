@@ -7,6 +7,7 @@ use crate::state::{icrc3_add_transaction, mutate_state, read_state, InternalFile
 use crate::types::metadata::__METADATA;
 use crate::types::nft::Icrc7Token;
 use crate::utils::check_memo;
+use core_nft_common::resolve_readers;
 use core_nft_common::types::http::add_redirection;
 use core_nft_common::types::sub_canister::StorageCanister;
 use core_nft_common::types::{icrc7, management};
@@ -21,9 +22,7 @@ pub use core_nft_common::types::management::{
     init_upload, migration_icrc3_add_transaction, revoke_permission, store_chunk,
 };
 pub use core_nft_common::types::permissions::Permission;
-use core_nft_common::{
-    construct_canonical_identity, NftPrivateRecord, PrivateContentStatus, PrivateEntry,
-};
+use core_nft_common::{construct_canonical_identity, PrivateContentStatus};
 pub use ic_cdk::call::RejectCode;
 use ic_cdk_macros::{query, update};
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
@@ -126,55 +125,6 @@ pub async fn update_collection_metadata(
     Ok(())
 }
 
-const DEFAULT_PRIVATE_CONTENT_ENTRY_NAME: &str = "default";
-
-fn validate_private_content_entry(
-    private_content: &PrivateEntry,
-    token_owner: &Account,
-) -> Result<NftPrivateRecord, String> {
-    if private_content.status != PrivateContentStatus::Active {
-        return Err("Private content must be Active when minting".to_string());
-    }
-
-    if private_content.pending_upload.is_some() {
-        return Err("Private content must be finalized before minting".to_string());
-    }
-
-    if private_content.plaintext_size > MAX_PRIVATE_CONTENT_SIZE {
-        return Err("Private content exceeds maximum permitted size".to_string());
-    }
-
-    if private_content.storage_path.is_empty() {
-        return Err("Private content storage path cannot be empty".to_string());
-    }
-
-    if private_content.readers.contains_key(&token_owner.owner) {
-        return Err("NFT owner cannot be a private content reader".to_string());
-    }
-
-    let canonical_identity =
-        construct_canonical_identity(token_owner.owner, &private_content.readers);
-    if canonical_identity != private_content.canonical_identity {
-        return Err("Private content canonical identity does not match reader list".to_string());
-    }
-
-    let mut record = NftPrivateRecord::new();
-    record.default_readers = private_content.readers.clone();
-
-    let mut entry = private_content.clone();
-    entry.readers = private_content.readers.clone();
-    entry.canonical_identity = canonical_identity;
-    entry.previous_canonical_identity = None;
-    entry.pending_upload = None;
-    entry.status = PrivateContentStatus::Active;
-
-    record
-        .entries
-        .insert(DEFAULT_PRIVATE_CONTENT_ENTRY_NAME.to_string(), entry);
-
-    Ok(record)
-}
-
 #[update(guard = "caller_has_minting_permission")]
 pub fn mint(req: management::mint::Args) -> management::mint::Response {
     trace("Minting NFT batch");
@@ -221,20 +171,23 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
     }
 
     let mut new_tokens = Vec::new();
-    let mut new_private_content_records = Vec::new();
     let mut transactions = Vec::new();
     let timestamp = ic_cdk::api::time();
+    let mut seen_hashes = std::collections::HashSet::new();
 
     for (i, mint_request) in req.mint_requests.iter().enumerate() {
         let token_id = current_token_id.clone() + Nat::from(i as u64);
 
-        if let Some(private_content) = mint_request.private_content.clone() {
-            // Flag to prevent calling the bulk-mint function multiple times
-            let mut pending_minted = false;
+        if let Some(pc) = &mint_request.private_content {
+            for (entry_name, entry_hash) in &pc.entries {
+                // Prevent double-spending a cache entry in the same batch
+                if !seen_hashes.insert(*entry_hash) {
+                    return Err(management::mint::MintError::StorageCanisterError(format!(
+                        "Duplicate private content hash '{}' in batch",
+                        hex::encode(entry_hash)
+                    )));
+                }
 
-            // Iterate by reference to avoid moving out of `private_content.entries`
-            for (entry_name, entry_hash) in &private_content.entries {
-                // 1. FIXED: Fetch the actual entry from the premint_cache
                 let entry = read_state(|state| {
                     state
                         .data
@@ -245,33 +198,38 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
                 })
                 .ok_or_else(|| {
                     management::mint::MintError::StorageCanisterError(format!(
-                        "Entry '{}' not found in premint cache",
-                        entry_name
+                        "Private entry '{}' with hash '{}' not found in premint cache",
+                        entry_name,
+                        hex::encode(entry_hash)
                     ))
                 })?;
 
-                match entry.status {
-                    PrivateContentStatus::PendingMinting => {
-                        // 2. FIXED: Only execute the bulk minting process once
-                        if !pending_minted {
-                            // We'll process this in the atomic section below
-                            pending_minted = true;
-                        }
-                    }
-                    PrivateContentStatus::Active => {
-                        let private_record =
-                            validate_private_content_entry(&entry, &mint_request.token_owner)
-                                .map_err(|e| {
-                                    management::mint::MintError::StorageCanisterError(e)
-                                })?;
-                        new_private_content_records.push((token_id.clone(), private_record));
-                    }
-                    _ => {
-                        return Err(management::mint::MintError::StorageCanisterError(
-                            "Private content must be PendingMinting or Active when minting"
-                                .to_string(),
-                        ));
-                    }
+                if entry.status != PrivateContentStatus::PendingMinting
+                    && entry.status != PrivateContentStatus::Active
+                {
+                    return Err(management::mint::MintError::StorageCanisterError(format!(
+                        "Private entry '{}' is not in a valid state for minting",
+                        entry_name
+                    )));
+                }
+
+                if entry.plaintext_size > MAX_PRIVATE_CONTENT_SIZE {
+                    return Err(management::mint::MintError::StorageCanisterError(format!(
+                        "Private entry '{}' exceeds maximum size",
+                        entry_name
+                    )));
+                }
+
+                // Verify identity consistency: content must be encrypted for the actual owner
+                let expected_identity = construct_canonical_identity(
+                    mint_request.token_owner.owner,
+                    &entry.readers,
+                    &pc.default_readers,
+                );
+                if entry.canonical_identity != expected_identity {
+                    return Err(management::mint::MintError::StorageCanisterError(format!(
+                        "Private content identity mismatch for entry '{}'. It may have been initialized for a different owner.", entry_name
+                    )));
                 }
             }
         }
@@ -319,23 +277,25 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
                 .push(token_id);
         }
 
-        for (token_id, private_record) in new_private_content_records.into_iter() {
-            state
-                .data
-                .private_content_system
-                .nft_private
-                .insert(token_id, private_record);
-        }
-
         // Handle PendingMinting cache migrations
         for (i, mint_request) in req.mint_requests.iter().enumerate() {
             if let Some(pc) = &mint_request.private_content {
                 let tid = current_token_id.clone() + Nat::from(i as u64);
-                let _ = state.data.private_content_system.mint_private_content(
-                    pc.default_readers.clone(),
-                    pc.entries.clone(),
-                    tid,
-                );
+                state
+                    .data
+                    .private_content_system
+                    .mint_private_content(
+                        pc.default_readers.clone(),
+                        pc.entries.clone(),
+                        tid.clone(),
+                        mint_request.token_owner.owner,
+                    )
+                    .unwrap_or_else(|e| {
+                        ic_cdk::trap(&format!(
+                            "Failed to register private content for token {}: {:?}",
+                            tid, e
+                        ));
+                    });
             }
         }
 

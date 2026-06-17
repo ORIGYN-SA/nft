@@ -69,6 +69,7 @@ fn test_private_content_upload_and_mint_rand_bytes() {
         plaintext_hash: hash,
         file_hash: hash,
         salt: salt.clone(),
+        readers: HashMap::new(),
         default_readers: HashMap::new(),
         storage_canister_id: collection_canister_id,
         storage_path: storage_path.clone(),
@@ -131,7 +132,11 @@ fn test_private_content_upload_and_mint_rand_bytes() {
         plaintext_size,
         file_size,
         encryption_mode: EncryptionMode::AES256,
-        canonical_identity: construct_canonical_identity(Principal::anonymous(), &HashMap::new()),
+        canonical_identity: construct_canonical_identity(
+            Principal::anonymous(),
+            &HashMap::new(),
+            &HashMap::new(),
+        ),
         previous_canonical_identity: None,
         storage_canister_id: collection_canister_id,
         storage_path: storage_path.clone(),
@@ -210,7 +215,8 @@ fn test_private_content_encryption_and_decryption_with_vetkeys() {
             alias: None,
         },
     );
-    let canonical_identity = construct_canonical_identity(Principal::anonymous(), &readers);
+    let canonical_identity =
+        construct_canonical_identity(Principal::anonymous(), &readers, &default_readers);
 
     // 1. Calculate metadata for the plaintext BEFORE encryption
     let plaintext_hash_bytes = Sha256::digest(&plaintext);
@@ -288,6 +294,7 @@ fn test_private_content_encryption_and_decryption_with_vetkeys() {
         plaintext_hash: plaintext_hash,
         file_hash: file_hash,
         salt: salt.clone(),
+        readers: HashMap::new(),
         default_readers: default_readers.clone(),
         storage_canister_id: collection_canister_id,
         storage_path: storage_path.clone(),
@@ -460,7 +467,7 @@ fn test_private_content_encryption_unauthorized_access() {
     let entry_name = "/test.txt".to_string();
     let storage_path = "/private/test.txt".to_string();
     let readers = HashMap::new();
-    let canonical_identity = construct_canonical_identity(nft_owner1, &readers);
+    let canonical_identity = construct_canonical_identity(nft_owner1, &readers, &default_readers);
 
     // 1. Calculate metadata for the plaintext BEFORE encryption
     let plaintext_hash_bytes = Sha256::digest(&plaintext);
@@ -539,6 +546,7 @@ fn test_private_content_encryption_unauthorized_access() {
         plaintext_hash: plaintext_hash,
         file_hash: file_hash,
         salt: salt.clone(),
+        readers: HashMap::new(),
         default_readers: default_readers.clone(),
         storage_canister_id: collection_canister_id,
         storage_path: storage_path.clone(),
@@ -586,23 +594,7 @@ fn test_private_content_encryption_unauthorized_access() {
         "finalize_private_content_upload failed"
     );
 
-    let private_entry = PrivateEntry {
-        status: PrivateContentStatus::PendingMinting,
-        readers: HashMap::new(),
-        hash: plaintext_hash,
-        salt: salt.clone(),
-        plaintext_size,
-        file_size,
-        encryption_mode: EncryptionMode::AES256,
-        canonical_identity: canonical_identity.to_vec().clone(),
-        previous_canonical_identity: None,
-        storage_canister_id: collection_canister_id,
-        storage_path: storage_path.clone(),
-        pending_upload: None,
-        format_version: 1,
-    };
-
-    let entries = HashMap::from([("test_file".to_string(), private_entry.hash)]);
+    let entries = HashMap::from([("test_file".to_string(), init_args.plaintext_hash)]);
 
     let mint_response = mint(
         pic,
@@ -656,6 +648,446 @@ fn test_private_content_encryption_unauthorized_access() {
         derive_response,
         "Caller is not part of the canonical identity"
     );
+}
+
+#[test]
+fn test_private_content_readers_access() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        ..
+    } = test_env;
+
+    let _grant_result = grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: nft_owner1,
+            permission: Permission::Minting,
+        }),
+    );
+    let _grant_result = grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: nft_owner1,
+            permission: Permission::UpdateUploads,
+        }),
+    );
+
+    let default_readers = HashMap::new();
+    let plaintext = b"Confidential NFT Asset Data 2026".to_vec();
+    let plaintext_size = plaintext.len() as u64;
+    let entry_name = "/test.txt".to_string();
+    let storage_path = "/private/test.txt".to_string();
+
+    let reader_a = Principal::from_text("r7inp-6aaaa-aaaaa-aaabq-cai").unwrap();
+    let readers: HashMap<_, _> = vec![(
+        reader_a,
+        ReaderInfo {
+            rights: AccessRights::Read,
+            alias: None,
+        },
+    )]
+    .into_iter()
+    .collect();
+    let canonical_identity = construct_canonical_identity(nft_owner1, &readers, &default_readers); // NOTE: canonical identity is formed on the frontend side. If it's formed incorrectly - some readers might not have access to files
+
+    // 1. Calculate metadata for the plaintext BEFORE encryption
+    let plaintext_hash_bytes = Sha256::digest(&plaintext);
+    let mut plaintext_hash = [0u8; 32];
+    plaintext_hash.copy_from_slice(&plaintext_hash_bytes);
+
+    // NOTE: Salt tied to the specific file upload entry, but better to make random
+    let salt = Sha256::digest(entry_name.as_bytes()).to_vec();
+
+    // -------------------------------------------------------------------------
+    // STEP 0: Generate transport key
+    // -------------------------------------------------------------------------
+    let transport_seed = [102u8; 32]; // Differentiated from crypto_seed for realism
+    let tsk = TransportSecretKey::from_seed(transport_seed.to_vec())
+        .expect("Failed to initialize TransportSecretKey from seed");
+
+    let tpk = tsk.public_key();
+
+    // -------------------------------------------------------------------------
+    // STEP 1: Fetch the Master VetKey Public Key from the Canister
+    // -------------------------------------------------------------------------
+    let pub_key_response = derive_vetkey_public_key(pic, controller, collection_canister_id, &())
+        .expect("Canister returned an error deriving public key");
+
+    // Reconstruct the DerivedPublicKey object from the canister response bytes
+    let dpk = DerivedPublicKey::deserialize(&pub_key_response.public_key)
+        .expect("Failed to deserialize public key using ic-vetkeys");
+
+    // -------------------------------------------------------------------------
+    // STEP 2: Derive VetKey
+    // -------------------------------------------------------------------------
+    // The client requests the decryption key by providing the exact derived identity definition
+    let derive_args = derive_vetkey::Args {
+        input: ByteBuf::from(canonical_identity.clone()), // Requesting key specifically for this salted context
+        transport_public_key: ByteBuf::from(tpk),
+    };
+
+    let derive_response = derive_vetkey(pic, nft_owner1, collection_canister_id, &derive_args)
+        .expect("Canister or Management system rejected VetKey derivation");
+
+    // -------------------------------------------------------------------------
+    // STEP 3: Derive symmetrical key
+    // -------------------------------------------------------------------------
+    let encrypted_vetkey = EncryptedVetKey::deserialize(&derive_response.encrypted_key)
+        .expect("Failed to parse returned payload into EncryptedVetKey");
+
+    // Decrypt and verify using the exact salted identity parameters
+    let vetkey = encrypted_vetkey
+        .decrypt_and_verify(&tsk, &dpk, &canonical_identity)
+        .expect("Identity-Based verification and decryption of VetKey failed");
+
+    let sk = vetkey.derive_symmetric_key("", 32);
+    // -------------------------------------------------------------------------
+    // STEP 4: Encrypt file
+    // -------------------------------------------------------------------------
+    let cipher = Aes256Gcm::new_from_slice(&sk)
+        .expect("Failed to initialize AES-256-GCM cipher with derived key");
+
+    let deterministic_nonce_bytes = Sha256::digest(entry_name.as_bytes());
+    let nonce = aes_gcm::Nonce::from_slice(&deterministic_nonce_bytes[0..12]); // First 12 bytes
+
+    let ciphertext = cipher.encrypt(nonce, plaintext.as_ref()).unwrap();
+    let file_size = ciphertext.len() as u64;
+    println!("ciphertext length: {:?}", ciphertext.len());
+    // -------------------------------------------------------------------------
+    // STEP 4: Upload encrypted file
+    // -------------------------------------------------------------------------
+    // Keeping hash, plaintext_size, and file_size tracked to plaintext as requested.
+    let hash_bytes = Sha256::digest(&ciphertext);
+    let mut file_hash = [0u8; 32];
+    file_hash.copy_from_slice(&hash_bytes);
+
+    let init_args = core_nft_api::init_private_content_upload::Args {
+        token_id_opt: None,
+        entry_name: None,
+        plaintext_hash: plaintext_hash,
+        file_hash: file_hash,
+        salt: salt.clone(),
+        readers,
+        default_readers: default_readers.clone(),
+        storage_canister_id: collection_canister_id,
+        storage_path: storage_path.clone(),
+        plaintext_size,
+        expected_chunks: 1,
+        chunk_size: Some(file_size), // Chunk size handles payload container dimensions
+        file_size,
+        encryption_mode: EncryptionMode::AES256,
+    };
+
+    let init_response =
+        init_private_content_upload(pic, controller, collection_canister_id, &init_args);
+    assert!(init_response.is_ok(), "init_private_content_upload failed");
+
+    let store_response = store_private_content_chunk(
+        pic,
+        controller,
+        collection_canister_id,
+        &core_nft_api::store_private_content_chunk::Args {
+            token_id_opt: None,
+            entry_name: None,
+            plaintext_hash: plaintext_hash, // NOTE: encrypted chunk hash
+            chunk_index: Nat::from(0u64),
+            chunk_data: ByteBuf::from(ciphertext.clone()), // Uploads the actual ciphertext
+            storage_path: storage_path.clone(),
+        },
+    );
+    println!("store_response: {:?}", store_response);
+    assert!(store_response.is_ok(), "store_private_content_chunk failed");
+
+    let finalize_response = finalize_private_content_upload(
+        pic,
+        controller,
+        collection_canister_id,
+        &core_nft_api::finalize_private_content_upload::Args {
+            token_id_opt: None,
+            entry_name: None,
+            hash: plaintext_hash,
+            storage_path: storage_path.clone(),
+        },
+    );
+    println!("finalize_response: {:?}", finalize_response);
+    assert!(
+        finalize_response.is_ok(),
+        "finalize_private_content_upload failed"
+    );
+
+    let entries = HashMap::from([("test_file".to_string(), init_args.plaintext_hash)]);
+
+    let mint_response = mint(
+        pic,
+        controller,
+        collection_canister_id,
+        &mint::Args {
+            mint_requests: vec![MintRequest {
+                token_owner: Account {
+                    owner: nft_owner1,
+                    subaccount: None,
+                },
+                memo: None,
+                metadata: vec![],
+                private_content: Some(NftPrivateRecordMint {
+                    default_readers: HashMap::new(),
+                    entries: entries.clone(),
+                }),
+            }],
+        },
+    );
+    assert!(mint_response.is_ok(), "Mint with private content failed");
+
+    // -------------------------------------------------------------------------
+    // STEP 4: Generate transport key
+    // -------------------------------------------------------------------------
+    let transport_seed = [101u8; 32]; // Differentiated from the first one
+    let tsk = TransportSecretKey::from_seed(transport_seed.to_vec())
+        .expect("Failed to initialize TransportSecretKey from seed");
+
+    let tpk = tsk.public_key();
+
+    // -------------------------------------------------------------------------
+    // STEP 5: Request Decryption VetKey as the Anon Principal
+    // -------------------------------------------------------------------------
+    let derive_args = derive_vetkey::Args {
+        input: ByteBuf::from(canonical_identity), // Requesting key specifically for this salted context
+        transport_public_key: ByteBuf::from(tpk),
+    };
+
+    // Test with anonymous user
+    let derive_response = derive_vetkey(pic, reader_a, collection_canister_id, &derive_args);
+    println!("derive_response: {:?}", derive_response);
+    // Final verification assertion
+    assert!(derive_response.is_ok());
+}
+
+#[test]
+fn test_private_content_default_readers_access() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        ..
+    } = test_env;
+
+    let _grant_result = grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: nft_owner1,
+            permission: Permission::Minting,
+        }),
+    );
+    let _grant_result = grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: nft_owner1,
+            permission: Permission::UpdateUploads,
+        }),
+    );
+
+    let readers = HashMap::new();
+    let plaintext = b"Confidential NFT Asset Data 2026".to_vec();
+    let plaintext_size = plaintext.len() as u64;
+    let entry_name = "/test.txt".to_string();
+    let storage_path = "/private/test.txt".to_string();
+
+    let reader_a = Principal::from_text("r7inp-6aaaa-aaaaa-aaabq-cai").unwrap();
+    let default_readers: HashMap<_, _> = vec![(
+        reader_a,
+        ReaderInfo {
+            rights: AccessRights::Read,
+            alias: None,
+        },
+    )]
+    .into_iter()
+    .collect();
+    let canonical_identity = construct_canonical_identity(nft_owner1, &readers, &default_readers); // NOTE: canonical identity is formed on the frontend side. If it's formed incorrectly
+
+    // 1. Calculate metadata for the plaintext BEFORE encryption
+    let plaintext_hash_bytes = Sha256::digest(&plaintext);
+    let mut plaintext_hash = [0u8; 32];
+    plaintext_hash.copy_from_slice(&plaintext_hash_bytes);
+
+    // NOTE: Salt tied to the specific file upload entry, but better to make random
+    let salt = Sha256::digest(entry_name.as_bytes()).to_vec();
+
+    // -------------------------------------------------------------------------
+    // STEP 0: Generate transport key
+    // -------------------------------------------------------------------------
+    let transport_seed = [102u8; 32]; // Differentiated from crypto_seed for realism
+    let tsk = TransportSecretKey::from_seed(transport_seed.to_vec())
+        .expect("Failed to initialize TransportSecretKey from seed");
+
+    let tpk = tsk.public_key();
+
+    // -------------------------------------------------------------------------
+    // STEP 1: Fetch the Master VetKey Public Key from the Canister
+    // -------------------------------------------------------------------------
+    let pub_key_response = derive_vetkey_public_key(pic, controller, collection_canister_id, &())
+        .expect("Canister returned an error deriving public key");
+
+    // Reconstruct the DerivedPublicKey object from the canister response bytes
+    let dpk = DerivedPublicKey::deserialize(&pub_key_response.public_key)
+        .expect("Failed to deserialize public key using ic-vetkeys");
+
+    // -------------------------------------------------------------------------
+    // STEP 2: Derive VetKey
+    // -------------------------------------------------------------------------
+    // The client requests the decryption key by providing the exact derived identity definition
+    let derive_args = derive_vetkey::Args {
+        input: ByteBuf::from(canonical_identity.clone()), // Requesting key specifically for this salted context
+        transport_public_key: ByteBuf::from(tpk),
+    };
+
+    let derive_response = derive_vetkey(pic, nft_owner1, collection_canister_id, &derive_args)
+        .expect("Canister or Management system rejected VetKey derivation");
+
+    // -------------------------------------------------------------------------
+    // STEP 3: Derive symmetrical key
+    // -------------------------------------------------------------------------
+    let encrypted_vetkey = EncryptedVetKey::deserialize(&derive_response.encrypted_key)
+        .expect("Failed to parse returned payload into EncryptedVetKey");
+
+    // Decrypt and verify using the exact salted identity parameters
+    let vetkey = encrypted_vetkey
+        .decrypt_and_verify(&tsk, &dpk, &canonical_identity)
+        .expect("Identity-Based verification and decryption of VetKey failed");
+
+    let sk = vetkey.derive_symmetric_key("", 32);
+    // -------------------------------------------------------------------------
+    // STEP 4: Encrypt file
+    // -------------------------------------------------------------------------
+    let cipher = Aes256Gcm::new_from_slice(&sk)
+        .expect("Failed to initialize AES-256-GCM cipher with derived key");
+
+    let deterministic_nonce_bytes = Sha256::digest(entry_name.as_bytes());
+    let nonce = aes_gcm::Nonce::from_slice(&deterministic_nonce_bytes[0..12]); // First 12 bytes
+
+    let ciphertext = cipher.encrypt(nonce, plaintext.as_ref()).unwrap();
+    let file_size = ciphertext.len() as u64;
+    println!("ciphertext length: {:?}", ciphertext.len());
+    // -------------------------------------------------------------------------
+    // STEP 4: Upload encrypted file
+    // -------------------------------------------------------------------------
+    // Keeping hash, plaintext_size, and file_size tracked to plaintext as requested.
+    let hash_bytes = Sha256::digest(&ciphertext);
+    let mut file_hash = [0u8; 32];
+    file_hash.copy_from_slice(&hash_bytes);
+
+    let init_args = core_nft_api::init_private_content_upload::Args {
+        token_id_opt: None,
+        entry_name: None,
+        plaintext_hash: plaintext_hash,
+        file_hash: file_hash,
+        salt: salt.clone(),
+        readers,
+        default_readers: default_readers.clone(),
+        storage_canister_id: collection_canister_id,
+        storage_path: storage_path.clone(),
+        plaintext_size,
+        expected_chunks: 1,
+        chunk_size: Some(file_size), // Chunk size handles payload container dimensions
+        file_size,
+        encryption_mode: EncryptionMode::AES256,
+    };
+
+    let init_response =
+        init_private_content_upload(pic, controller, collection_canister_id, &init_args);
+    assert!(init_response.is_ok(), "init_private_content_upload failed");
+
+    let store_response = store_private_content_chunk(
+        pic,
+        controller,
+        collection_canister_id,
+        &core_nft_api::store_private_content_chunk::Args {
+            token_id_opt: None,
+            entry_name: None,
+            plaintext_hash: plaintext_hash, // NOTE: encrypted chunk hash
+            chunk_index: Nat::from(0u64),
+            chunk_data: ByteBuf::from(ciphertext.clone()), // Uploads the actual ciphertext
+            storage_path: storage_path.clone(),
+        },
+    );
+    println!("store_response: {:?}", store_response);
+    assert!(store_response.is_ok(), "store_private_content_chunk failed");
+
+    let finalize_response = finalize_private_content_upload(
+        pic,
+        controller,
+        collection_canister_id,
+        &core_nft_api::finalize_private_content_upload::Args {
+            token_id_opt: None,
+            entry_name: None,
+            hash: plaintext_hash,
+            storage_path: storage_path.clone(),
+        },
+    );
+    println!("finalize_response: {:?}", finalize_response);
+    assert!(
+        finalize_response.is_ok(),
+        "finalize_private_content_upload failed"
+    );
+
+    let entries = HashMap::from([("test_file".to_string(), init_args.plaintext_hash)]);
+
+    let mint_response = mint(
+        pic,
+        controller,
+        collection_canister_id,
+        &mint::Args {
+            mint_requests: vec![MintRequest {
+                token_owner: Account {
+                    owner: nft_owner1,
+                    subaccount: None,
+                },
+                memo: None,
+                metadata: vec![],
+                private_content: Some(NftPrivateRecordMint {
+                    default_readers: HashMap::new(),
+                    entries: entries.clone(),
+                }),
+            }],
+        },
+    );
+    assert!(mint_response.is_ok(), "Mint with private content failed");
+
+    // -------------------------------------------------------------------------
+    // STEP 4: Generate transport key
+    // -------------------------------------------------------------------------
+    let transport_seed = [101u8; 32]; // Differentiated from the first one
+    let tsk = TransportSecretKey::from_seed(transport_seed.to_vec())
+        .expect("Failed to initialize TransportSecretKey from seed");
+
+    let tpk = tsk.public_key();
+
+    // -------------------------------------------------------------------------
+    // STEP 5: Request Decryption VetKey as the Anon Principal
+    // -------------------------------------------------------------------------
+    let derive_args = derive_vetkey::Args {
+        input: ByteBuf::from(canonical_identity), // Requesting key specifically for this salted context
+        transport_public_key: ByteBuf::from(tpk),
+    };
+
+    // Test with anonymous user
+    let derive_response = derive_vetkey(pic, reader_a, collection_canister_id, &derive_args);
+    println!("derive_response: {:?}", derive_response);
+    // Final verification assertion
+    assert!(derive_response.is_ok());
 }
 
 #[test]
@@ -720,7 +1152,8 @@ fn test_private_content_reencryption_workflow() {
     let dpk = DerivedPublicKey::deserialize(&pub_key_response.public_key)
         .expect("Failed to deserialize public key using ic-vetkeys");
 
-    let initial_canonical_identity = construct_canonical_identity(nft_owner1, &initial_readers);
+    let initial_canonical_identity =
+        construct_canonical_identity(nft_owner1, &initial_readers, &HashMap::new());
 
     let derive_args = derive_vetkey::Args {
         input: ByteBuf::from(initial_canonical_identity.clone()),
@@ -761,6 +1194,7 @@ fn test_private_content_reencryption_workflow() {
             plaintext_hash,
             file_hash,
             salt: salt.clone(),
+            readers: HashMap::new(),
             default_readers: HashMap::new(),
             storage_canister_id: collection_canister_id,
             storage_path: storage_path.clone(),
@@ -888,7 +1322,8 @@ fn test_private_content_reencryption_workflow() {
     );
 
     // 5. Re-encryption Upload (Overwrite)
-    let new_canonical_identity = construct_canonical_identity(nft_owner1, &new_readers);
+    let new_canonical_identity =
+        construct_canonical_identity(nft_owner1, &new_readers, &HashMap::new());
 
     let transport_seed_new = [101u8; 32];
     let tsk_new = TransportSecretKey::from_seed(transport_seed_new.to_vec()).unwrap();
@@ -925,6 +1360,7 @@ fn test_private_content_reencryption_workflow() {
             entry_name: Some(entry_name.clone()),
             plaintext_hash,
             file_hash: file_hash_new,
+            readers: HashMap::new(),
             salt: salt.clone(),
             default_readers: HashMap::new(),
             storage_canister_id: collection_canister_id,
@@ -1039,7 +1475,6 @@ fn test_private_content_transfer_workflow() {
         nft_owner2,
         ..
     } = test_env;
-    let reader_a = Principal::from_text("r7inp-6aaaa-aaaaa-aaabq-cai").unwrap();
 
     // Grant permissions to nft_owner1
     grant_permission(
@@ -1069,6 +1504,17 @@ fn test_private_content_transfer_workflow() {
     let mut plaintext_hash = [0u8; 32];
     plaintext_hash.copy_from_slice(&plaintext_hash_bytes);
 
+    let reader_a = Principal::from_text("r7inp-6aaaa-aaaaa-aaabq-cai").unwrap();
+    let readers: HashMap<_, _> = vec![(
+        reader_a,
+        ReaderInfo {
+            rights: AccessRights::Read,
+            alias: None,
+        },
+    )]
+    .into_iter()
+    .collect();
+
     // 1. Initial Setup: Owner encrypts for themselves
     let mut initial_readers = HashMap::new();
     initial_readers.insert(
@@ -1089,7 +1535,8 @@ fn test_private_content_transfer_workflow() {
     let dpk = DerivedPublicKey::deserialize(&pub_key_response.public_key)
         .expect("Failed to deserialize public key using ic-vetkeys");
 
-    let initial_canonical_identity = construct_canonical_identity(nft_owner1, &initial_readers);
+    let initial_canonical_identity =
+        construct_canonical_identity(nft_owner1, &initial_readers, &HashMap::new());
 
     let derive_args = derive_vetkey::Args {
         input: ByteBuf::from(initial_canonical_identity.clone()),
@@ -1130,6 +1577,7 @@ fn test_private_content_transfer_workflow() {
             plaintext_hash,
             file_hash,
             salt: salt.clone(),
+            readers,
             default_readers: HashMap::new(),
             storage_canister_id: collection_canister_id,
             storage_path: storage_path.clone(),
@@ -1291,7 +1739,8 @@ fn test_private_content_transfer_workflow() {
     // );
 
     // 5. Re-encryption Upload (Overwrite)
-    let new_canonical_identity = construct_canonical_identity(nft_owner2, &HashMap::new()); // share to nobody
+    let new_canonical_identity =
+        construct_canonical_identity(nft_owner2, &HashMap::new(), &HashMap::new()); // share to nobody
 
     let transport_seed_owner_2 = [201u8; 32];
     let tsk_owner_2 = TransportSecretKey::from_seed(transport_seed_owner_2.to_vec()).unwrap();
@@ -1329,6 +1778,7 @@ fn test_private_content_transfer_workflow() {
             plaintext_hash,
             file_hash: file_hash_new,
             salt: salt.clone(),
+            readers: HashMap::new(),
             default_readers: HashMap::new(),
             storage_canister_id: collection_canister_id,
             storage_path: storage_path_reupload.clone(),
@@ -1422,9 +1872,18 @@ fn test_private_content_transfer_workflow() {
     // test whether owner 1 has access
     let derive_args_new = derive_vetkey::Args {
         input: ByteBuf::from(new_canonical_identity.clone()),
-        transport_public_key: ByteBuf::from(tpk),
+        transport_public_key: ByteBuf::from(tpk.clone()),
     };
     let derive_response_new =
         derive_vetkey(pic, nft_owner1, collection_canister_id, &derive_args_new);
-    assert!(derive_response_new.is_err())
+    assert!(derive_response_new.is_err());
+
+    let derive_args = derive_vetkey::Args {
+        input: ByteBuf::from(new_canonical_identity.clone()), // Requesting key specifically for this salted context
+        transport_public_key: ByteBuf::from(tpk),
+    };
+
+    // Test with anonymous user
+    let derive_response_new_1 = derive_vetkey(pic, reader_a, collection_canister_id, &derive_args);
+    assert!(derive_response_new_1.is_err());
 }

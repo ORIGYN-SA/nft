@@ -49,3 +49,4 @@ bity-ic-icrc3 = { workspace = true }
 bity-ic-icrc3-macros = { workspace = true }
 bity-ic-storage-canister-c2c = { workspace = true }
 bity-ic-storage-canister-api = { workspace = true }
+hex = { workspace = true }

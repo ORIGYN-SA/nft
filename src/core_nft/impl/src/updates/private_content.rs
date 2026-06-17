@@ -16,7 +16,6 @@ pub use core_nft_common::types::management::{
     init_upload, migration_icrc3_add_transaction, revoke_permission, store_chunk,
 };
 pub use core_nft_common::PrivateContentError;
-use ic_cdk::query;
 use ic_cdk::update;
 use serde_bytes::ByteBuf;
 
@@ -38,7 +37,6 @@ pub async fn init_private_content_upload(
                     &args.plaintext_hash,
                     args.plaintext_size,
                     args.file_size,
-                    args.encryption_mode, // user can select with which algorithm to reencrypt
                 )
             })?;
 
@@ -53,7 +51,6 @@ pub async fn init_private_content_upload(
                     token_id,
                     &entry_name,
                     args.expected_chunks,
-                    args.encryption_mode,
                 )
             })
         }
@@ -78,13 +75,14 @@ pub async fn init_private_content_upload(
                     args.plaintext_hash,
                     args.salt,
                     caller,
-                    args.default_readers,
+                    args.readers,
                     args.storage_canister_id,
                     args.storage_path,
                     args.encryption_mode,
                     args.plaintext_size,
                     args.expected_chunks,
                     args.file_size,
+                    &args.default_readers,
                 )
             })
         }

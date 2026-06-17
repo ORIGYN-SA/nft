@@ -72,12 +72,14 @@ pub struct EntryDetailResp {
     pub storage_path: String,
 }
 
-// Helper functions
 pub fn construct_canonical_identity(
     owner: Principal,
     readers: &HashMap<Principal, ReaderInfo>,
+    default_readers: &HashMap<Principal, ReaderInfo>,
 ) -> Vec<u8> {
-    let mut principals: Vec<Principal> = readers.keys().cloned().collect();
+    let resolved_readers = resolve_readers(readers, default_readers);
+
+    let mut principals: Vec<Principal> = resolved_readers.keys().cloned().collect();
     if !principals.contains(&owner) {
         principals.push(owner);
     }
@@ -95,11 +97,9 @@ pub fn resolve_readers(
     entry_readers: &HashMap<Principal, ReaderInfo>,
     default_readers: &HashMap<Principal, ReaderInfo>,
 ) -> HashMap<Principal, ReaderInfo> {
-    if entry_readers.is_empty() {
-        default_readers.clone()
-    } else {
-        entry_readers.clone()
-    }
+    let mut readers = default_readers.clone();
+    readers.extend(entry_readers.clone()); // entry_readers has priority and overwrites all the readers accesses
+    readers
 }
 
 pub fn readers_equal(
@@ -182,13 +182,14 @@ impl PrivateContentSystem {
         plaintext_size: u64,
         expected_chunks: usize,
         file_size: u64,
+        default_readers: &HashMap<Principal, ReaderInfo>,
     ) -> Result<(), PrivateContentError> {
         if self.premint_cache.contains_key(&hash) {
             return Err(PrivateContentError::AlreadyExists);
         }
 
-        let effective_readers = resolve_readers(&readers, &HashMap::new());
-        let canonical_identity = construct_canonical_identity(owner_to_be, &effective_readers);
+        let canonical_identity =
+            construct_canonical_identity(owner_to_be, &readers, default_readers);
 
         let entry = PrivateEntry {
             status: PrivateContentStatus::PendingUpload,
@@ -291,13 +292,16 @@ impl PrivateContentSystem {
 
     pub fn mint_private_content(
         &mut self,
-        default_readers: HashMap<Principal, ReaderInfo>,
+        mut default_readers: HashMap<Principal, ReaderInfo>,
         entries_to_mint_hashs: HashMap<String, Sha256Hash>,
         token_id: Nat,
+        owner: Principal,
     ) -> Result<(), PrivateContentError> {
         if self.nft_private.contains_key(&token_id) {
             return Err(PrivateContentError::AlreadyExists);
         }
+
+        default_readers.remove(&owner);
 
         let mut private_record = NftPrivateRecord {
             default_readers,
@@ -314,6 +318,7 @@ impl PrivateContentSystem {
             {
                 return Err(PrivateContentError::InvalidStateTransition);
             } else {
+                entry.readers.remove(&owner);
                 entry.status = PrivateContentStatus::Active;
                 private_record.entries.insert(entry_name, entry);
             }
@@ -352,7 +357,6 @@ impl PrivateContentSystem {
         plaintext_hash: &Sha256Hash,
         plaintext_size: u64,
         file_size: u64,
-        encryption_mode: EncryptionMode,
     ) -> Result<(), PrivateContentError> {
         let record = self
             .nft_private
@@ -380,14 +384,10 @@ impl PrivateContentSystem {
             ));
         }
 
-        match entry.encryption_mode {
-            EncryptionMode::AES256 => {
-                if entry.file_size != file_size {
-                    return Err(PrivateContentError::StorageError(
-                        "Encrypted file size mismatch".to_string(),
-                    ));
-                }
-            }
+        if entry.file_size != file_size {
+            return Err(PrivateContentError::StorageError(
+                "File size mismatch".to_string(),
+            ));
         }
 
         Ok(())
@@ -398,7 +398,7 @@ impl PrivateContentSystem {
         token_id: &Nat,
         entry_name: &str,
         expected_chunks: usize,
-        encryption_mode: EncryptionMode,
+        // encryption_mode: EncryptionMode, // NOTE: cannot be changed for now, since this affects the file size. If the filesize is smaller than the initially uploaded ciphertext- then it should be acceptible
     ) -> Result<(), PrivateContentError> {
         let record = self
             .nft_private
@@ -416,7 +416,7 @@ impl PrivateContentSystem {
             chunk_size: CHUNK_SIZE,
             timestamp_ns: ic_cdk::api::time(),
         });
-        entry.encryption_mode = encryption_mode;
+        // entry.encryption_mode = encryption_mode;
 
         Ok(())
     }
@@ -596,6 +596,7 @@ impl PrivateEntry {
         default_readers: &HashMap<Principal, ReaderInfo>,
     ) -> Result<(), String> {
         let new_readers: HashMap<_, _> = readers
+            .clone()
             .into_iter()
             .filter(|(principal, _)| *principal != nft_owner)
             .collect();
@@ -607,8 +608,7 @@ impl PrivateEntry {
             ));
         }
 
-        let effective_new_readers = resolve_readers(&new_readers, default_readers);
-        let new_identity = construct_canonical_identity(nft_owner, &effective_new_readers);
+        let new_identity = construct_canonical_identity(nft_owner, &readers, default_readers);
 
         if self.readers != new_readers || self.canonical_identity != new_identity {
             if self.status != PrivateContentStatus::PendingReencryption {
