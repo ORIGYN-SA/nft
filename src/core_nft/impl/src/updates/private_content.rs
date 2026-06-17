@@ -283,7 +283,7 @@ pub async fn derive_vetkey_by_entry(
             .private_content_system
             .get_nft_private_entry(args.token_id.clone(), &args.entry_name)?;
 
-        // FIXED: Make sure the NFT owner can actually derive the key!
+        // Check if the caller is the NFT owner
         let is_owner = token.token_owner.owner == caller;
 
         let record = state
@@ -296,10 +296,19 @@ pub async fn derive_vetkey_by_entry(
         let effective_readers = resolve_readers(&private_entry.readers, &record.default_readers);
         let has_read_access = effective_readers.contains_key(&caller);
 
+        // 1. Enforce access permissions
         if !is_owner && !has_read_access {
             return Err("The user does not have permission to derive a key".to_string());
         }
 
+        // 2. Enforce state validation (PendingReencryption blocking non-owners)
+        if private_entry.status == core_nft_common::PrivateContentStatus::PendingReencryption
+            && !is_owner
+        {
+            return Err("Content is currently being re-encrypted by the owner".to_string());
+        }
+
+        // 3. Success path: Both owners and authorized readers reach here when valid
         Ok((
             private_entry.canonical_identity.clone(),
             args.transport_public_key.clone().into_vec(),
