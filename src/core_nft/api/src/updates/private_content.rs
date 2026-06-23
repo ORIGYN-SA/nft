@@ -141,6 +141,20 @@ impl From<store_chunk::StoreChunkError>
                     "UploadAlreadyFinalized".to_string(),
                 )
             }
+            store_chunk::StoreChunkError::InvalidStateTransition => {
+                store_private_content_chunk::StorePrivateContentChunkError::StorageCanisterError(
+                    "InvalidStateTransition".to_string(),
+                )
+            }
+            store_chunk::StoreChunkError::InvalidChunkId => {
+                store_private_content_chunk::StorePrivateContentChunkError::InvalidChunk
+            }
+            store_chunk::StoreChunkError::InvalidFilePath => {
+                store_private_content_chunk::StorePrivateContentChunkError::NotFound
+            }
+            store_chunk::StoreChunkError::InvalidChunkData => {
+                store_private_content_chunk::StorePrivateContentChunkError::InvalidChunk
+            }
             store_chunk::StoreChunkError::StorageCanisterError(msg) => {
                 store_private_content_chunk::StorePrivateContentChunkError::StorageCanisterError(
                     msg,
@@ -225,6 +239,7 @@ pub mod cancel_private_content_upload {
 
     #[derive(Serialize, Deserialize, CandidType, Debug)]
     pub enum CancelPrivateContentUploadError {
+        InvalidFilePath,
         ConcurrentManagementCall,
         UploadNotInitialized,
         UploadAlreadyFinalized,
@@ -238,6 +253,9 @@ impl From<cancel_upload::CancelUploadError>
 {
     fn from(error: cancel_upload::CancelUploadError) -> Self {
         match error {
+            cancel_upload::CancelUploadError::InvalidFilePath => {
+                cancel_private_content_upload::CancelPrivateContentUploadError::InvalidFilePath
+            }
             cancel_upload::CancelUploadError::ConcurrentManagementCall => {
                 cancel_private_content_upload::CancelPrivateContentUploadError::ConcurrentManagementCall
             }

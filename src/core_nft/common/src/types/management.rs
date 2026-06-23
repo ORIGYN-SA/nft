@@ -19,12 +19,18 @@ pub mod mint {
         pub memo: Option<serde_bytes::ByteBuf>,
         pub metadata: Vec<(String, ICRC3Value)>,
         pub private_content: Option<NftPrivateRecordMint>,
+        pub public_content: Option<NftPublicRecordMint>,
     }
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct NftPrivateRecordMint {
         pub default_readers: HashMap<Principal, ReaderInfo>,
-        pub entries: HashMap<String, Sha256Hash>, // TODO: add Merkle tree with all the entries
+        pub entries: HashMap<String, Sha256Hash>,
+    }
+
+    #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+    pub struct NftPublicRecordMint {
+        pub entries: HashMap<String, String>,
     }
 
     #[derive(CandidType, Serialize, Deserialize, Clone)]
@@ -125,6 +131,28 @@ pub mod update_collection_metadata {
     pub type Response = Result<(), UpdateCollectionMetadataError>;
 }
 
+// pub mod init_upload {
+//     use crate::PublicContentError;
+//     use bity_ic_storage_canister_api::updates::init_upload;
+//     pub use bity_ic_storage_canister_api::updates::init_upload::InitUploadResp;
+
+//     pub type Args = init_upload::Args;
+//     pub type InitUploadError = PublicContentError;
+//     pub type Response = Result<init_upload::InitUploadResp, InitUploadError>;
+
+//     pub fn from_storage_response(resp: init_upload::Response) -> Response {
+//         match resp {
+//             Ok(data) => Ok(data),
+//             Err(e) => match e {
+//                 init_upload::InitUploadError::FileAlreadyExists => {
+//                     Err(InitUploadError::FileAlreadyExists)
+//                 }
+//                 _ => Err(InitUploadError::StorageCanisterError(format!("{:?}", e))),
+//             },
+//         }
+//     }
+// }
+
 pub mod init_upload {
     use bity_ic_storage_canister_api::updates::init_upload;
     pub use bity_ic_storage_canister_api::updates::init_upload::InitUploadResp;
@@ -133,6 +161,7 @@ pub mod init_upload {
 
     #[derive(Serialize, Deserialize, CandidType, Debug)]
     pub enum InitUploadError {
+        ContentTooLarge,
         ConcurrentManagementCall,
         FileAlreadyExists,
         StorageCanisterError(String),
@@ -162,6 +191,10 @@ pub mod store_chunk {
 
     #[derive(Serialize, Deserialize, CandidType, Debug)]
     pub enum StoreChunkError {
+        InvalidFilePath,
+        InvalidStateTransition,
+        InvalidChunkId,
+        InvalidChunkData,
         ConcurrentManagementCall,
         UploadNotInitialized,
         UploadAlreadyFinalized,
@@ -235,6 +268,7 @@ pub mod cancel_upload {
 
     #[derive(Serialize, Deserialize, CandidType, Debug)]
     pub enum CancelUploadError {
+        InvalidFilePath,
         ConcurrentManagementCall,
         UploadNotInitialized,
         UploadAlreadyFinalized,
@@ -250,6 +284,12 @@ pub mod cancel_upload {
             Err(e) => match e {
                 cancel_upload::CancelUploadError::UploadNotInitialized => {
                     Err(CancelUploadError::UploadNotInitialized)
+                }
+                cancel_upload::CancelUploadError::UploadAlreadyFinalized => {
+                    Err(CancelUploadError::UploadAlreadyFinalized)
+                }
+                cancel_upload::CancelUploadError::InvalidFilePath => {
+                    Err(CancelUploadError::InvalidFilePath)
                 }
             },
         }
@@ -339,5 +379,35 @@ pub mod migration_icrc3_add_transaction {
     #[derive(Serialize, Deserialize, CandidType, Debug)]
     pub enum MigrationIcrc3AddTransactionError {
         DefaultError(String),
+    }
+}
+pub mod remove_file {
+    use bity_ic_storage_canister_api::updates::remove_file;
+    pub use bity_ic_storage_canister_api::updates::remove_file::RemoveFileResp;
+    use candid::CandidType;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, CandidType, Debug)]
+    pub enum RemoveFileError {
+        InvalidFilePath,
+        UploadNotInitialized,
+        StorageCanisterError(String),
+    }
+
+    pub type Args = remove_file::Args;
+    pub type Response = Result<RemoveFileResp, RemoveFileError>;
+
+    pub fn from_storage_response(resp: remove_file::Response) -> Response {
+        match resp {
+            Ok(data) => Ok(data),
+            Err(e) => match e {
+                remove_file::RemoveFileError::InvalidFilePath => {
+                    Err(RemoveFileError::InvalidFilePath)
+                }
+                remove_file::RemoveFileError::UploadNotInitialized => {
+                    Err(RemoveFileError::UploadNotInitialized)
+                }
+            },
+        }
     }
 }

@@ -1,3 +1,4 @@
+use crate::calls::mint::mint::NftPublicRecordMint;
 use anyhow::{anyhow, Result};
 use candid::{Encode, Nat, Principal};
 use core_nft_common::mint::NftPrivateRecordMint;
@@ -13,6 +14,7 @@ pub async fn mint_nft(
     subaccount: Option<[u8; 32]>,
     metadata: Vec<(String, ICRC3Value)>,
     memo: Option<&str>,
+    public_content: Option<NftPublicRecordMint>,
     private_content: Option<NftPrivateRecordMint>,
 ) -> Result<Nat> {
     let mint_args = mint::Args {
@@ -20,6 +22,7 @@ pub async fn mint_nft(
             token_owner: Account { owner, subaccount },
             memo: memo.map(|m| serde_bytes::ByteBuf::from(m.as_bytes())),
             metadata,
+            public_content,
             private_content,
         }],
     };

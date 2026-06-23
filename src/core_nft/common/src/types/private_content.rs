@@ -1,14 +1,13 @@
 use crate::AccessRights;
+use crate::Sha256Hash;
+use crate::CHUNK_SIZE;
+use crate::MAX_CONTENT_SIZE;
 use candid::Nat;
 use candid::{CandidType, Principal};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub const MAX_PRIVATE_CONTENT_SIZE: u64 = 100 * 1024 * 1024; // 100MB
 pub const MAX_READERS_PER_ENTRY: usize = 100;
-pub const CHUNK_SIZE: usize = 1024 * 1024; // 1MB
-
-pub type Sha256Hash = [u8; 32];
 
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct ReaderInfo {
@@ -152,7 +151,7 @@ impl PrivateContentSystem {
             return Err(PrivateContentError::AlreadyExists);
         }
 
-        if file_size > MAX_PRIVATE_CONTENT_SIZE {
+        if file_size > MAX_CONTENT_SIZE {
             return Err(PrivateContentError::ContentTooLarge);
         }
 
@@ -306,6 +305,7 @@ impl PrivateContentSystem {
         let mut private_record = NftPrivateRecord {
             default_readers,
             entries: HashMap::new(),
+            burned_at_ns: None,
         };
 
         for (entry_name, entry_hash) in entries_to_mint_hashs {
@@ -505,6 +505,49 @@ impl PrivateContentSystem {
 
         Ok(())
     }
+
+    // Mark a minted NFT's private content as burned.
+    pub fn burn_private_content(&mut self, token_id: &Nat) {
+        if let Some(record) = self.nft_private.get_mut(token_id) {
+            record.burned_at_ns = Some(ic_cdk::api::time());
+        }
+    }
+
+    // Return all burned private records whose `burned_at_ns` is older than `threshold_ns`.
+    pub fn collect_expired_burned(
+        &self,
+        now_ns: u64,
+        threshold_ns: u64,
+    ) -> Vec<(Nat, Vec<(String, Principal, String)>)> {
+        self.nft_private
+            .iter()
+            .filter_map(|(token_id, record)| {
+                record.burned_at_ns.and_then(|burned_at| {
+                    if burned_at + threshold_ns <= now_ns {
+                        let files: Vec<_> = record
+                            .entries
+                            .iter()
+                            .map(|(name, entry)| {
+                                (
+                                    name.clone(),
+                                    entry.storage_canister_id,
+                                    entry.storage_path.clone(),
+                                )
+                            })
+                            .collect();
+                        Some((token_id.clone(), files))
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect()
+    }
+
+    /// Remove a burned private record after its files have been deleted.
+    pub fn remove_burned_record(&mut self, token_id: &Nat) {
+        self.nft_private.remove(token_id);
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -556,17 +599,28 @@ impl PrivateContentConfig {
 }
 
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+#[serde(default)]
 pub struct NftPrivateRecord {
     pub default_readers: HashMap<Principal, ReaderInfo>,
     pub entries: HashMap<String, PrivateEntry>,
+    /// Timestamp (nanoseconds) when the parent NFT was burned.
+    /// Set by `burn_private_content`; the GC will delete files after a TTL.
+    pub burned_at_ns: Option<u64>,
+}
+
+impl Default for NftPrivateRecord {
+    fn default() -> Self {
+        Self {
+            default_readers: HashMap::new(),
+            entries: HashMap::new(),
+            burned_at_ns: None,
+        }
+    }
 }
 
 impl NftPrivateRecord {
     pub fn new() -> Self {
-        Self {
-            default_readers: HashMap::new(),
-            entries: HashMap::new(),
-        }
+        Self::default()
     }
 }
 

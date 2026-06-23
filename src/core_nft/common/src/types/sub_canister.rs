@@ -1,7 +1,7 @@
-use crate::types::management::{cancel_upload, finalize_upload, init_upload, store_chunk};
+use crate::types::management::{cancel_upload, finalize_upload, init_upload, remove_file, store_chunk};
 use crate::utils::trace;
 use bity_ic_storage_canister_c2c::{
-    cancel_upload, finalize_upload, get_storage_size, init_upload, store_chunk,
+    cancel_upload, finalize_upload, get_storage_size, init_upload, remove_file, store_chunk,
 };
 use bity_ic_subcanister_manager;
 use bity_ic_subcanister_manager::Canister;
@@ -336,6 +336,30 @@ impl StorageCanister {
             }
             Err(e) => Err(
                 crate::types::management::cancel_upload::CancelUploadError::StorageCanisterError(
+                    format!("{e:?}"),
+                ),
+            ),
+        }
+    }
+
+    pub async fn remove_file(
+        &self,
+        data: remove_file::Args,
+    ) -> crate::types::management::remove_file::Response {
+        if self.state != bity_ic_subcanister_manager::CanisterState::Installed {
+            return Err(
+                crate::types::management::remove_file::RemoveFileError::StorageCanisterError(
+                    "Canister is not installed".to_string(),
+                ),
+            );
+        }
+
+        let res = retry_async(|| remove_file(self.canister_id, data.clone()), 3).await;
+
+        match res {
+            Ok(resp) => crate::types::management::remove_file::from_storage_response(resp),
+            Err(e) => Err(
+                crate::types::management::remove_file::RemoveFileError::StorageCanisterError(
                     format!("{e:?}"),
                 ),
             ),

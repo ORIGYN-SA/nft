@@ -216,6 +216,7 @@ pub async fn handle_mint(
         metadata,
         memo.map(|s| s.as_str()),
         None,
+        None,
     )
     .await?;
 

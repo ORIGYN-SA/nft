@@ -1,6 +1,6 @@
 use crate::types::nft::Icrc7Token;
 use bity_ic_canister_state_macros::canister_state;
-use bity_ic_icrc3::transaction::TransactionType;
+use bity_ic_icrc3::transaction::{Hash, TransactionType};
 use bity_ic_icrc3_macros::icrc3_state;
 use bity_ic_storage_canister_api::types::storage::UploadState;
 use bity_ic_types::{BuildVersion, TimestampNanos};
@@ -17,6 +17,7 @@ use core_nft_common::types::{
 };
 use core_nft_common::PrivateContentConfig;
 use core_nft_common::PrivateContentSystem;
+use core_nft_common::PublicContentSystem;
 
 use candid::{CandidType, Nat, Principal};
 use icrc_ledger_types::icrc1::account::Account;
@@ -36,7 +37,6 @@ pub struct RuntimeState {
     pub data: Data,
     pub principal_guards: BTreeSet<Principal>,
     pub sliding_window_guards: HashMap<candid::Nat, Vec<TimestampNanos>>, // per token id
-    pub internal_filestorage: InternalFilestorage,
 }
 
 impl RuntimeState {
@@ -46,7 +46,6 @@ impl RuntimeState {
             data,
             principal_guards: BTreeSet::new(),
             sliding_window_guards: HashMap::new(),
-            internal_filestorage: InternalFilestorage::new(),
         }
     }
 
@@ -85,6 +84,7 @@ pub struct Data {
     pub tokens_list: HashMap<Nat, Icrc7Token>,
     pub tokens_list_by_owner: HashMap<Account, Vec<Nat>>,
     pub private_content_system: PrivateContentSystem,
+    pub public_content_system: PublicContentSystem,
     pub approval_init: InitApprovalsArg,
     pub sub_canister_manager: StorageSubCanisterManager,
     pub last_token_id: Nat,
@@ -194,6 +194,13 @@ impl Data {
                     vetkd_context,
                 },
             },
+            public_content_system: PublicContentSystem {
+                nft_public: HashMap::new(),
+                premint_cache: HashMap::new(),
+                file_to_nfts: HashMap::new(),
+                nft_to_files: HashMap::new(),
+                all_files_index: HashMap::new(),
+            },
             approval_init,
             sub_canister_manager,
             last_token_id: Nat::from(1u64), // 0 is the reserved value for the collection metadata
@@ -275,6 +282,7 @@ impl Clone for Data {
             tokens_list: self.tokens_list.clone(),
             tokens_list_by_owner: self.tokens_list_by_owner.clone(),
             private_content_system: self.private_content_system.clone(),
+            public_content_system: self.public_content_system.clone(),
             approval_init: self.approval_init.clone(),
             sub_canister_manager: self.sub_canister_manager.clone(),
             last_token_id: self.last_token_id.clone(),
@@ -298,50 +306,6 @@ pub struct CanisterInfo {
     pub commit_hash: String,
     pub memory_used: MemorySize,
     pub cycles_balance: Cycles,
-}
-
-#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
-pub struct InternalFilestorageData {
-    pub init_timestamp: TimestampNanos,
-    pub state: UploadState,
-    pub canister: Principal,
-    pub path: String,
-}
-
-#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
-pub struct InternalFilestorage {
-    pub map: HashMap<String, InternalFilestorageData>,
-}
-
-impl InternalFilestorage {
-    pub fn new() -> Self {
-        Self {
-            map: HashMap::new(),
-        }
-    }
-
-    pub fn insert(&mut self, path: String, data: InternalFilestorageData) {
-        self.map.insert(path, data);
-    }
-
-    pub fn get(&self, path: &str) -> Option<&InternalFilestorageData> {
-        self.map.get(path)
-    }
-
-    pub fn remove(&mut self, path: &str) -> Option<InternalFilestorageData> {
-        self.map.remove(path)
-    }
-
-    pub fn contains_path(&self, path: &str) -> bool {
-        self.map.values().any(|data| data.path == path)
-    }
-
-    pub fn get_all_files(&self) -> Vec<(String, InternalFilestorageData)> {
-        self.map
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect()
-    }
 }
 #[cfg(test)]
 mod tests {}

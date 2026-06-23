@@ -158,6 +158,7 @@ fn test_private_content_upload_and_mint_rand_bytes() {
                 },
                 memo: None,
                 metadata: vec![],
+                public_content: None,
                 private_content: Some(NftPrivateRecordMint {
                     default_readers: HashMap::new(),
                     entries,
@@ -373,6 +374,7 @@ fn test_private_content_encryption_and_decryption_with_vetkeys() {
                 },
                 memo: None,
                 metadata: vec![],
+                public_content: None,
                 private_content: Some(NftPrivateRecordMint {
                     default_readers: HashMap::new(),
                     entries,
@@ -608,6 +610,7 @@ fn test_private_content_encryption_unauthorized_access() {
                 },
                 memo: None,
                 metadata: vec![],
+                public_content: None,
                 private_content: Some(NftPrivateRecordMint {
                     default_readers: HashMap::new(),
                     entries: entries.clone(),
@@ -837,6 +840,7 @@ fn test_private_content_readers_access() {
                 },
                 memo: None,
                 metadata: vec![],
+                public_content: None,
                 private_content: Some(NftPrivateRecordMint {
                     default_readers: HashMap::new(),
                     entries: entries.clone(),
@@ -1057,6 +1061,7 @@ fn test_private_content_default_readers_access() {
                 },
                 memo: None,
                 metadata: vec![],
+                public_content: None,
                 private_content: Some(NftPrivateRecordMint {
                     default_readers: HashMap::new(),
                     entries: entries.clone(),
@@ -1256,6 +1261,7 @@ fn test_private_content_reencryption_workflow() {
                 },
                 memo: None,
                 metadata: vec![],
+                public_content: None,
                 private_content: Some(NftPrivateRecordMint {
                     default_readers: HashMap::new(),
                     entries: entries.clone(),
@@ -1639,6 +1645,7 @@ fn test_private_content_transfer_workflow() {
                 },
                 memo: None,
                 metadata: vec![],
+                public_content: None,
                 private_content: Some(NftPrivateRecordMint {
                     default_readers: HashMap::new(),
                     entries: entries.clone(),

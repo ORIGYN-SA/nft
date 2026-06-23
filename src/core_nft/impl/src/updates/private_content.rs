@@ -30,7 +30,7 @@ pub async fn init_private_content_upload(
                 .as_deref()
                 .ok_or(core_nft_common::types::private_content::PrivateContentError::NotFound)?;
 
-            mutate_state(|state| {
+            read_state(|state| {
                 state.data.private_content_system.reencryption_validate(
                     token_id,
                     &entry_name,
@@ -55,7 +55,7 @@ pub async fn init_private_content_upload(
             })
         }
         None => {
-            mutate_state(|state| {
+            read_state(|state| {
                 state.data.private_content_system.init_premint_validate(
                     &args.plaintext_hash,
                     args.encryption_mode,
