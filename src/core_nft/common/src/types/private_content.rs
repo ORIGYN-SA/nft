@@ -1,128 +1,22 @@
 use crate::AccessRights;
 use crate::Sha256Hash;
-use crate::CHUNK_SIZE;
-use crate::MAX_CONTENT_SIZE;
 use candid::Nat;
 use candid::{CandidType, Principal};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-
-pub const MAX_READERS_PER_ENTRY: usize = 100;
-
-#[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct ReaderInfo {
-    pub rights: AccessRights,
-    pub alias: Option<String>,
-}
-
-#[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub enum PrivateContentStatus {
-    PendingUpload,
-    PendingMinting,
-    Active,
-    PendingReencryption,
-}
-
-#[derive(CandidType, Serialize, Deserialize, Copy, Clone, Debug, PartialEq)]
-pub enum EncryptionMode {
-    AES256,
-}
-
-#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
-pub enum PrivateContentError {
-    AlreadyExists,
-    InvalidStateTransition,
-    NotEnabled,
-    NotFound,
-    Unauthorized,
-    InvalidStatus,
-    TooManyReaders,
-    ContentTooLarge,
-    InvalidChunk,
-    StorageError(String),
-    VetkdNotConfigured,
-    VetkdError(String),
-}
-
-#[derive(CandidType, Serialize, Deserialize, Clone, Debug, Default)]
-#[serde(default)]
-pub struct PendingUpload {
-    pub expected_chunks: usize,
-    pub received_chunks: HashMap<usize, Vec<u8>>,
-    pub chunk_size: usize,
-    pub timestamp_ns: u64,
-}
-
-#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
-pub struct ReaderDetail {
-    pub principal: Principal,
-    pub rights: AccessRights,
-    pub alias: Option<String>,
-}
-
-#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
-pub struct EntryDetailResp {
-    pub name: String,
-    pub status: PrivateContentStatus,
-    pub readers: Vec<ReaderDetail>,
-    pub plaintext_hash: Sha256Hash,
-    pub plaintext_size: u64,
-    pub storage_canister_id: Principal,
-    pub storage_path: String,
-}
-
-pub fn construct_canonical_identity(
-    owner: Principal,
-    readers: &HashMap<Principal, ReaderInfo>,
-    default_readers: &HashMap<Principal, ReaderInfo>,
-) -> Vec<u8> {
-    let resolved_readers = resolve_readers(readers, default_readers);
-
-    let mut principals: Vec<Principal> = resolved_readers.keys().cloned().collect();
-    if !principals.contains(&owner) {
-        principals.push(owner);
-    }
-    principals.sort();
-
-    let joined = principals
-        .iter()
-        .map(|p| p.to_text())
-        .collect::<Vec<_>>()
-        .join(",");
-    joined.into_bytes()
-}
-
-pub fn resolve_readers(
-    entry_readers: &HashMap<Principal, ReaderInfo>,
-    default_readers: &HashMap<Principal, ReaderInfo>,
-) -> HashMap<Principal, ReaderInfo> {
-    let mut readers = default_readers.clone();
-    readers.extend(entry_readers.clone()); // entry_readers has priority and overwrites all the readers accesses
-    readers
-}
-
-pub fn readers_equal(
-    a: &HashMap<Principal, ReaderInfo>,
-    b: &HashMap<Principal, ReaderInfo>,
-) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    a.iter().all(|(k, v)| {
-        b.get(k)
-            .map_or(false, |bv| v.rights == bv.rights && v.alias == bv.alias)
-    })
-}
-
 use ic_cdk::management_canister::VetKDCurve;
 use ic_cdk::management_canister::VetKDDeriveKeyArgs;
 use ic_cdk::management_canister::VetKDKeyId;
 use ic_cdk::management_canister::VetKDPublicKeyArgs;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+pub const MAX_PRIVATE_CONTENT_SIZE: u64 = 100 * 1024 * 1024; // 100MB
+pub const MAX_READERS_PER_ENTRY: usize = 100;
+pub const CHUNK_SIZE: usize = 1024 * 1024; // 1MB
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct PrivateContentSystem {
     pub nft_private: HashMap<Nat, NftPrivateRecord>,
-    pub premint_cache: HashMap<Sha256Hash, PrivateEntry>,
+    pub temp_file_cache: HashMap<Sha256Hash, PrivateEntry>,
     pub config: PrivateContentConfig,
 }
 
@@ -141,17 +35,17 @@ impl PrivateContentSystem {
             .ok_or_else(|| format!("Private entry '{entry_name}' not found for NFT {token_id}"))
     }
 
-    pub fn init_premint_validate(
+    pub fn init_upload_validate(
         &self,
         hash: &Sha256Hash,
         encryption_mode: EncryptionMode,
         file_size: u64,
     ) -> Result<(), PrivateContentError> {
-        if self.premint_cache.contains_key(hash) {
+        if self.temp_file_cache.contains_key(hash) {
             return Err(PrivateContentError::AlreadyExists);
         }
 
-        if file_size > MAX_CONTENT_SIZE {
+        if file_size > MAX_PRIVATE_CONTENT_SIZE {
             return Err(PrivateContentError::ContentTooLarge);
         }
 
@@ -169,7 +63,7 @@ impl PrivateContentSystem {
         Ok(())
     }
 
-    pub fn init_premint_store(
+    pub fn init_upload_register(
         &mut self,
         hash: Sha256Hash,
         salt: Vec<u8>,
@@ -183,7 +77,7 @@ impl PrivateContentSystem {
         file_size: u64,
         default_readers: &HashMap<Principal, ReaderInfo>,
     ) -> Result<(), PrivateContentError> {
-        if self.premint_cache.contains_key(&hash) {
+        if self.temp_file_cache.contains_key(&hash) {
             return Err(PrivateContentError::AlreadyExists);
         }
 
@@ -211,19 +105,18 @@ impl PrivateContentSystem {
             format_version: 1,
         };
 
-        self.premint_cache.insert(hash, entry);
+        self.temp_file_cache.insert(hash, entry);
         Ok(())
     }
 
-    // Removed unused entry_name parameter
-    pub fn upload_chunk(
+    pub fn upload_chunk_register(
         &mut self,
         plaintext_hash: &Sha256Hash,
         chunk_index: usize,
         data: Vec<u8>,
     ) -> Result<(), PrivateContentError> {
         let entry = self
-            .premint_cache
+            .temp_file_cache
             .get_mut(plaintext_hash)
             .ok_or(PrivateContentError::NotFound)?;
 
@@ -249,9 +142,12 @@ impl PrivateContentSystem {
         Ok(())
     }
 
-    pub fn finalize_upload(&mut self, hash: &Sha256Hash) -> Result<(), PrivateContentError> {
+    pub fn finalize_upload_register(
+        &mut self,
+        hash: &Sha256Hash,
+    ) -> Result<(), PrivateContentError> {
         let entry = self
-            .premint_cache
+            .temp_file_cache
             .get_mut(hash)
             .ok_or(PrivateContentError::NotFound)?;
 
@@ -285,7 +181,7 @@ impl PrivateContentSystem {
     }
 
     pub fn cancel_upload(&mut self, entry_hash: &Sha256Hash) -> Result<(), PrivateContentError> {
-        self.premint_cache.remove(entry_hash);
+        self.temp_file_cache.remove(entry_hash);
         Ok(())
     }
 
@@ -305,12 +201,11 @@ impl PrivateContentSystem {
         let mut private_record = NftPrivateRecord {
             default_readers,
             entries: HashMap::new(),
-            burned_at_ns: None,
         };
 
         for (entry_name, entry_hash) in entries_to_mint_hashs {
             let mut entry = self
-                .premint_cache
+                .temp_file_cache
                 .remove(&entry_hash)
                 .ok_or(PrivateContentError::NotFound)?;
             if entry.status != PrivateContentStatus::PendingMinting
@@ -325,6 +220,49 @@ impl PrivateContentSystem {
         }
 
         self.nft_private.insert(token_id, private_record);
+        Ok(())
+    }
+
+    pub fn append_private_content(
+        &mut self,
+        mut default_readers: HashMap<Principal, ReaderInfo>,
+        entries_to_append_hashs: HashMap<String, Sha256Hash>,
+        token_id: Nat,
+        owner: Principal,
+    ) -> Result<(), PrivateContentError> {
+        default_readers.remove(&owner);
+
+        let record = self
+            .nft_private
+            .entry(token_id.clone())
+            .or_insert_with(|| NftPrivateRecord {
+                default_readers: default_readers.clone(),
+                entries: HashMap::new(),
+            });
+
+        for (k, v) in default_readers {
+            record.default_readers.insert(k, v);
+        }
+
+        for (entry_name, entry_hash) in entries_to_append_hashs {
+            if record.entries.contains_key(&entry_name) {
+                return Err(PrivateContentError::AlreadyExists);
+            }
+            let mut entry = self
+                .temp_file_cache
+                .remove(&entry_hash)
+                .ok_or(PrivateContentError::NotFound)?;
+            if entry.status != PrivateContentStatus::PendingMinting
+                && entry.status != PrivateContentStatus::Active
+            {
+                return Err(PrivateContentError::InvalidStateTransition);
+            } else {
+                entry.readers.remove(&owner);
+                entry.status = PrivateContentStatus::Active;
+                record.entries.insert(entry_name, entry);
+            }
+        }
+
         Ok(())
     }
 
@@ -421,7 +359,7 @@ impl PrivateContentSystem {
         Ok(())
     }
 
-    pub fn reupload_chunk(
+    pub fn reupload_chunk_register(
         &mut self,
         token_id: &Nat,
         entry_name: &str,
@@ -459,9 +397,7 @@ impl PrivateContentSystem {
         Ok(())
     }
 
-    // FIXED: Fetch from nft_private instead of premint_cache.
-    // Uses token_id and entry_name, and transitions to Active.
-    pub fn finalize_reupload(
+    pub fn finalize_reupload_register(
         &mut self,
         token_id: &Nat,
         entry_name: &str,
@@ -505,122 +441,20 @@ impl PrivateContentSystem {
 
         Ok(())
     }
-
-    // Mark a minted NFT's private content as burned.
-    pub fn burn_private_content(&mut self, token_id: &Nat) {
-        if let Some(record) = self.nft_private.get_mut(token_id) {
-            record.burned_at_ns = Some(ic_cdk::api::time());
-        }
-    }
-
-    // Return all burned private records whose `burned_at_ns` is older than `threshold_ns`.
-    pub fn collect_expired_burned(
-        &self,
-        now_ns: u64,
-        threshold_ns: u64,
-    ) -> Vec<(Nat, Vec<(String, Principal, String)>)> {
-        self.nft_private
-            .iter()
-            .filter_map(|(token_id, record)| {
-                record.burned_at_ns.and_then(|burned_at| {
-                    if burned_at + threshold_ns <= now_ns {
-                        let files: Vec<_> = record
-                            .entries
-                            .iter()
-                            .map(|(name, entry)| {
-                                (
-                                    name.clone(),
-                                    entry.storage_canister_id,
-                                    entry.storage_path.clone(),
-                                )
-                            })
-                            .collect();
-                        Some((token_id.clone(), files))
-                    } else {
-                        None
-                    }
-                })
-            })
-            .collect()
-    }
-
-    /// Remove a burned private record after its files have been deleted.
-    pub fn remove_burned_record(&mut self, token_id: &Nat) {
-        self.nft_private.remove(token_id);
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct PrivateContentConfig {
-    pub vetkd_key_name: String,
-    pub vetkd_context: String,
-}
-
-impl PrivateContentConfig {
-    fn vetkd_key_id(&self) -> VetKDKeyId {
-        VetKDKeyId {
-            curve: VetKDCurve::Bls12_381_G2,
-            name: self.vetkd_key_name.clone(),
-        }
-    }
-
-    pub async fn derive_public_key(&self) -> Result<Vec<u8>, String> {
-        let request = VetKDPublicKeyArgs {
-            canister_id: None,
-            context: self.vetkd_context.clone().into(),
-            key_id: self.vetkd_key_id(),
-        };
-
-        let reply = ic_cdk::management_canister::vetkd_public_key(&request)
-            .await
-            .map_err(|e| format!("failed to derive public key: {:?}", e))?;
-
-        Ok(reply.public_key)
-    }
-
-    pub async fn derive_vetkey(
-        &self,
-        input: Vec<u8>,
-        transport_public_key: Vec<u8>,
-    ) -> Result<Vec<u8>, String> {
-        let request = VetKDDeriveKeyArgs {
-            input,
-            context: self.vetkd_context.clone().into(),
-            transport_public_key,
-            key_id: self.vetkd_key_id(),
-        };
-
-        let reply = ic_cdk::management_canister::vetkd_derive_key(&request)
-            .await
-            .map_err(|e| format!("failed to derive vetkey: {:?}", e))?;
-
-        Ok(reply.encrypted_key)
-    }
 }
 
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
-#[serde(default)]
 pub struct NftPrivateRecord {
     pub default_readers: HashMap<Principal, ReaderInfo>,
     pub entries: HashMap<String, PrivateEntry>,
-    /// Timestamp (nanoseconds) when the parent NFT was burned.
-    /// Set by `burn_private_content`; the GC will delete files after a TTL.
-    pub burned_at_ns: Option<u64>,
-}
-
-impl Default for NftPrivateRecord {
-    fn default() -> Self {
-        Self {
-            default_readers: HashMap::new(),
-            entries: HashMap::new(),
-            burned_at_ns: None,
-        }
-    }
 }
 
 impl NftPrivateRecord {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            default_readers: HashMap::new(),
+            entries: HashMap::new(),
+        }
     }
 }
 
@@ -679,4 +513,126 @@ impl PrivateEntry {
 
         Ok(())
     }
+}
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct ReaderInfo {
+    pub rights: AccessRights,
+    pub alias: Option<String>,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum PrivateContentStatus {
+    PendingUpload,
+    PendingMinting,
+    Active,
+    PendingReencryption,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(default)]
+pub struct PendingUpload {
+    pub expected_chunks: usize,
+    pub received_chunks: HashMap<usize, Vec<u8>>,
+    pub chunk_size: usize,
+    pub timestamp_ns: u64,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Copy, Clone, Debug, PartialEq)]
+pub enum EncryptionMode {
+    AES256,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct PrivateContentConfig {
+    pub vetkd_key_name: String,
+    pub vetkd_context: String,
+}
+
+impl PrivateContentConfig {
+    fn vetkd_key_id(&self) -> VetKDKeyId {
+        VetKDKeyId {
+            curve: VetKDCurve::Bls12_381_G2,
+            name: self.vetkd_key_name.clone(),
+        }
+    }
+
+    pub async fn derive_public_key(&self) -> Result<Vec<u8>, String> {
+        let request = VetKDPublicKeyArgs {
+            canister_id: None,
+            context: self.vetkd_context.clone().into(),
+            key_id: self.vetkd_key_id(),
+        };
+
+        let reply = ic_cdk::management_canister::vetkd_public_key(&request)
+            .await
+            .map_err(|e| format!("failed to derive public key: {:?}", e))?;
+
+        Ok(reply.public_key)
+    }
+
+    pub async fn derive_vetkey(
+        &self,
+        input: Vec<u8>,
+        transport_public_key: Vec<u8>,
+    ) -> Result<Vec<u8>, String> {
+        let request = VetKDDeriveKeyArgs {
+            input,
+            context: self.vetkd_context.clone().into(),
+            transport_public_key,
+            key_id: self.vetkd_key_id(),
+        };
+
+        let reply = ic_cdk::management_canister::vetkd_derive_key(&request)
+            .await
+            .map_err(|e| format!("failed to derive vetkey: {:?}", e))?;
+
+        Ok(reply.encrypted_key)
+    }
+}
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+pub enum PrivateContentError {
+    AlreadyExists,
+    InvalidStateTransition,
+    NotEnabled,
+    NotFound,
+    Unauthorized,
+    InvalidStatus,
+    TooManyReaders,
+    ContentTooLarge,
+    InvalidChunk,
+    StorageError(String),
+    VetkdNotConfigured,
+    VetkdError(String),
+}
+
+pub fn construct_canonical_identity(
+    owner: Principal,
+    readers: &HashMap<Principal, ReaderInfo>,
+    default_readers: &HashMap<Principal, ReaderInfo>,
+) -> Vec<u8> {
+    let resolved_readers = resolve_readers(readers, default_readers);
+
+    let mut principals: Vec<Principal> = resolved_readers.keys().cloned().collect();
+    if !principals.contains(&owner) {
+        principals.push(owner);
+    }
+    principals.sort();
+
+    let joined = principals
+        .iter()
+        .map(|p| p.to_text())
+        .collect::<Vec<_>>()
+        .join(",");
+    joined.into_bytes()
+}
+
+pub fn resolve_readers(
+    entry_readers: &HashMap<Principal, ReaderInfo>,
+    default_readers: &HashMap<Principal, ReaderInfo>,
+) -> HashMap<Principal, ReaderInfo> {
+    let mut readers = default_readers.clone();
+    readers.extend(entry_readers.clone()); // entry_readers has priority and overwrites all the readers accesses
+    readers
 }

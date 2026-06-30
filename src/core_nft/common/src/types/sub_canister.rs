@@ -1,4 +1,6 @@
-use crate::types::management::{cancel_upload, finalize_upload, init_upload, remove_file, store_chunk};
+use crate::types::management::{
+    cancel_upload, finalize_upload, init_upload, remove_file, store_chunk,
+};
 use crate::utils::trace;
 use bity_ic_storage_canister_c2c::{
     cancel_upload, finalize_upload, get_storage_size, init_upload, remove_file, store_chunk,

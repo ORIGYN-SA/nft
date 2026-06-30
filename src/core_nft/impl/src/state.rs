@@ -1,8 +1,8 @@
 use crate::types::nft::Icrc7Token;
 use bity_ic_canister_state_macros::canister_state;
-use bity_ic_icrc3::transaction::{Hash, TransactionType};
+use bity_ic_icrc3::transaction::TransactionType;
 use bity_ic_icrc3_macros::icrc3_state;
-use bity_ic_storage_canister_api::types::storage::UploadState;
+use bity_ic_storage_canister_api::storage::UploadState;
 use bity_ic_types::{BuildVersion, TimestampNanos};
 use bity_ic_types::{Cycles, TimestampMillis};
 use bity_ic_utils::env::{CanisterEnv, Environment};
@@ -37,6 +37,7 @@ pub struct RuntimeState {
     pub data: Data,
     pub principal_guards: BTreeSet<Principal>,
     pub sliding_window_guards: HashMap<candid::Nat, Vec<TimestampNanos>>, // per token id
+    pub internal_filestorage: InternalFilestorage,
 }
 
 impl RuntimeState {
@@ -46,6 +47,9 @@ impl RuntimeState {
             data,
             principal_guards: BTreeSet::new(),
             sliding_window_guards: HashMap::new(),
+            internal_filestorage: InternalFilestorage {
+                map: HashMap::new(),
+            },
         }
     }
 
@@ -188,7 +192,7 @@ impl Data {
             tokens_list_by_owner: HashMap::new(),
             private_content_system: PrivateContentSystem {
                 nft_private: HashMap::new(),
-                premint_cache: HashMap::new(),
+                temp_file_cache: HashMap::new(),
                 config: PrivateContentConfig {
                     vetkd_key_name,
                     vetkd_context,
@@ -196,7 +200,7 @@ impl Data {
             },
             public_content_system: PublicContentSystem {
                 nft_public: HashMap::new(),
-                premint_cache: HashMap::new(),
+                temp_file_cache: HashMap::new(),
                 file_to_nfts: HashMap::new(),
                 nft_to_files: HashMap::new(),
                 all_files_index: HashMap::new(),
@@ -306,6 +310,50 @@ pub struct CanisterInfo {
     pub commit_hash: String,
     pub memory_used: MemorySize,
     pub cycles_balance: Cycles,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct InternalFilestorageData {
+    pub init_timestamp: TimestampNanos,
+    pub state: UploadState,
+    pub canister: Principal,
+    pub path: String,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct InternalFilestorage {
+    pub map: HashMap<String, InternalFilestorageData>,
+}
+
+impl InternalFilestorage {
+    pub fn new() -> Self {
+        Self {
+            map: HashMap::new(),
+        }
+    }
+
+    pub fn insert(&mut self, path: String, data: InternalFilestorageData) {
+        self.map.insert(path, data);
+    }
+
+    pub fn get(&self, path: &str) -> Option<&InternalFilestorageData> {
+        self.map.get(path)
+    }
+
+    pub fn remove(&mut self, path: &str) -> Option<InternalFilestorageData> {
+        self.map.remove(path)
+    }
+
+    pub fn contains_path(&self, path: &str) -> bool {
+        self.map.values().any(|data| data.path == path)
+    }
+
+    pub fn get_all_files(&self) -> Vec<(String, InternalFilestorageData)> {
+        self.map
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    }
 }
 #[cfg(test)]
 mod tests {}

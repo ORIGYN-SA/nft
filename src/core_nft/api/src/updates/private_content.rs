@@ -239,9 +239,9 @@ pub mod cancel_private_content_upload {
 
     #[derive(Serialize, Deserialize, CandidType, Debug)]
     pub enum CancelPrivateContentUploadError {
-        InvalidFilePath,
         ConcurrentManagementCall,
         UploadNotInitialized,
+        InvalidFilePath,
         UploadAlreadyFinalized,
         StorageCanisterError(String),
     }
@@ -253,9 +253,6 @@ impl From<cancel_upload::CancelUploadError>
 {
     fn from(error: cancel_upload::CancelUploadError) -> Self {
         match error {
-            cancel_upload::CancelUploadError::InvalidFilePath => {
-                cancel_private_content_upload::CancelPrivateContentUploadError::InvalidFilePath
-            }
             cancel_upload::CancelUploadError::ConcurrentManagementCall => {
                 cancel_private_content_upload::CancelPrivateContentUploadError::ConcurrentManagementCall
             }
@@ -264,6 +261,9 @@ impl From<cancel_upload::CancelUploadError>
             }
             cancel_upload::CancelUploadError::UploadAlreadyFinalized => {
                 cancel_private_content_upload::CancelPrivateContentUploadError::UploadAlreadyFinalized
+            }
+            cancel_upload::CancelUploadError::InvalidFilePath => {
+                cancel_private_content_upload::CancelPrivateContentUploadError::InvalidFilePath
             }
             cancel_upload::CancelUploadError::StorageCanisterError(msg) => {
                 cancel_private_content_upload::CancelPrivateContentUploadError::StorageCanisterError(msg)

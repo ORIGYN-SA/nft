@@ -1,6 +1,7 @@
 use crate::client::core_nft::{
-    cancel_upload, finalize_upload, get_upload_status, grant_permission, init_upload, mint,
-    revoke_permission, store_chunk, update_collection_metadata, update_nft_metadata,
+    __get_public_entry_test, append_file, cancel_upload, finalize_upload, get_upload_status,
+    grant_permission, init_upload, mint, revoke_permission, store_chunk,
+    update_collection_metadata, update_nft_metadata,
 };
 use crate::utils::create_default_icrc97_metadata;
 
@@ -10,8 +11,9 @@ use icrc_ledger_types::icrc1::account::Account;
 
 use bity_ic_storage_canister_api::types::storage::UploadState;
 use core_nft_common::types::management::{
-    cancel_upload, finalize_upload, grant_permission, init_upload, mint, mint::MintRequest,
-    revoke_permission, store_chunk, update_collection_metadata, update_nft_metadata,
+    append_file, append_file::AppendFileRequest, cancel_upload, finalize_upload, grant_permission,
+    init_upload, mint, mint::MintRequest, revoke_permission, store_chunk,
+    update_collection_metadata, update_nft_metadata,
 };
 use ic_cdk::println;
 use sha2::{Digest, Sha256};
@@ -1099,8 +1101,8 @@ fn test_mint_unauthorized() {
                 },
                 memo: None,
                 metadata: create_default_icrc97_metadata(metadata_url),
-                public_content: None,
                 private_content: None,
+                public_content: None,
             }],
         }),
     );
@@ -1155,8 +1157,8 @@ fn test_mint_authorized() {
                 },
                 memo: None,
                 metadata: create_default_icrc97_metadata(metadata_url.clone()),
-                public_content: None,
                 private_content: None,
+                public_content: None,
             }],
         }),
     );
@@ -1250,8 +1252,8 @@ fn test_add_then_remove_minting_authorities_unauthorized() {
                 },
                 memo: None,
                 metadata: create_default_icrc97_metadata(metadata_url),
-                public_content: None,
                 private_content: None,
+                public_content: None,
             }],
         }),
     );
@@ -1304,8 +1306,8 @@ fn test_mint_with_metadata() {
                 },
                 memo: None,
                 metadata: create_default_icrc97_metadata(metadata_url.clone()),
-                public_content: None,
                 private_content: None,
+                public_content: None,
             }],
         }),
     );
@@ -1662,8 +1664,8 @@ fn test_permissions_add_and_remove_one_by_one() {
                 },
                 memo: None,
                 metadata: create_default_icrc97_metadata(metadata_url),
-                public_content: None,
                 private_content: None,
+                public_content: None,
             }],
         }),
     );
@@ -1924,4 +1926,107 @@ fn test_permissions_add_and_remove_one_by_one() {
         revoke_result.is_ok(),
         "Should revoke ManageAuthorities permission successfully"
     );
+}
+
+#[test]
+fn test_append_file_authorized() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    // 1. Grant minting permission
+    let result = grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: nft_owner1,
+            permission: Permission::Minting,
+        }),
+    );
+    assert!(result.is_ok(), "Should succeed with authorized principal");
+
+    // 2. Mint an NFT
+    let mint_result = mint(
+        pic,
+        nft_owner1,
+        collection_canister_id,
+        &(mint::Args {
+            mint_requests: vec![MintRequest {
+                token_owner: Account {
+                    owner: nft_owner1,
+                    subaccount: None,
+                },
+                memo: None,
+                metadata: vec![],
+                private_content: None,
+                public_content: None,
+            }],
+        }),
+    );
+    assert!(mint_result.is_ok());
+    let token_id = mint_result.unwrap();
+
+    // 3. Upload a public file
+    let file_path = "./src/core_suite/assets/test.png";
+    let upload_path = "/test_append.png";
+    upload_file(
+        pic,
+        controller,
+        collection_canister_id,
+        file_path,
+        upload_path,
+    )
+    .expect("Upload failed");
+
+    // 4. Append the file using append_file
+    let mut entries = HashMap::new();
+    entries.insert("test_entry".to_string(), upload_path.to_string());
+
+    let append_result = append_file(
+        pic,
+        nft_owner1,
+        collection_canister_id,
+        &(append_file::Args {
+            append_file_requests: vec![AppendFileRequest {
+                token_id: token_id.clone(),
+                token_owner: Account {
+                    owner: nft_owner1,
+                    subaccount: None,
+                },
+                memo: None,
+                metadata: vec![],
+                private_content: None,
+                public_content: Some(
+                    core_nft_common::types::management::append_file::NftPublicRecordAppend {
+                        entries,
+                    },
+                ),
+            }],
+        }),
+    );
+    assert!(append_result.is_ok(), "Append file should succeed");
+
+    // 5. Query the public entry using the test query to verify it was appended
+    let get_public_result = __get_public_entry_test(
+        pic,
+        controller,
+        collection_canister_id,
+        &core_nft_api::queries::public_content::__get_public_entry_test::Args {
+            token_id,
+            entry_name: "test_entry".to_string(),
+        },
+    );
+
+    assert!(
+        get_public_result.is_ok(),
+        "Query public entry should succeed"
+    );
+    let entry = get_public_result.unwrap();
+    assert_eq!(entry.hash, upload_path.to_string());
 }

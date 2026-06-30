@@ -42,7 +42,7 @@ fn test_private_content_upload_and_mint_rand_bytes() {
         ..
     } = test_env;
 
-    let grant_result = grant_permission(
+    grant_permission(
         pic,
         controller,
         collection_canister_id,
@@ -50,7 +50,18 @@ fn test_private_content_upload_and_mint_rand_bytes() {
             principal: nft_owner1,
             permission: Permission::Minting,
         }),
-    );
+    )
+    .unwrap();
+    grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: nft_owner1,
+            permission: Permission::UpdateUploads,
+        }),
+    )
+    .unwrap();
 
     let content = b"0123456789abcdef".to_vec();
     let plaintext_size = content.len() as u64;
@@ -63,14 +74,16 @@ fn test_private_content_upload_and_mint_rand_bytes() {
     hash.copy_from_slice(&hash_bytes);
     let salt = vec![];
 
+    let readers = HashMap::new();
+    let default_readers = HashMap::new();
     let init_args = core_nft_api::init_private_content_upload::Args {
         token_id_opt: None,
         entry_name: None,
         plaintext_hash: hash,
         file_hash: hash,
         salt: salt.clone(),
-        readers: HashMap::new(),
-        default_readers: HashMap::new(),
+        readers: readers.clone(),
+        default_readers: default_readers.clone(),
         storage_canister_id: collection_canister_id,
         storage_path: storage_path.clone(),
         plaintext_size,
@@ -81,7 +94,7 @@ fn test_private_content_upload_and_mint_rand_bytes() {
     };
 
     let init_response =
-        init_private_content_upload(pic, controller, collection_canister_id, &init_args);
+        init_private_content_upload(pic, nft_owner1, collection_canister_id, &init_args);
     assert!(
         init_response.is_ok(),
         "init_private_content_upload failed: {:?}",
@@ -90,7 +103,7 @@ fn test_private_content_upload_and_mint_rand_bytes() {
 
     let store_response = store_private_content_chunk(
         pic,
-        controller,
+        nft_owner1,
         collection_canister_id,
         &core_nft_api::store_private_content_chunk::Args {
             token_id_opt: None,
@@ -109,7 +122,7 @@ fn test_private_content_upload_and_mint_rand_bytes() {
 
     let finalize_response = finalize_private_content_upload(
         pic,
-        controller,
+        nft_owner1,
         collection_canister_id,
         &core_nft_api::finalize_private_content_upload::Args {
             token_id_opt: None,
@@ -126,17 +139,13 @@ fn test_private_content_upload_and_mint_rand_bytes() {
 
     let private_entry = PrivateEntry {
         status: PrivateContentStatus::PendingMinting,
-        readers: HashMap::new(),
+        readers: readers.clone(),
         hash,
         salt,
         plaintext_size,
         file_size,
         encryption_mode: EncryptionMode::AES256,
-        canonical_identity: construct_canonical_identity(
-            Principal::anonymous(),
-            &HashMap::new(),
-            &HashMap::new(),
-        ),
+        canonical_identity: construct_canonical_identity(nft_owner1, &readers, &default_readers),
         previous_canonical_identity: None,
         storage_canister_id: collection_canister_id,
         storage_path: storage_path.clone(),
@@ -148,7 +157,7 @@ fn test_private_content_upload_and_mint_rand_bytes() {
 
     let mint_response = mint(
         pic,
-        controller,
+        nft_owner1,
         collection_canister_id,
         &mint::Args {
             mint_requests: vec![MintRequest {
@@ -158,11 +167,11 @@ fn test_private_content_upload_and_mint_rand_bytes() {
                 },
                 memo: None,
                 metadata: vec![],
-                public_content: None,
                 private_content: Some(NftPrivateRecordMint {
-                    default_readers: HashMap::new(),
+                    default_readers: default_readers.clone(),
                     entries,
                 }),
+                public_content: None,
             }],
         },
     );
@@ -216,8 +225,7 @@ fn test_private_content_encryption_and_decryption_with_vetkeys() {
             alias: None,
         },
     );
-    let canonical_identity =
-        construct_canonical_identity(Principal::anonymous(), &readers, &default_readers);
+    let canonical_identity = construct_canonical_identity(nft_owner1, &readers, &default_readers);
 
     // 1. Calculate metadata for the plaintext BEFORE encryption
     let plaintext_hash_bytes = Sha256::digest(&plaintext);
@@ -307,12 +315,12 @@ fn test_private_content_encryption_and_decryption_with_vetkeys() {
     };
 
     let init_response =
-        init_private_content_upload(pic, controller, collection_canister_id, &init_args);
+        init_private_content_upload(pic, nft_owner1, collection_canister_id, &init_args);
     assert!(init_response.is_ok(), "init_private_content_upload failed");
 
     let store_response = store_private_content_chunk(
         pic,
-        controller,
+        nft_owner1,
         collection_canister_id,
         &core_nft_api::store_private_content_chunk::Args {
             token_id_opt: None,
@@ -328,7 +336,7 @@ fn test_private_content_encryption_and_decryption_with_vetkeys() {
 
     let finalize_response = finalize_private_content_upload(
         pic,
-        controller,
+        nft_owner1,
         collection_canister_id,
         &core_nft_api::finalize_private_content_upload::Args {
             token_id_opt: None,
@@ -364,7 +372,7 @@ fn test_private_content_encryption_and_decryption_with_vetkeys() {
 
     let mint_response = mint(
         pic,
-        controller,
+        nft_owner1,
         collection_canister_id,
         &mint::Args {
             mint_requests: vec![MintRequest {
@@ -374,15 +382,16 @@ fn test_private_content_encryption_and_decryption_with_vetkeys() {
                 },
                 memo: None,
                 metadata: vec![],
-                public_content: None,
                 private_content: Some(NftPrivateRecordMint {
                     default_readers: HashMap::new(),
                     entries,
                 }),
+                public_content: None,
             }],
         },
-    );
-    assert!(mint_response.is_ok(), "Mint with private content failed");
+    )
+    .unwrap();
+    // assert!(mint_response.is_ok(), "Mint with private content failed");
 
     // -------------------------------------------------------------------------
     // STEP 4: Generate transport key
@@ -491,7 +500,7 @@ fn test_private_content_encryption_unauthorized_access() {
     // -------------------------------------------------------------------------
     // STEP 1: Fetch the Master VetKey Public Key from the Canister
     // -------------------------------------------------------------------------
-    let pub_key_response = derive_vetkey_public_key(pic, controller, collection_canister_id, &())
+    let pub_key_response = derive_vetkey_public_key(pic, nft_owner1, collection_canister_id, &())
         .expect("Canister returned an error deriving public key");
 
     // Reconstruct the DerivedPublicKey object from the canister response bytes
@@ -560,12 +569,12 @@ fn test_private_content_encryption_unauthorized_access() {
     };
 
     let init_response =
-        init_private_content_upload(pic, controller, collection_canister_id, &init_args);
+        init_private_content_upload(pic, nft_owner1, collection_canister_id, &init_args);
     assert!(init_response.is_ok(), "init_private_content_upload failed");
 
     let store_response = store_private_content_chunk(
         pic,
-        controller,
+        nft_owner1,
         collection_canister_id,
         &core_nft_api::store_private_content_chunk::Args {
             token_id_opt: None,
@@ -581,7 +590,7 @@ fn test_private_content_encryption_unauthorized_access() {
 
     let finalize_response = finalize_private_content_upload(
         pic,
-        controller,
+        nft_owner1,
         collection_canister_id,
         &core_nft_api::finalize_private_content_upload::Args {
             token_id_opt: None,
@@ -600,7 +609,7 @@ fn test_private_content_encryption_unauthorized_access() {
 
     let mint_response = mint(
         pic,
-        controller,
+        nft_owner1,
         collection_canister_id,
         &mint::Args {
             mint_requests: vec![MintRequest {
@@ -610,11 +619,11 @@ fn test_private_content_encryption_unauthorized_access() {
                 },
                 memo: None,
                 metadata: vec![],
-                public_content: None,
                 private_content: Some(NftPrivateRecordMint {
                     default_readers: HashMap::new(),
                     entries: entries.clone(),
                 }),
+                public_content: None,
             }],
         },
     );
@@ -721,7 +730,7 @@ fn test_private_content_readers_access() {
     // -------------------------------------------------------------------------
     // STEP 1: Fetch the Master VetKey Public Key from the Canister
     // -------------------------------------------------------------------------
-    let pub_key_response = derive_vetkey_public_key(pic, controller, collection_canister_id, &())
+    let pub_key_response = derive_vetkey_public_key(pic, nft_owner1, collection_canister_id, &())
         .expect("Canister returned an error deriving public key");
 
     // Reconstruct the DerivedPublicKey object from the canister response bytes
@@ -790,12 +799,12 @@ fn test_private_content_readers_access() {
     };
 
     let init_response =
-        init_private_content_upload(pic, controller, collection_canister_id, &init_args);
+        init_private_content_upload(pic, nft_owner1, collection_canister_id, &init_args);
     assert!(init_response.is_ok(), "init_private_content_upload failed");
 
     let store_response = store_private_content_chunk(
         pic,
-        controller,
+        nft_owner1,
         collection_canister_id,
         &core_nft_api::store_private_content_chunk::Args {
             token_id_opt: None,
@@ -811,7 +820,7 @@ fn test_private_content_readers_access() {
 
     let finalize_response = finalize_private_content_upload(
         pic,
-        controller,
+        nft_owner1,
         collection_canister_id,
         &core_nft_api::finalize_private_content_upload::Args {
             token_id_opt: None,
@@ -830,7 +839,7 @@ fn test_private_content_readers_access() {
 
     let mint_response = mint(
         pic,
-        controller,
+        nft_owner1,
         collection_canister_id,
         &mint::Args {
             mint_requests: vec![MintRequest {
@@ -840,14 +849,15 @@ fn test_private_content_readers_access() {
                 },
                 memo: None,
                 metadata: vec![],
-                public_content: None,
                 private_content: Some(NftPrivateRecordMint {
                     default_readers: HashMap::new(),
                     entries: entries.clone(),
                 }),
+                public_content: None,
             }],
         },
     );
+    println!("Mint: {:?}", mint_response);
     assert!(mint_response.is_ok(), "Mint with private content failed");
 
     // -------------------------------------------------------------------------
@@ -920,6 +930,11 @@ fn test_private_content_default_readers_access() {
     )]
     .into_iter()
     .collect();
+    println!(
+        "Owner: {:?}, controller: {:?}",
+        nft_owner1.to_text(),
+        controller.to_text()
+    );
     let canonical_identity = construct_canonical_identity(nft_owner1, &readers, &default_readers); // NOTE: canonical identity is formed on the frontend side. If it's formed incorrectly
 
     // 1. Calculate metadata for the plaintext BEFORE encryption
@@ -942,7 +957,7 @@ fn test_private_content_default_readers_access() {
     // -------------------------------------------------------------------------
     // STEP 1: Fetch the Master VetKey Public Key from the Canister
     // -------------------------------------------------------------------------
-    let pub_key_response = derive_vetkey_public_key(pic, controller, collection_canister_id, &())
+    let pub_key_response = derive_vetkey_public_key(pic, nft_owner1, collection_canister_id, &())
         .expect("Canister returned an error deriving public key");
 
     // Reconstruct the DerivedPublicKey object from the canister response bytes
@@ -1011,12 +1026,12 @@ fn test_private_content_default_readers_access() {
     };
 
     let init_response =
-        init_private_content_upload(pic, controller, collection_canister_id, &init_args);
+        init_private_content_upload(pic, nft_owner1, collection_canister_id, &init_args);
     assert!(init_response.is_ok(), "init_private_content_upload failed");
 
     let store_response = store_private_content_chunk(
         pic,
-        controller,
+        nft_owner1,
         collection_canister_id,
         &core_nft_api::store_private_content_chunk::Args {
             token_id_opt: None,
@@ -1032,7 +1047,7 @@ fn test_private_content_default_readers_access() {
 
     let finalize_response = finalize_private_content_upload(
         pic,
-        controller,
+        nft_owner1,
         collection_canister_id,
         &core_nft_api::finalize_private_content_upload::Args {
             token_id_opt: None,
@@ -1051,7 +1066,7 @@ fn test_private_content_default_readers_access() {
 
     let mint_response = mint(
         pic,
-        controller,
+        nft_owner1,
         collection_canister_id,
         &mint::Args {
             mint_requests: vec![MintRequest {
@@ -1061,14 +1076,15 @@ fn test_private_content_default_readers_access() {
                 },
                 memo: None,
                 metadata: vec![],
-                public_content: None,
                 private_content: Some(NftPrivateRecordMint {
-                    default_readers: HashMap::new(),
+                    default_readers: default_readers.clone(),
                     entries: entries.clone(),
                 }),
+                public_content: None,
             }],
         },
     );
+    println!("Mint :{:?}", mint_response);
     assert!(mint_response.is_ok(), "Mint with private content failed");
 
     // -------------------------------------------------------------------------
@@ -1261,11 +1277,11 @@ fn test_private_content_reencryption_workflow() {
                 },
                 memo: None,
                 metadata: vec![],
-                public_content: None,
                 private_content: Some(NftPrivateRecordMint {
                     default_readers: HashMap::new(),
                     entries: entries.clone(),
                 }),
+                public_content: None,
             }],
         },
     )
@@ -1645,11 +1661,11 @@ fn test_private_content_transfer_workflow() {
                 },
                 memo: None,
                 metadata: vec![],
-                public_content: None,
                 private_content: Some(NftPrivateRecordMint {
                     default_readers: HashMap::new(),
                     entries: entries.clone(),
                 }),
+                public_content: None,
             }],
         },
     )
@@ -1893,4 +1909,156 @@ fn test_private_content_transfer_workflow() {
     // Test with anonymous user
     let derive_response_new_1 = derive_vetkey(pic, reader_a, collection_canister_id, &derive_args);
     assert!(derive_response_new_1.is_err());
+}
+
+// FIXME: ideally we need to decline such interceptions
+#[test]
+fn test_private_content_upload_intercept() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        ..
+    } = test_env;
+
+    grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: nft_owner1,
+            permission: Permission::Minting,
+        }),
+    )
+    .unwrap();
+    grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: nft_owner1,
+            permission: Permission::UpdateUploads,
+        }),
+    )
+    .unwrap();
+
+    let content = b"0123456789abcdef".to_vec();
+    let plaintext_size = content.len() as u64;
+    let file_size = plaintext_size;
+    let entry_name = "/private_test.bin".to_string();
+    let storage_path = "/private/test.bin".to_string();
+
+    let hash_bytes = Sha256::digest(&content);
+    let mut hash = [0u8; 32];
+    hash.copy_from_slice(&hash_bytes);
+    let salt = vec![];
+
+    let readers = HashMap::new();
+    let default_readers = HashMap::new();
+    let init_args = core_nft_api::init_private_content_upload::Args {
+        token_id_opt: None,
+        entry_name: None,
+        plaintext_hash: hash,
+        file_hash: hash,
+        salt: salt.clone(),
+        readers: readers.clone(),
+        default_readers: default_readers.clone(),
+        storage_canister_id: collection_canister_id,
+        storage_path: storage_path.clone(),
+        plaintext_size,
+        expected_chunks: 1,
+        chunk_size: Some(plaintext_size),
+        file_size,
+        encryption_mode: EncryptionMode::AES256,
+    };
+
+    let init_response =
+        init_private_content_upload(pic, nft_owner1, collection_canister_id, &init_args);
+    assert!(
+        init_response.is_ok(),
+        "init_private_content_upload failed: {:?}",
+        init_response
+    );
+
+    let store_response = store_private_content_chunk(
+        pic,
+        controller,
+        collection_canister_id,
+        &core_nft_api::store_private_content_chunk::Args {
+            token_id_opt: None,
+            entry_name: None,
+            storage_path: storage_path.clone(),
+            plaintext_hash: hash,
+            chunk_index: Nat::from(0u64),
+            chunk_data: ByteBuf::from(content.clone()),
+        },
+    );
+    assert!(
+        store_response.is_ok(),
+        "store_private_content_chunk failed: {:?}",
+        store_response
+    );
+
+    let finalize_response = finalize_private_content_upload(
+        pic,
+        nft_owner1,
+        collection_canister_id,
+        &core_nft_api::finalize_private_content_upload::Args {
+            token_id_opt: None,
+            entry_name: None,
+            hash,
+            storage_path: storage_path.clone(),
+        },
+    );
+    assert!(
+        finalize_response.is_ok(),
+        "finalize_private_content_upload failed: {:?}",
+        finalize_response
+    );
+
+    let private_entry = PrivateEntry {
+        status: PrivateContentStatus::PendingMinting,
+        readers: readers.clone(),
+        hash,
+        salt,
+        plaintext_size,
+        file_size,
+        encryption_mode: EncryptionMode::AES256,
+        canonical_identity: construct_canonical_identity(nft_owner1, &readers, &default_readers),
+        previous_canonical_identity: None,
+        storage_canister_id: collection_canister_id,
+        storage_path: storage_path.clone(),
+        pending_upload: None,
+        format_version: 1,
+    };
+
+    let entries = HashMap::from([("test_file".to_string(), private_entry.hash)]);
+
+    let mint_response = mint(
+        pic,
+        nft_owner1,
+        collection_canister_id,
+        &mint::Args {
+            mint_requests: vec![MintRequest {
+                token_owner: Account {
+                    owner: nft_owner1,
+                    subaccount: None,
+                },
+                memo: None,
+                metadata: vec![],
+                private_content: Some(NftPrivateRecordMint {
+                    default_readers: default_readers.clone(),
+                    entries,
+                }),
+                public_content: None,
+            }],
+        },
+    );
+    assert!(
+        mint_response.is_ok(),
+        "mint with private content failed: {:?}",
+        mint_response
+    );
 }

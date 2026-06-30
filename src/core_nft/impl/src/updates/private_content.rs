@@ -30,7 +30,7 @@ pub async fn init_private_content_upload(
                 .as_deref()
                 .ok_or(core_nft_common::types::private_content::PrivateContentError::NotFound)?;
 
-            read_state(|state| {
+            mutate_state(|state| {
                 state.data.private_content_system.reencryption_validate(
                     token_id,
                     &entry_name,
@@ -55,8 +55,8 @@ pub async fn init_private_content_upload(
             })
         }
         None => {
-            read_state(|state| {
-                state.data.private_content_system.init_premint_validate(
+            mutate_state(|state| {
+                state.data.private_content_system.init_upload_validate(
                     &args.plaintext_hash,
                     args.encryption_mode,
                     args.file_size,
@@ -71,7 +71,7 @@ pub async fn init_private_content_upload(
 
             mutate_state(|state| {
                 let caller = ic_cdk::api::msg_caller();
-                state.data.private_content_system.init_premint_store(
+                state.data.private_content_system.init_upload_register(
                     args.plaintext_hash,
                     args.salt,
                     caller,
@@ -114,7 +114,7 @@ pub async fn store_private_content_chunk(
                 .as_deref()
                 .ok_or(core_nft_common::types::private_content::PrivateContentError::NotFound)?;
 
-            state.data.private_content_system.reupload_chunk(
+            state.data.private_content_system.reupload_chunk_register(
                 token_id,
                 &entry_name,
                 chunk_index,
@@ -122,7 +122,7 @@ pub async fn store_private_content_chunk(
             )
         } else {
             // entry_name removed from upload_chunk as per previous fix
-            state.data.private_content_system.upload_chunk(
+            state.data.private_content_system.upload_chunk_register(
                 &args.plaintext_hash,
                 chunk_index,
                 chunk_data,
@@ -172,12 +172,12 @@ pub async fn finalize_private_content_upload(
             state
                 .data
                 .private_content_system
-                .finalize_reupload(token_id, &entry_name)
+                .finalize_reupload_register(token_id, &entry_name)
         } else {
             state
                 .data
                 .private_content_system
-                .finalize_upload(&args.hash)
+                .finalize_upload_register(&args.hash)
         }
     });
 
@@ -348,6 +348,8 @@ pub fn set_readers(args: set_readers::Args) -> set_readers::Response {
 }
 
 #[cfg(feature = "inttest")]
+use ic_cdk_macros::query;
+#[cfg(feature = "inttest")]
 #[query]
 pub fn __get_private_entry_test(
     args: __get_private_entry_test::Args,
@@ -369,7 +371,7 @@ pub fn __get_premint_entry_test(
         state
             .data
             .private_content_system
-            .premint_cache
+            .temp_file_cache
             .get(&args.hash)
             .cloned()
             .ok_or_else(|| "Not found".to_string())

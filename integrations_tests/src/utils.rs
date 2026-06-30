@@ -50,8 +50,8 @@ pub fn mint_nft(
             token_owner: owner,
             memo: Some(serde_bytes::ByteBuf::from("memo")),
             metadata,
-            public_content: None,
             private_content: None,
+            public_content: None,
         }],
     };
 

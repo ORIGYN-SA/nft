@@ -3,17 +3,19 @@ use crate::guards::{
     caller_has_read_uploads_permission, caller_has_update_collection_metadata_permission,
     caller_has_update_metadata_permission, caller_has_update_uploads_permission, GuardManagement,
 };
-use crate::state::{icrc3_add_transaction, mutate_state, read_state};
+use crate::state::{icrc3_add_transaction, mutate_state, read_state, InternalFilestorageData};
 use crate::types::metadata::__METADATA;
 use crate::types::nft::Icrc7Token;
 use crate::utils::check_memo;
+
+#[cfg(feature = "inttest")]
+pub use core_nft_api::__get_public_entry_test;
+use core_nft_common::resolve_readers;
 use core_nft_common::types::http::add_redirection;
 use core_nft_common::types::sub_canister::StorageCanister;
 use core_nft_common::types::{icrc7, management};
 use core_nft_common::utils::trace;
-use core_nft_common::PublicContentStatus;
-use core_nft_common::CHUNK_SIZE;
-use core_nft_common::MAX_CONTENT_SIZE;
+use core_nft_common::MAX_PRIVATE_CONTENT_SIZE;
 
 use bity_ic_icrc3::transaction::{ICRC7Transaction, ICRC7TransactionData};
 use bity_ic_storage_canister_api::types::storage::UploadState;
@@ -174,7 +176,7 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
     let mut new_tokens = Vec::new();
     let mut transactions = Vec::new();
     let timestamp = ic_cdk::api::time();
-    let mut seen_private_hashes = std::collections::HashSet::new();
+    let mut seen_hashes = std::collections::HashSet::new();
 
     for (i, mint_request) in req.mint_requests.iter().enumerate() {
         let token_id = current_token_id.clone() + Nat::from(i as u64);
@@ -182,7 +184,7 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
         if let Some(pc) = &mint_request.private_content {
             for (entry_name, entry_hash) in &pc.entries {
                 // Prevent double-spending a cache entry in the same batch
-                if !seen_private_hashes.insert(*entry_hash) {
+                if !seen_hashes.insert(*entry_hash) {
                     return Err(management::mint::MintError::StorageCanisterError(format!(
                         "Duplicate private content hash '{}' in batch",
                         hex::encode(entry_hash)
@@ -193,7 +195,7 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
                     state
                         .data
                         .private_content_system
-                        .premint_cache
+                        .temp_file_cache
                         .get(entry_hash)
                         .cloned()
                 })
@@ -214,7 +216,7 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
                     )));
                 }
 
-                if entry.plaintext_size > MAX_CONTENT_SIZE {
+                if entry.plaintext_size > MAX_PRIVATE_CONTENT_SIZE {
                     return Err(management::mint::MintError::StorageCanisterError(format!(
                         "Private entry '{}' exceeds maximum size",
                         entry_name
@@ -227,60 +229,25 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
                     &entry.readers,
                     &pc.default_readers,
                 );
+
+                ic_cdk::println!(
+                    "[mint] Validating private content identity for entry '{}'",
+                    entry_name
+                );
+                ic_cdk::println!("[mint] Token owner: {}", mint_request.token_owner.owner);
+                ic_cdk::println!("[mint] Entry readers: {:?}", entry.readers);
+                ic_cdk::println!("[mint] Default readers: {:?}", pc.default_readers);
+                ic_cdk::println!(
+                    "[mint] Expected canonical identity: {:?}",
+                    expected_identity
+                );
+                ic_cdk::println!(
+                    "[mint] Stored canonical identity: {:?}",
+                    entry.canonical_identity
+                );
                 if entry.canonical_identity != expected_identity {
                     return Err(management::mint::MintError::StorageCanisterError(format!(
                         "Private content identity mismatch for entry '{}'. It may have been initialized for a different owner.", entry_name
-                    )));
-                }
-            }
-        }
-
-        // --- MODIFIED: VALIDATE PUBLIC CONTENT WITH DEDUPLICATION SUPPORT ---
-        if let Some(pub_c) = &mint_request.public_content {
-            for (entry_name, entry_hash) in &pub_c.entries {
-                // Read-state search checking premint cache OR fallback active records
-                let entry_opt = read_state(|state| {
-                    state
-                        .data
-                        .public_content_system
-                        .premint_cache
-                        .get(entry_hash)
-                        .cloned()
-                        .or_else(|| {
-                            state
-                                .data
-                                .public_content_system
-                                .nft_public
-                                .values()
-                                .find_map(|record| {
-                                    record
-                                        .entries
-                                        .values()
-                                        .find(|e| e.hash == *entry_hash)
-                                        .cloned()
-                                })
-                        })
-                });
-
-                let entry = entry_opt.ok_or_else(|| {
-                    management::mint::MintError::StorageCanisterError(format!(
-                        "Public entry '{}' with hash '{}' not found in cache or active storage",
-                        entry_name,
-                        hex::encode(entry_hash)
-                    ))
-                })?;
-
-                if entry.state != UploadState::Finalized {
-                    return Err(management::mint::MintError::StorageCanisterError(format!(
-                        "Public entry '{}' is not in a valid state for minting",
-                        entry_name
-                    )));
-                }
-
-                if entry.file_size > MAX_CONTENT_SIZE {
-                    return Err(management::mint::MintError::StorageCanisterError(format!(
-                        "Public entry '{}' exceeds maximum size",
-                        entry_name
                     )));
                 }
             }
@@ -307,7 +274,8 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
         transactions.push(transaction);
     }
 
-    // Atomic block
+    // Atomic block: If anything fails here, we should have trapped earlier or we use Results carefully.
+    // On ICP, the ledger (icrc3_add_transaction) and tokens_list must be updated together.
     mutate_state(|state| {
         for (i, transaction) in transactions.into_iter().enumerate() {
             if let Err(e) = icrc3_add_transaction(transaction) {
@@ -328,7 +296,7 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
                 .push(token_id);
         }
 
-        // Handle PendingMinting cache migrations — private content
+        // Handle PendingMinting cache migrations
         for (i, mint_request) in req.mint_requests.iter().enumerate() {
             if let Some(pc) = &mint_request.private_content {
                 let tid = current_token_id.clone() + Nat::from(i as u64);
@@ -348,21 +316,6 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
                         ));
                     });
             }
-
-            // Handle PendingMinting cache migrations — public content
-            if let Some(pub_c) = &mint_request.public_content {
-                let tid = current_token_id.clone() + Nat::from(i as u64);
-                state
-                    .data
-                    .public_content_system
-                    .mint_public_content(pub_c.entries.clone(), tid.clone())
-                    .unwrap_or_else(|e| {
-                        ic_cdk::trap(&format!(
-                            "Failed to register public content for token {}: {:?}",
-                            tid, e
-                        ));
-                    });
-            }
         }
 
         state.data.last_token_id =
@@ -375,6 +328,204 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
     ));
     Ok(current_token_id.clone())
 }
+
+#[update(guard = "caller_has_minting_permission")]
+pub fn append_file(
+    req: management::append_file::Args,
+) -> management::append_file::Response {
+    trace("Appending files to NFT");
+    let caller = ic_cdk::api::msg_caller();
+    let _guard_principal = GuardManagement::new(caller)
+        .map_err(|_| management::append_file::AppendFileError::ConcurrentManagementCall)?;
+
+    // 1. Validate Memo
+    for request in &req.append_file_requests {
+        match check_memo(&request.memo) {
+            Ok(_) => {}
+            Err(_) => {
+                return Err(management::append_file::AppendFileError::InvalidMemo);
+            }
+        }
+    }
+
+    let mut seen_hashes = std::collections::HashSet::new();
+
+    // 2. Validate all request details
+    for request in &req.append_file_requests {
+        // Validate that token exists
+        let token_exists = read_state(|state| state.data.tokens_list.contains_key(&request.token_id));
+        if !token_exists {
+            return Err(management::append_file::AppendFileError::TokenDoesNotExists);
+        }
+
+        // Validate public content if present
+        if let Some(pub_c) = &request.public_content {
+            // Check for duplicate entry name
+            let has_duplicate_entry = read_state(|state| {
+                state.data.public_content_system.nft_public.get(&request.token_id)
+                    .map(|record| {
+                        pub_c.entries.keys().any(|entry_name| record.entries.contains_key(entry_name))
+                    })
+                    .unwrap_or(false)
+            });
+            if has_duplicate_entry {
+                return Err(management::append_file::AppendFileError::FileAlreadyExists);
+            }
+
+            for (_entry_name, file_path) in &pub_c.entries {
+                let entry_exists = read_state(|state| {
+                    state.data.public_content_system.temp_file_cache.contains_key(file_path) ||
+                    state.data.public_content_system.nft_public.values().any(|record| {
+                        record.entries.values().any(|e| &e.hash == file_path)
+                    })
+                });
+                if !entry_exists {
+                    return Err(management::append_file::AppendFileError::NotFound);
+                }
+
+                let is_finalized = read_state(|state| {
+                    if let Some(entry) = state.data.public_content_system.temp_file_cache.get(file_path) {
+                        entry.state == UploadState::Finalized
+                    } else {
+                        true
+                    }
+                });
+                if !is_finalized {
+                    return Err(management::append_file::AppendFileError::InvalidStateTransition);
+                }
+            }
+        }
+
+        // Validate private content if present
+        if let Some(priv_c) = &request.private_content {
+            let token_owner = read_state(|state| {
+                state.data.tokens_list.get(&request.token_id).map(|t| t.token_owner.owner)
+            }).ok_or(management::append_file::AppendFileError::TokenDoesNotExists)?;
+
+            for (entry_name, entry_hash) in &priv_c.entries {
+                if !seen_hashes.insert(*entry_hash) {
+                    return Err(management::append_file::AppendFileError::StorageCanisterError(format!(
+                        "Duplicate private content hash '{}' in batch",
+                        hex::encode(entry_hash)
+                    )));
+                }
+
+                // Check for duplicate entry name
+                let entry_exists = read_state(|state| {
+                    state.data.private_content_system.nft_private.get(&request.token_id)
+                        .map(|record| record.entries.contains_key(entry_name))
+                        .unwrap_or(false)
+                });
+                if entry_exists {
+                    return Err(management::append_file::AppendFileError::FileAlreadyExists);
+                }
+
+                let entry = read_state(|state| {
+                    state
+                        .data
+                        .private_content_system
+                        .temp_file_cache
+                        .get(entry_hash)
+                        .cloned()
+                })
+                .ok_or(management::append_file::AppendFileError::NotFound)?;
+
+                if entry.status != PrivateContentStatus::PendingMinting
+                    && entry.status != PrivateContentStatus::Active
+                {
+                    return Err(management::append_file::AppendFileError::InvalidStateTransition);
+                }
+
+                if entry.plaintext_size > MAX_PRIVATE_CONTENT_SIZE {
+                    return Err(management::append_file::AppendFileError::StorageCanisterError(format!(
+                        "Private entry '{}' exceeds maximum size",
+                        entry_name
+                    )));
+                }
+
+                let expected_identity = construct_canonical_identity(
+                    token_owner,
+                    &entry.readers,
+                    &priv_c.default_readers,
+                );
+
+                if entry.canonical_identity != expected_identity {
+                    return Err(management::append_file::AppendFileError::StorageCanisterError(format!(
+                        "Private content identity mismatch for entry '{}'. It may have been initialized for a different owner.", entry_name
+                    )));
+                }
+            }
+        }
+    }
+
+    // 3. Mutate state
+    mutate_state(|state| {
+        for request in req.append_file_requests {
+            // Append public content
+            if let Some(pub_c) = request.public_content {
+                let public_system = &mut state.data.public_content_system;
+                
+                let mut resolved_entries = Vec::new();
+                for (entry_name, file_path) in pub_c.entries {
+                    let mut entry = match public_system.temp_file_cache.remove(&file_path) {
+                        Some(cached_entry) => cached_entry,
+                        None => public_system
+                            .nft_public
+                            .values()
+                            .find_map(|record| record.entries.values().find(|e| e.hash == file_path))
+                            .cloned()
+                            .unwrap(), // Safe because of prior validation
+                    };
+                    entry.state = UploadState::Finalized;
+                    resolved_entries.push((entry_name, entry));
+                }
+
+                let public_record = public_system.nft_public.entry(request.token_id.clone()).or_default();
+                for (entry_name, entry) in resolved_entries {
+                    let file_identity = entry.storage_path.clone();
+
+                    public_system.file_to_nfts
+                        .entry(file_identity.clone())
+                        .or_default()
+                        .insert(request.token_id.clone());
+
+                    public_system.nft_to_files
+                        .entry(request.token_id.clone())
+                        .or_default()
+                        .insert(file_identity);
+
+                    public_record.entries.insert(entry_name, entry);
+                }
+            }
+
+            // Append private content
+            if let Some(priv_c) = request.private_content {
+                let token_owner = state.data.tokens_list.get(&request.token_id).unwrap().token_owner.owner;
+                state.data.private_content_system.append_private_content(
+                    priv_c.default_readers,
+                    priv_c.entries,
+                    request.token_id.clone(),
+                    token_owner,
+                ).unwrap_or_else(|e| {
+                    ic_cdk::trap(&format!(
+                        "Failed to register private content for token {}: {:?}",
+                        request.token_id, e
+                    ));
+                });
+            }
+
+            // Update metadata
+            if !request.metadata.is_empty() {
+                if let Some(token) = state.data.tokens_list.get_mut(&request.token_id) {
+                    __METADATA.with_borrow_mut(|m| token.add_metadata(m, request.metadata));
+                }
+            }
+        }
+    });
+
+    Ok(())
+}
+
 
 #[update(guard = "caller_has_update_metadata_permission")]
 pub fn update_nft_metadata(
@@ -515,17 +666,6 @@ pub fn burn_nft(token_id: Nat) -> management::burn_nft::Response {
 
     mutate_state(|state| {
         state.data.tokens_list.remove(&token_id);
-
-        // TODO: decide what to do with those files. Delete immediately or wait for some time?
-        let _orphaned_public_files = state
-            .data
-            .public_content_system
-            .burn_public_content(&token_id);
-
-        state
-            .data
-            .private_content_system
-            .burn_private_content(&token_id);
     });
 
     Ok(())
@@ -537,13 +677,9 @@ pub async fn init_upload(data: init_upload::Args) -> init_upload::Response {
     let _guard_principal = GuardManagement::new(caller)
         .map_err(|_| init_upload::InitUploadError::ConcurrentManagementCall)?;
 
-    read_state(|state| {
-        state
-            .data
-            .public_content_system
-            .init_premint_validate(&data.file_hash, data.file_size)
-    })
-    .expect("Premint file upload validation failed");
+    if read_state(|state| state.internal_filestorage.contains_path(&data.file_path)) {
+        return Err(init_upload::InitUploadError::FileAlreadyExists);
+    }
 
     let mut sub_canister_manager = read_state(|state| state.data.sub_canister_manager.clone());
 
@@ -555,18 +691,36 @@ pub async fn init_upload(data: init_upload::Args) -> init_upload::Response {
         }
     };
 
-    // FIXME
-    let chunk_size = data.chunk_size.unwrap_or(CHUNK_SIZE.try_into().unwrap());
-    let expected_chunks = data.file_size.div_ceil(chunk_size).try_into().unwrap();
     mutate_state(|state| {
-        state.data.public_content_system.init_premint_store(
-            data.file_hash,
+        state.data.sub_canister_manager = sub_canister_manager;
+        state.internal_filestorage.insert(
+            data.file_path.clone(),
+            InternalFilestorageData {
+                init_timestamp: ic_cdk::api::time(),
+                state: UploadState::Init,
+                canister: canister.clone(),
+                path: data.file_path.clone(),
+            },
+        );
+
+        let timestamp = ic_cdk::api::time();
+        let chunk_size = data.chunk_size.unwrap_or(core_nft_common::CHUNK_SIZE as u64);
+        let expected_chunks = if chunk_size > 0 {
+            ((data.file_size + chunk_size - 1) / chunk_size) as usize
+        } else {
+            1
+        };
+        let _ = state.data.public_content_system.init_upload_register(
+            data.file_path.clone(),
             canister,
             data.file_path,
             expected_chunks,
             data.file_size,
-        )
-    })
+            timestamp,
+        );
+    });
+
+    Ok(init_upload::InitUploadResp {})
 }
 
 #[update(guard = "caller_has_update_uploads_permission")]
@@ -575,36 +729,20 @@ pub async fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
     let _guard_principal = GuardManagement::new(caller)
         .map_err(|_| store_chunk::StoreChunkError::ConcurrentManagementCall)?;
 
-    let (init_timestamp, canister_id, file_path) = match read_state(|state| {
-        state
-            .data
-            .public_content_system
-            .get_public_file_by_path(&data.file_path)
-    }) {
-        Some(data) => match data.state {
-            UploadState::Init => (
-                data.created_at_ns,
-                data.storage_canister_id,
-                data.storage_path,
-            ),
-            UploadState::ReuploadInit => (
-                data.created_at_ns,
-                data.storage_canister_id,
-                data.storage_path,
-            ),
-            UploadState::InProgress => (
-                data.created_at_ns,
-                data.storage_canister_id,
-                data.storage_path,
-            ),
-            UploadState::Finalized => {
-                return Err(store_chunk::StoreChunkError::UploadAlreadyFinalized);
+    let (init_timestamp, canister_id, file_path) =
+        match read_state(|state| state.internal_filestorage.get(&data.file_path).cloned()) {
+            Some(data) => match data.state {
+                UploadState::Init => (data.init_timestamp, data.canister, data.path),
+                UploadState::ReuploadInit => (data.init_timestamp, data.canister, data.path),
+                UploadState::InProgress => (data.init_timestamp, data.canister, data.path),
+                UploadState::Finalized => {
+                    return Err(store_chunk::StoreChunkError::UploadAlreadyFinalized);
+                }
+            },
+            None => {
+                return Err(store_chunk::StoreChunkError::UploadNotInitialized);
             }
-        },
-        None => {
-            return Err(store_chunk::StoreChunkError::UploadNotInitialized);
-        }
-    };
+        };
 
     let canister: StorageCanister = match read_state(|state| {
         state
@@ -614,10 +752,9 @@ pub async fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
     }) {
         Some(canister) => canister,
         None => {
-            // FIXME
-            // mutate_state(|state| {
-            //     state.data.public_content_system..remove(&data.file_path);
-            // });
+            mutate_state(|state| {
+                state.internal_filestorage.remove(&data.file_path);
+            });
             return Err(store_chunk::StoreChunkError::StorageCanisterError(
                 "Storage canister not found. Cancelling the upload.".to_string(),
             ));
@@ -631,14 +768,24 @@ pub async fn store_chunk(data: store_chunk::Args) -> store_chunk::Response {
             return Err(e);
         }
     }
-
     mutate_state(|state| {
-        state.data.public_content_system.upload_chunk(
+        let chunk_data = data.chunk_data.clone().into();
+        let _ = state.data.public_content_system.upload_chunk_register(
             &data.file_path,
-            data.chunk_id,
-            data.chunk_data,
-        )
-    })?;
+            data.chunk_id.clone(),
+            chunk_data,
+        );
+
+        state.internal_filestorage.insert(
+            data.file_path.clone(),
+            InternalFilestorageData {
+                init_timestamp: init_timestamp,
+                state: UploadState::InProgress,
+                canister: canister_id,
+                path: file_path,
+            },
+        );
+    });
 
     Ok(store_chunk::StoreChunkResp {})
 }
@@ -650,32 +797,24 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
     let _guard_principal = GuardManagement::new(caller)
         .map_err(|_| finalize_upload::FinalizeUploadError::ConcurrentManagementCall)?;
 
-    let (init_timestamp, media_path, canister_id) = match read_state(|state| {
-        state
-            .data
-            .public_content_system
-            .get_public_file_by_path(&data.file_path)
-    }) {
-        Some(data) => match data.state {
-            UploadState::Init => {
+    let (init_timestamp, media_path, canister_id) =
+        match read_state(|state| state.internal_filestorage.get(&data.file_path).cloned()) {
+            Some(data) => match data.state {
+                UploadState::Init => {
+                    return Err(finalize_upload::FinalizeUploadError::UploadNotStarted);
+                }
+                UploadState::ReuploadInit => {
+                    return Err(finalize_upload::FinalizeUploadError::UploadNotStarted);
+                }
+                UploadState::InProgress => (data.init_timestamp, data.path, data.canister),
+                UploadState::Finalized => {
+                    return Err(finalize_upload::FinalizeUploadError::UploadAlreadyFinalized);
+                }
+            },
+            None => {
                 return Err(finalize_upload::FinalizeUploadError::UploadNotStarted);
             }
-            UploadState::ReuploadInit => {
-                return Err(finalize_upload::FinalizeUploadError::UploadNotStarted);
-            }
-            UploadState::InProgress => (
-                data.created_at_ns,
-                data.storage_path,
-                data.storage_canister_id,
-            ),
-            UploadState::Finalized => {
-                return Err(finalize_upload::FinalizeUploadError::UploadAlreadyFinalized);
-            }
-        },
-        None => {
-            return Err(finalize_upload::FinalizeUploadError::UploadNotStarted);
-        }
-    };
+        };
 
     let canister: StorageCanister = match read_state(|state| {
         state
@@ -685,10 +824,9 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
     }) {
         Some(canister) => canister,
         None => {
-            // FIXME
-            // mutate_state(|state| {
-            //     state.data.public_content_system.remove(&data.file_path);
-            // });
+            mutate_state(|state| {
+                state.internal_filestorage.remove(&data.file_path);
+            });
             return Err(finalize_upload::FinalizeUploadError::StorageCanisterError(
                 "Storage canister not found. Cancelling the upload.".to_string(),
             ));
@@ -738,15 +876,24 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
     add_redirection(path.clone(), redirection_url.clone());
 
     mutate_state(|state| {
+        let _ = state.data.public_content_system.finalize_upload_register(
+            &data.file_path
+        );
+
         state
             .data
             .media_redirections
             .insert(path.clone(), redirection_url);
 
-        state
-            .data
-            .public_content_system
-            .finalize_upload(&media_path)
+        state.internal_filestorage.insert(
+            data.file_path.clone(),
+            InternalFilestorageData {
+                init_timestamp,
+                state: UploadState::Finalized,
+                canister: canister_id,
+                path: media_path,
+            },
+        );
     });
 
     let main_canister_id = ic_cdk::api::canister_self().to_string();
@@ -762,12 +909,7 @@ pub fn get_all_storage_subcanisters() -> Vec<candid::Principal> {
 
 #[query(guard = "caller_has_read_uploads_permission")]
 pub fn get_upload_status(file_path: String) -> management::get_upload_status::Response {
-    let upload_status = read_state(|state| {
-        state
-            .data
-            .public_content_system
-            .get_public_file_by_path(&file_path)
-    });
+    let upload_status = read_state(|state| state.internal_filestorage.get(&file_path).cloned());
     match upload_status {
         Some(status) => Ok(status.state),
         None => Err(management::get_upload_status::GetUploadStatusError::UploadNotFound),
@@ -780,13 +922,17 @@ pub fn get_all_uploads(
     take: Option<Nat>,
 ) -> management::get_all_uploads::Response {
     trace(&format!("prev: {:?}, take: {:?}", prev, take));
-
-    let filtered_uploads = read_state(|state| {
-        state
-            .data
-            .public_content_system
-            .get_paginated_uploads(prev, take)
-    });
+    let all_uploads = read_state(|state| state.internal_filestorage.clone());
+    let start: usize = usize::try_from(prev.unwrap_or(Nat::from(0u64)).0).unwrap_or(0);
+    let end: usize = usize::try_from(take.unwrap_or(Nat::from(100u64)).0).unwrap_or(100);
+    trace(&format!("start: {:?}, end: {:?}", start, end));
+    let filtered_uploads: HashMap<String, UploadState> = all_uploads
+        .map
+        .iter()
+        .skip(start)
+        .take(end)
+        .map(|(path, status)| (path.clone(), status.state.clone()))
+        .collect();
 
     Ok(filtered_uploads)
 }
@@ -797,24 +943,20 @@ pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response
     let _guard_principal = GuardManagement::new(caller)
         .map_err(|_| cancel_upload::CancelUploadError::ConcurrentManagementCall)?;
 
-    let canister_id = match read_state(|state| {
-        state
-            .data
-            .public_content_system
-            .get_public_file_by_path(&data.file_path)
-    }) {
-        Some(data) => match data.state {
-            UploadState::Init => data.storage_canister_id,
-            UploadState::ReuploadInit => data.storage_canister_id,
-            UploadState::InProgress => data.storage_canister_id,
-            UploadState::Finalized => {
-                return Err(cancel_upload::CancelUploadError::UploadAlreadyFinalized);
+    let canister_id =
+        match read_state(|state| state.internal_filestorage.get(&data.file_path).cloned()) {
+            Some(data) => match data.state {
+                UploadState::Init => data.canister,
+                UploadState::ReuploadInit => data.canister,
+                UploadState::InProgress => data.canister,
+                UploadState::Finalized => {
+                    return Err(cancel_upload::CancelUploadError::UploadAlreadyFinalized);
+                }
+            },
+            None => {
+                return Err(cancel_upload::CancelUploadError::UploadNotInitialized);
             }
-        },
-        None => {
-            return Err(cancel_upload::CancelUploadError::UploadNotInitialized);
-        }
-    };
+        };
 
     let canister: StorageCanister = match read_state(|state| {
         state
@@ -824,9 +966,9 @@ pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response
     }) {
         Some(canister) => canister,
         None => {
-            // mutate_state(|state| {
-            //     state.internal_filestorage.remove(&data.file_path);
-            // });
+            mutate_state(|state| {
+                state.internal_filestorage.remove(&data.file_path);
+            });
             return Err(cancel_upload::CancelUploadError::StorageCanisterError(
                 "Storage canister not found. Cancelling the upload.".to_string(),
             ));
@@ -841,9 +983,9 @@ pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response
         }
     }
 
-    // mutate_state(|state| {
-    //     state.internal_filestorage.remove(&data.file_path);
-    // });
+    mutate_state(|state| {
+        state.internal_filestorage.remove(&data.file_path);
+    });
 
     Ok(cancel_upload::CancelUploadResp {})
 }
@@ -905,4 +1047,18 @@ pub fn has_permission(args: has_permission::Args) -> has_permission::Response {
     });
 
     Ok(has_permission)
+}
+
+#[cfg(feature = "inttest")]
+#[query]
+pub fn __get_public_entry_test(
+    args: __get_public_entry_test::Args,
+) -> __get_public_entry_test::Response {
+    read_state(|state| {
+        state
+            .data
+            .public_content_system
+            .get_nft_public_entry(args.token_id, &args.entry_name)
+            .map_err(|e| e.to_string())
+    })
 }

@@ -26,5 +26,4 @@ pub use wrapped_types::*;
 pub type Sha256Hash = [u8; 32];
 
 pub const MAX_CONTENT_SIZE: u64 = 100 * 1024 * 1024; // 100MB
-                                                     // pub const MAX_PUBLIC_CONTENT_SIZE: u64 = 100 * 1024 * 1024; // 100MB
 pub const CHUNK_SIZE: usize = 1024 * 1024; // 1MB

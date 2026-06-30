@@ -1,15 +1,17 @@
-pub mod get_private_content_metadata {
+pub mod get_caller_nft_private_content_access {
     use candid::CandidType;
-    use candid::Nat;
-    use core_nft_common::types::private_content::EntryDetailResp;
     use serde::{Deserialize, Serialize};
+    use serde_bytes::ByteBuf;
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct Args {
-        pub token_id: Nat,
-        // If provided, return only the named entry; otherwise return all available to read entries.
-        pub entry_name: Option<String>,
+        pub context: ByteBuf,
     }
 
-    pub type Response = Result<Vec<EntryDetailResp>, String>;
+    #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+    pub struct DeriveVetkeyPublicKeyResp {
+        pub public_key: ByteBuf,
+    }
+
+    pub type Response = Result<DeriveVetkeyPublicKeyResp, String>;
 }

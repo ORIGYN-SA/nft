@@ -48,6 +48,50 @@ pub mod mint {
     pub type Response = Result<Nat, MintError>;
 }
 
+pub mod append_file {
+    use super::*;
+    use crate::ReaderInfo;
+    use crate::Sha256Hash;
+
+    #[derive(CandidType, Serialize, Deserialize, Clone)]
+    pub struct AppendFileRequest {
+        pub token_id: Nat,
+        pub token_owner: Account,
+        pub memo: Option<serde_bytes::ByteBuf>,
+        pub metadata: Vec<(String, ICRC3Value)>,
+        pub private_content: Option<NftPrivateRecordAppend>,
+        pub public_content: Option<NftPublicRecordAppend>,
+    }
+
+    #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+    pub struct NftPrivateRecordAppend {
+        pub default_readers: HashMap<Principal, ReaderInfo>,
+        pub entries: HashMap<String, Sha256Hash>,
+    }
+
+    #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+    pub struct NftPublicRecordAppend {
+        pub entries: HashMap<String, String>,
+    }
+
+    #[derive(CandidType, Serialize, Deserialize, Clone)]
+    pub struct Args {
+        pub append_file_requests: Vec<AppendFileRequest>,
+    }
+
+    #[derive(Serialize, Deserialize, CandidType, Debug)]
+    pub enum AppendFileError {
+        ConcurrentManagementCall,
+        FileAlreadyExists,
+        TokenDoesNotExists,
+        InvalidStateTransition,
+        InvalidMemo,
+        NotFound,
+        StorageCanisterError(String),
+    }
+    pub type Response = Result<(), AppendFileError>;
+}
+
 pub mod burn_nft {
     use super::*;
 
@@ -131,28 +175,6 @@ pub mod update_collection_metadata {
     pub type Response = Result<(), UpdateCollectionMetadataError>;
 }
 
-// pub mod init_upload {
-//     use crate::PublicContentError;
-//     use bity_ic_storage_canister_api::updates::init_upload;
-//     pub use bity_ic_storage_canister_api::updates::init_upload::InitUploadResp;
-
-//     pub type Args = init_upload::Args;
-//     pub type InitUploadError = PublicContentError;
-//     pub type Response = Result<init_upload::InitUploadResp, InitUploadError>;
-
-//     pub fn from_storage_response(resp: init_upload::Response) -> Response {
-//         match resp {
-//             Ok(data) => Ok(data),
-//             Err(e) => match e {
-//                 init_upload::InitUploadError::FileAlreadyExists => {
-//                     Err(InitUploadError::FileAlreadyExists)
-//                 }
-//                 _ => Err(InitUploadError::StorageCanisterError(format!("{:?}", e))),
-//             },
-//         }
-//     }
-// }
-
 pub mod init_upload {
     use bity_ic_storage_canister_api::updates::init_upload;
     pub use bity_ic_storage_canister_api::updates::init_upload::InitUploadResp;
@@ -178,6 +200,40 @@ pub mod init_upload {
                     Err(InitUploadError::FileAlreadyExists)
                 }
                 _ => Err(InitUploadError::StorageCanisterError(format!("{:?}", e))),
+            },
+        }
+    }
+}
+
+pub mod init_reupload {
+    use bity_ic_storage_canister_api::updates::init_reupload;
+    pub use bity_ic_storage_canister_api::updates::init_reupload::InitReuploadResp;
+    use candid::CandidType;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, CandidType, Debug)]
+    pub enum InitReuploadError {
+        FileNotFound,
+        FileSizeMismatch,
+        ConcurrentManagementCall,
+        InvalidStateTransition,
+        StorageCanisterError(String),
+    }
+
+    pub type Args = init_reupload::Args;
+    pub type Response = Result<InitReuploadResp, InitReuploadError>;
+
+    pub fn from_storage_response(resp: init_reupload::Response) -> Response {
+        match resp {
+            Ok(data) => Ok(data),
+            Err(e) => match e {
+                init_reupload::InitReuploadError::FileNotFound => {
+                    Err(InitReuploadError::FileNotFound)
+                }
+                init_reupload::InitReuploadError::FileSizeMismatch => {
+                    Err(InitReuploadError::FileSizeMismatch)
+                }
+                _ => Err(InitReuploadError::StorageCanisterError(format!("{:?}", e))),
             },
         }
     }
