@@ -1,5 +1,6 @@
 use core_nft_common::types::management;
 
+pub use core_nft_common::types::management::burn_nft;
 pub use management::burn_nft::Response as BurnNftResponse;
 pub use management::get_all_uploads::Response as GetAllUploadsResponse;
 pub use management::get_upload_status::Response as GetUploadStatusResponse;

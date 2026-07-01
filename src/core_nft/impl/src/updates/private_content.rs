@@ -19,16 +19,28 @@ pub use core_nft_common::PrivateContentError;
 use ic_cdk::update;
 use serde_bytes::ByteBuf;
 
-#[update(guard = "caller_has_update_uploads_permission")]
+#[update]
 pub async fn init_private_content_upload(
     args: init_private_content_upload::Args,
 ) -> init_private_content_upload::Response {
+    let caller = ic_cdk::api::msg_caller();
     match args.token_id_opt.as_ref() {
         Some(token_id) => {
             let entry_name = args
                 .entry_name
                 .as_deref()
                 .ok_or(core_nft_common::types::private_content::PrivateContentError::NotFound)?;
+
+            let is_authorized = read_state(|state| {
+                crate::guards::has_write_access(state, token_id, &entry_name, caller)
+            });
+            if !is_authorized {
+                return Err(
+                    core_nft_common::types::private_content::PrivateContentError::StorageError(
+                        "Unauthorized".to_string(),
+                    ),
+                );
+            }
 
             mutate_state(|state| {
                 state.data.private_content_system.reencryption_validate(
@@ -55,6 +67,9 @@ pub async fn init_private_content_upload(
             })
         }
         None => {
+            crate::guards::caller_has_update_uploads_permission()
+                .map_err(|e| PrivateContentError::StorageError(e))?;
+
             mutate_state(|state| {
                 state.data.private_content_system.init_upload_validate(
                     &args.plaintext_hash,
@@ -89,10 +104,33 @@ pub async fn init_private_content_upload(
     }
 }
 
-#[update(guard = "caller_has_update_uploads_permission")]
+#[update]
 pub async fn store_private_content_chunk(
     args: store_private_content_chunk::Args,
 ) -> store_private_content_chunk::Response {
+    let caller = ic_cdk::api::msg_caller();
+    if let Some(token_id) = args.token_id_opt.as_ref() {
+        let entry_name = args
+            .entry_name
+            .as_deref()
+            .ok_or(store_private_content_chunk::StorePrivateContentChunkError::NotFound)?;
+
+        let is_authorized = read_state(|state| {
+            crate::guards::has_write_access(state, token_id, &entry_name, caller)
+        });
+        if !is_authorized {
+            return Err(
+                store_private_content_chunk::StorePrivateContentChunkError::StorageCanisterError(
+                    "Unauthorized".to_string(),
+                ),
+            );
+        }
+    } else {
+        crate::guards::caller_has_update_uploads_permission().map_err(|e| {
+            store_private_content_chunk::StorePrivateContentChunkError::StorageCanisterError(e)
+        })?;
+    }
+
     let chunk_index_nat = args.chunk_index.clone();
     let chunk_index = usize::try_from(chunk_index_nat.0)
         .map_err(|_| store_private_content_chunk::StorePrivateContentChunkError::InvalidChunk)?;
@@ -149,10 +187,28 @@ pub async fn store_private_content_chunk(
     }
 }
 
-#[update(guard = "caller_has_update_uploads_permission")]
+#[update]
 pub async fn finalize_private_content_upload(
     args: finalize_private_content_upload::Args,
 ) -> finalize_private_content_upload::Response {
+    let caller = ic_cdk::api::msg_caller();
+    if let Some(token_id) = args.token_id_opt.as_ref() {
+        let entry_name = args
+            .entry_name
+            .as_deref()
+            .ok_or(finalize_private_content_upload::FinalizePrivateContentUploadError::NotFound)?;
+
+        let is_authorized = read_state(|state| {
+            crate::guards::has_write_access(state, token_id, &entry_name, caller)
+        });
+        if !is_authorized {
+            return Err(finalize_private_content_upload::FinalizePrivateContentUploadError::StorageCanisterError("Unauthorized".to_string()));
+        }
+    } else {
+        crate::guards::caller_has_update_uploads_permission()
+            .map_err(|e| finalize_private_content_upload::FinalizePrivateContentUploadError::StorageCanisterError(e))?;
+    }
+
     let storage_result = crate::updates::management::finalize_upload(args.clone().into())
         .await
         .map(|_| ())
@@ -326,8 +382,16 @@ pub async fn derive_vetkey_by_entry(
     })
 }
 
-#[update(guard = "caller_has_update_uploads_permission")]
+#[update]
 pub fn set_readers(args: set_readers::Args) -> set_readers::Response {
+    let caller = ic_cdk::api::msg_caller();
+    let is_authorized = read_state(|state| {
+        crate::guards::has_write_access(state, &args.token_id, &args.entry_name, caller)
+    });
+    if !is_authorized {
+        return Err("Caller is not authorized to set readers".to_string());
+    }
+
     mutate_state(|state| {
         let nft_owner = {
             let token = state
@@ -354,11 +418,36 @@ use ic_cdk_macros::query;
 pub fn __get_private_entry_test(
     args: __get_private_entry_test::Args,
 ) -> __get_private_entry_test::Response {
+    let caller = ic_cdk::api::msg_caller();
     read_state(|state| {
-        state
+        let token = state
+            .data
+            .get_token_by_id(&args.token_id)
+            .ok_or_else(|| "NFT not found".to_string())?;
+
+        let private_entry = state
             .data
             .private_content_system
-            .get_nft_private_entry(args.token_id, &args.entry_name)
+            .get_nft_private_entry(args.token_id.clone(), &args.entry_name)?;
+
+        let is_owner = token.token_owner.owner == caller;
+        let record = state
+            .data
+            .private_content_system
+            .nft_private
+            .get(&args.token_id)
+            .ok_or("Private content record not found")?;
+
+        let effective_readers = resolve_readers(&private_entry.readers, &record.default_readers);
+        let has_read_access = effective_readers.contains_key(&caller);
+
+        let is_controller = ic_cdk::api::is_controller(&caller);
+
+        if !is_owner && !has_read_access && !is_controller {
+            return Err("Unauthorized".to_string());
+        }
+
+        Ok(private_entry)
     })
 }
 

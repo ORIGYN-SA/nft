@@ -101,13 +101,12 @@ fn transfer_nft(arg: &icrc7::TransferArg) -> Result<Nat, icrc7::icrc7_transfer::
                     .nft_private
                     .get_mut(&arg.token_id)
                 {
-                    private_record.default_readers.clear();
-                    let empty_defaults = std::collections::HashMap::new();
+                    let default_readers = private_record.default_readers.clone();
                     for entry in private_record.entries.values_mut() {
                         if let Err(err) = entry.set_readers(
                             arg.to.owner,
                             std::collections::HashMap::new(),
-                            &empty_defaults,
+                            &default_readers,
                         ) {
                             trace(&format!(
                                 "Failed to reset private content readers for token {:?}: {}",

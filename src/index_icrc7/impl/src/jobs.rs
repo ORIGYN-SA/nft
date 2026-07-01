@@ -33,7 +33,31 @@ fn update_index_job() {
     ic_cdk::futures::spawn(update_index());
 }
 
+thread_local! {
+    static IS_UPDATING: std::cell::Cell<bool> = std::cell::Cell::new(false);
+}
+
 async fn update_index() {
+    let updating = IS_UPDATING.with(|flag| {
+        if flag.get() {
+            true
+        } else {
+            flag.set(true);
+            false
+        }
+    });
+    if updating {
+        return;
+    }
+
+    struct Guard;
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            IS_UPDATING.with(|flag| flag.set(false));
+        }
+    }
+    let _guard = Guard;
+
     let mut last_block_id: u64 = read_state(|state| state.data.last_block_id);
 
     // Generate block IDs array starting from last_block_id and incrementing

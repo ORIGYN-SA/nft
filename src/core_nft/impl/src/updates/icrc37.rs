@@ -843,6 +843,27 @@ fn transfer_from(
             .entry(previous_owner)
             .or_insert(vec![])
             .retain(|id| *id != nft.token_id.clone());
+
+        if let Some(private_record) = state
+            .data
+            .private_content_system
+            .nft_private
+            .get_mut(&arg.token_id)
+        {
+            let default_readers = private_record.default_readers.clone();
+            for entry in private_record.entries.values_mut() {
+                if let Err(err) = entry.set_readers(
+                    arg.to.owner,
+                    std::collections::HashMap::new(),
+                    &default_readers,
+                ) {
+                    trace(&format!(
+                        "Failed to reset private content readers for token {:?}: {}",
+                        arg.token_id, err
+                    ));
+                }
+            }
+        }
     });
 
     __TOKEN_APPROVALS.with_borrow_mut(|token_approvals| {

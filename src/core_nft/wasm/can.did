@@ -373,13 +373,10 @@ type InitArgs = record {
   vetkd_key_name : text;
 };
 type InitUploadError = variant {
-  InvalidFilePath;
-  TooManyChunks;
-  NotEnoughStorage;
+  StorageCanisterError : text;
+  ContentTooLarge;
   ConcurrentManagementCall;
   FileAlreadyExists;
-  TooManyFiles;
-  InvalidChunkSize;
 };
 type IsApprovedArg = record {
   token_id : nat;
@@ -565,13 +562,13 @@ type RevokeTokenApprovalResponse = variant {
   Err : RevokeTokenApprovalError;
 };
 type StoreChunkError = variant {
-  InvalidFileHash;
   InvalidFilePath;
-  InvalidFileSize;
+  StorageCanisterError : text;
+  InvalidStateTransition;
+  ConcurrentManagementCall;
   InvalidChunkId;
   UploadNotInitialized;
   InvalidChunkData;
-  InvalidFileFormat;
   UploadAlreadyFinalized;
 };
 type StorePrivateContentChunkError = variant {
@@ -632,7 +629,15 @@ type UpdateNftMetadataError = variant {
   ConcurrentManagementCall;
 };
 type UpgradeArgs = record { version : BuildVersion; commit_hash : text };
-type UploadState = variant { Init; Finalized; ReuploadInit; InProgress };
+type UploadState = variant {
+  Init;
+  Finalized;
+  FinalizeReupload;
+  ReuploadInit;
+  InProgress;
+  InitReupload;
+  ChunkReupload;
+};
 type Value = variant {
   Text : record { content : text };
   TokenAmount : record { decimals : nat8; amount : nat64; symbol : text };

@@ -22,40 +22,21 @@ async fn upload_garbage_collector() {
     let now = ic_cdk::api::time();
     let stale_threshold = DAY_IN_MS * 1_000_000;
 
-    let all_files = read_state(|state| state.internal_filestorage.get_all_files().clone());
-
-    for (file_path, file) in all_files {
-        if file.init_timestamp + stale_threshold < now {
-            let result = cancel_upload(
-                file.canister,
-                cancel_upload::Args {
-                    file_path: file_path.clone(),
-                },
-            )
-            .await;
-
-            match result {
-                Ok(_) => {
-                    debug!("Successfully canceled upload for file {}", file_path);
-                }
-                Err(err) => {
-                    info!("Failed to cancel upload for file {}: {:?}", file_path, err);
-                }
-            }
-        }
-    }
-
-    let stale_premint_hashes = read_state(|state| {
+    // Collect stale public uploads
+    let stale_public_uploads = read_state(|state| {
         state
             .data
-            .private_content_system
+            .public_content_system
             .temp_file_cache
             .iter()
-            .filter_map(|(hash, entry)| {
-                // Directly check the entry since there is no nested map here
+            .filter_map(|(key, entry)| {
                 if let Some(pending) = &entry.pending_upload {
                     if pending.timestamp_ns + stale_threshold < now {
-                        return Some(hash.clone()); // .clone() is safer here depending on if your hash is a String or [u8; 32]
+                        return Some((
+                            entry.storage_canister_id.clone(),
+                            entry.storage_path.clone(),
+                            key.clone(),
+                        ));
                     }
                 }
                 None
@@ -63,15 +44,81 @@ async fn upload_garbage_collector() {
             .collect::<Vec<_>>()
     });
 
-    if !stale_premint_hashes.is_empty() {
-        mutate_state(|state| {
-            for hash in stale_premint_hashes {
-                state
-                    .data
-                    .private_content_system
-                    .temp_file_cache
-                    .remove(&hash);
+    // Cancel and remove stale public uploads
+    for (canister, storage_path, key) in stale_public_uploads {
+        let result = cancel_upload(
+            canister,
+            cancel_upload::Args {
+                file_path: storage_path.clone(),
+            },
+        )
+        .await;
+
+        match result {
+            Ok(_) => {
+                debug!("Successfully canceled public upload for file {}", storage_path);
             }
+            Err(err) => {
+                info!("Failed to cancel public upload for file {}: {:?}", storage_path, err);
+            }
+        }
+
+        mutate_state(|state| {
+            state
+                .data
+                .public_content_system
+                .temp_file_cache
+                .remove(&key);
+        });
+    }
+
+    // Collect stale private uploads
+    let stale_private_uploads = read_state(|state| {
+        state
+            .data
+            .private_content_system
+            .temp_file_cache
+            .iter()
+            .filter_map(|(key, entry)| {
+                if let Some(pending) = &entry.pending_upload {
+                    if pending.timestamp_ns + stale_threshold < now {
+                        return Some((
+                            entry.storage_canister_id.clone(),
+                            entry.storage_path.clone(),
+                            key.clone(),
+                        ));
+                    }
+                }
+                None
+            })
+            .collect::<Vec<_>>()
+    });
+
+    // Cancel and remove stale private uploads
+    for (canister, storage_path, key) in stale_private_uploads {
+        let result = cancel_upload(
+            canister,
+            cancel_upload::Args {
+                file_path: storage_path.clone(),
+            },
+        )
+        .await;
+
+        match result {
+            Ok(_) => {
+                debug!("Successfully canceled private upload for file {}", storage_path);
+            }
+            Err(err) => {
+                info!("Failed to cancel private upload for file {}: {:?}", storage_path, err);
+            }
+        }
+
+        mutate_state(|state| {
+            state
+                .data
+                .private_content_system
+                .temp_file_cache
+                .remove(&key);
         });
     }
 }

@@ -13,13 +13,6 @@ use candid::{CandidType, Principal};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-#[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub enum PublicContentStatus {
-    PendingUpload,
-    PendingMinting,
-    Active,
-}
-
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub enum PublicContentError {
     FileAlreadyExists,
@@ -34,33 +27,14 @@ pub enum PublicContentError {
     StorageCanisterError(String),
 }
 
-#[derive(CandidType, Serialize, Deserialize, Clone, Debug, Default)]
-#[serde(default)]
-pub struct PendingUpload {
-    pub expected_chunks: usize,
-    pub received_chunks: HashMap<Nat, Vec<u8>>,
-    pub chunk_size: usize,
-    pub timestamp_ns: u64,
-}
-
-#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
-pub struct EntryDetailResp {
-    pub name: String,
-    pub state: UploadState,
-    pub hash: String,
-    pub file_size: u64,
-    pub storage_canister_id: Principal,
-    pub storage_path: String,
-}
-
-// NOTE: I introduce here a lot of denormalizing to allow faster access to files needed
+// NOTE: there are a lot of denormalizing introduced to allow faster access to files needed
 #[derive(Serialize, Deserialize, Clone)]
 pub struct PublicContentSystem {
-    pub nft_public: HashMap<Nat, NftPublicRecord>, // check that nft exists in append
-    pub temp_file_cache: HashMap<String, PublicEntry>, // NOTE: not hash, but file path
-    pub file_to_nfts: HashMap<String, HashSet<Nat>>,
-    pub nft_to_files: HashMap<Nat, HashSet<String>>,
-    pub all_files_index: HashMap<String, PublicEntry>,
+    pub nft_public: HashMap<Nat, NftPublicRecord>, // all minted NFTs with public content, indexed by token_id
+    pub temp_file_cache: HashMap<String, PublicEntry>, // NOTE: indexing by file_path
+    pub file_to_nfts: HashMap<String, HashSet<Nat>>, // all files and NFTs that are using it
+    pub nft_to_files: HashMap<Nat, HashSet<String>>, // nft to file pathes mapping
+    pub all_files_index: HashMap<String, PublicEntry>, // files that was already saved
 }
 
 impl PublicContentSystem {
@@ -595,6 +569,15 @@ pub struct PublicEntry {
     pub format_version: u8,
     #[serde(default)]
     pub created_at_ns: u64,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(default)]
+pub struct PendingUpload {
+    pub expected_chunks: usize,
+    pub received_chunks: HashMap<Nat, Vec<u8>>,
+    pub chunk_size: usize,
+    pub timestamp_ns: u64,
 }
 
 #[cfg(test)]

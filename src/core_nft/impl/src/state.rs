@@ -37,7 +37,6 @@ pub struct RuntimeState {
     pub data: Data,
     pub principal_guards: BTreeSet<Principal>,
     pub sliding_window_guards: HashMap<candid::Nat, Vec<TimestampNanos>>, // per token id
-    pub internal_filestorage: InternalFilestorage,
 }
 
 impl RuntimeState {
@@ -47,9 +46,6 @@ impl RuntimeState {
             data,
             principal_guards: BTreeSet::new(),
             sliding_window_guards: HashMap::new(),
-            internal_filestorage: InternalFilestorage {
-                map: HashMap::new(),
-            },
         }
     }
 

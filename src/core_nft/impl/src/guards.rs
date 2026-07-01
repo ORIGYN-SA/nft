@@ -2,8 +2,8 @@ use crate::state::mutate_state;
 use crate::state::read_state;
 use bity_ic_types::TimestampNanos;
 use candid::Principal;
-use core_nft_common::resolve_readers;
 use core_nft_common::types::permissions::Permission;
+use core_nft_common::{resolve_readers, AccessControl};
 use std::marker::PhantomData;
 use std::time::Duration;
 
@@ -223,4 +223,29 @@ pub fn entry_content_is_accessible(nft_id: &candid::Nat, entry_name: &str) -> Re
             }
         }
     })
+}
+
+pub fn has_write_access(
+    state: &crate::state::RuntimeState,
+    token_id: &candid::Nat,
+    entry_name: &str,
+    caller: candid::Principal,
+) -> bool {
+    // is caller the owner
+    if let Some(token) = state.data.get_token_by_id(token_id) {
+        if token.token_owner.owner == caller {
+            return true;
+        }
+    }
+    // is caller an authorized reader with write/manage rights
+    if let Some(private_record) = state.data.private_content_system.nft_private.get(token_id) {
+        if let Some(entry) = private_record.entries.get(entry_name) {
+            let effective_readers =
+                resolve_readers(&entry.readers, &private_record.default_readers);
+            if let Some(reader_info) = effective_readers.get(&caller) {
+                return reader_info.rights.can_write();
+            }
+        }
+    }
+    false
 }
