@@ -19,7 +19,7 @@ pub use core_nft_common::PrivateContentError;
 use ic_cdk::update;
 use serde_bytes::ByteBuf;
 
-#[update]
+#[update(guard = "caller_has_update_uploads_permission")]
 pub async fn init_private_content_upload(
     args: init_private_content_upload::Args,
 ) -> init_private_content_upload::Response {
@@ -104,7 +104,7 @@ pub async fn init_private_content_upload(
     }
 }
 
-#[update]
+#[update(guard = "caller_has_update_uploads_permission")]
 pub async fn store_private_content_chunk(
     args: store_private_content_chunk::Args,
 ) -> store_private_content_chunk::Response {
@@ -187,7 +187,7 @@ pub async fn store_private_content_chunk(
     }
 }
 
-#[update]
+#[update(guard = "caller_has_update_uploads_permission")]
 pub async fn finalize_private_content_upload(
     args: finalize_private_content_upload::Args,
 ) -> finalize_private_content_upload::Response {
@@ -279,7 +279,7 @@ pub async fn cancel_private_content_upload(
     Ok(())
 }
 
-#[update(guard = "caller_has_update_uploads_permission")]
+#[update]
 pub async fn derive_vetkey_public_key(
     _args: derive_vetkey_public_key::Args,
 ) -> derive_vetkey_public_key::Response {

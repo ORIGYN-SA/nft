@@ -1523,6 +1523,28 @@ fn test_private_content_transfer_workflow() {
     )
     .unwrap();
 
+    // Grant minting and uploads permission to nft_owner1
+    grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: nft_owner2,
+            permission: Permission::Minting,
+        }),
+    )
+    .unwrap();
+    grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: nft_owner2,
+            permission: Permission::UpdateUploads,
+        }),
+    )
+    .unwrap();
+
     let entry_name = "reencryption_test".to_string();
     let plaintext = b"Confidential NFT Asset Data 2026".to_vec();
     let plaintext_hash_bytes = Sha256::digest(&plaintext);
@@ -2245,6 +2267,27 @@ fn test_private_content_security_requirements() {
         }),
     )
     .unwrap();
+    // Grant minting and uploads permission to nft_owner2
+    grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: nft_owner2,
+            permission: Permission::Minting,
+        }),
+    )
+    .unwrap();
+    grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: nft_owner2,
+            permission: Permission::UpdateUploads,
+        }),
+    )
+    .unwrap();
 
     // 1. Upload private content as nft_owner1
     let content = b"supersecretdata!".to_vec();
@@ -2900,7 +2943,8 @@ fn test_private_content_reencryption_edgecases() {
     let tsk = TransportSecretKey::from_seed(transport_seed.to_vec()).unwrap();
     let tpk = tsk.public_key();
 
-    let pub_key_response = derive_vetkey_public_key(pic, controller, collection_canister_id, &()).unwrap();
+    let pub_key_response =
+        derive_vetkey_public_key(pic, controller, collection_canister_id, &()).unwrap();
     let dpk = DerivedPublicKey::deserialize(&pub_key_response.public_key).unwrap();
 
     let initial_canonical_identity =
@@ -3064,8 +3108,25 @@ fn test_private_content_reencryption_edgecases() {
         "Re-upload with mismatched plaintext size should fail"
     );
 
-    // 4. Test Edge Case: Re-upload unauthorized caller
     let unauthorized_caller = Principal::anonymous();
+    let _grant_result = grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: unauthorized_caller,
+            permission: Permission::Minting,
+        }),
+    );
+    let _grant_result = grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: unauthorized_caller,
+            permission: Permission::UpdateUploads,
+        }),
+    );
     let unauthorized_res = init_private_content_upload(
         pic,
         unauthorized_caller,
