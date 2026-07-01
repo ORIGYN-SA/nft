@@ -344,7 +344,7 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
     Ok(current_token_id.clone())
 }
 
-#[update(guard = "caller_has_minting_permission")]
+#[update(guard = "caller_has_update_metadata_permission")]
 pub fn append_file(req: management::append_file::Args) -> management::append_file::Response {
     trace("Appending files to NFT");
     let caller = ic_cdk::api::msg_caller();
