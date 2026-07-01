@@ -1939,7 +1939,7 @@ fn test_append_file_authorized() {
         nft_owner2,
     } = test_env;
 
-    // 1. Grant minting permission
+    // 1. Grant minting and update metadata permission
     let result = grant_permission(
         pic,
         controller,
@@ -1947,6 +1947,17 @@ fn test_append_file_authorized() {
         &(grant_permission::Args {
             principal: nft_owner1,
             permission: Permission::Minting,
+        }),
+    );
+    assert!(result.is_ok(), "Should succeed with authorized principal");
+
+    let result = grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: nft_owner1,
+            permission: Permission::UpdateMetadata,
         }),
     );
     assert!(result.is_ok(), "Should succeed with authorized principal");

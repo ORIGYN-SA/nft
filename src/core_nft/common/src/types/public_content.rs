@@ -471,29 +471,30 @@ impl PublicContentSystem {
         let start = usize::try_from(prev.unwrap_or(Nat::from(0u64)).0).unwrap_or(0);
         let count = usize::try_from(take.unwrap_or(Nat::from(100u64)).0).unwrap_or(100);
 
-        // 1. Create an iterator over active NFT entries
-        // We flatten the nested HashMap<Nat, NftPublicRecord> -> HashMap<String, PublicEntry>
-        let nft_iter = self.nft_public.values().flat_map(|record| {
-            record.entries.iter().map(|(_name, entry)| {
-                // Use storage_path as the unique key for consistency with temp_file_cache
-                (entry.storage_path.clone(), entry.state.clone())
-            })
-        });
-
-        // 2. Create an iterator over premint cache entries
-        let cache_iter = self
-            .temp_file_cache
+        // 1. Process active/minted files. Since files can be shared across multiple NFTs,
+        // we iterate over file_to_nfts keys to ensure unique paths.
+        let mut combined: Vec<(String, UploadState)> = self
+            .file_to_nfts
             .iter()
-            .map(|(path, entry)| (path.clone(), entry.state.clone()));
+            .filter_map(|(file_path, nft_set)| {
+                let token_id_ref = nft_set.iter().next()?;
+                let record = self.nft_public.get(token_id_ref)?;
+                let entry = record
+                    .entries
+                    .values()
+                    .find(|e| e.storage_path == *file_path)?;
+                Some((file_path.clone(), entry.state.clone()))
+            })
+            .collect();
 
-        // 3. Chain them together
-        // Note: If stable ordering across upgrades is critical, you MUST sort here.
-        // Sorting requires collecting into a Vec first, which trades memory for stability.
-        // If stability isn't critical, this direct chain is most efficient.
+        // 2. Process premint/cached files (only those not already in active files)
+        for (path, entry) in &self.temp_file_cache {
+            if !self.file_to_nfts.contains_key(path) {
+                combined.push((path.clone(), entry.state.clone()));
+            }
+        }
 
-        let mut combined: Vec<(String, UploadState)> = nft_iter.chain(cache_iter).collect();
-
-        // Optional: Sort by path to ensure deterministic pagination
+        // Sort by path to ensure deterministic pagination
         combined.sort_by(|a, b| a.0.cmp(&b.0));
 
         combined.into_iter().skip(start).take(count).collect()

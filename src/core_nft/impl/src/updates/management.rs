@@ -1036,27 +1036,14 @@ pub fn get_all_uploads(
     take: Option<Nat>,
 ) -> management::get_all_uploads::Response {
     trace(&format!("prev: {:?}, take: {:?}", prev, take));
-    let start: usize = usize::try_from(prev.unwrap_or(Nat::from(0u64)).0).unwrap_or(0);
-    let end: usize = usize::try_from(take.unwrap_or(Nat::from(100u64)).0).unwrap_or(100);
-    trace(&format!("start: {:?}, end: {:?}", start, end));
-
     let uploads = read_state(|state| {
-        let mut all_uploads = HashMap::new();
-        for (path, entry) in &state.data.public_content_system.temp_file_cache {
-            all_uploads.insert(path.clone(), entry.state.clone());
-        }
-        for record in state.data.public_content_system.nft_public.values() {
-            for entry in record.entries.values() {
-                all_uploads.insert(entry.storage_path.clone(), entry.state.clone());
-            }
-        }
-        all_uploads
+        state
+            .data
+            .public_content_system
+            .get_paginated_uploads(prev, take)
     });
 
-    let filtered_uploads: HashMap<String, UploadState> =
-        uploads.into_iter().skip(start).take(end).collect();
-
-    Ok(filtered_uploads)
+    Ok(uploads)
 }
 
 #[update(guard = "caller_has_update_uploads_permission")]

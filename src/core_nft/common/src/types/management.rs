@@ -1,6 +1,8 @@
 use crate::types::permissions::Permission;
 use crate::types::value_custom::CustomValue;
 
+use crate::EntryName;
+use crate::FilePath;
 use bity_ic_storage_canister_api::types::storage::UploadState;
 use candid::{CandidType, Nat, Principal};
 use icrc_ledger_types::icrc::generic_value::ICRC3Value;
@@ -25,12 +27,12 @@ pub mod mint {
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct NftPrivateRecordMint {
         pub default_readers: HashMap<Principal, ReaderInfo>,
-        pub entries: HashMap<String, Sha256Hash>,
+        pub entries: HashMap<EntryName, Sha256Hash>,
     }
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct NftPublicRecordMint {
-        pub entries: HashMap<String, String>,
+        pub entries: HashMap<EntryName, FilePath>,
     }
 
     #[derive(CandidType, Serialize, Deserialize, Clone)]
@@ -66,7 +68,7 @@ pub mod append_file {
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct NftPrivateRecordAppend {
         pub default_readers: HashMap<Principal, ReaderInfo>,
-        pub entries: HashMap<String, Sha256Hash>,
+        pub entries: HashMap<EntryName, Sha256Hash>,
     }
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]

@@ -40,13 +40,14 @@ pub mod derive_vetkey {
 pub mod derive_vetkey_by_entry {
     use candid::CandidType;
     use candid::Nat;
+    use core_nft_common::EntryName;
     use serde::{Deserialize, Serialize};
     use serde_bytes::ByteBuf;
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct Args {
         pub token_id: Nat,
-        pub entry_name: String,
+        pub entry_name: EntryName,
         pub transport_public_key: ByteBuf,
     }
 
@@ -63,6 +64,7 @@ pub mod init_private_content_upload {
     use candid::Nat;
     use candid::Principal;
     use core_nft_common::types::private_content::EncryptionMode;
+    use core_nft_common::EntryName;
     use core_nft_common::ReaderInfo;
     use core_nft_common::Sha256Hash;
     use serde::{Deserialize, Serialize};
@@ -72,7 +74,7 @@ pub mod init_private_content_upload {
     pub struct Args {
         // is used for reuploading reencrypted content
         pub token_id_opt: Option<Nat>,
-        pub entry_name: Option<String>,
+        pub entry_name: Option<EntryName>,
         // should always stay the same if reencrypted
         pub plaintext_hash: Sha256Hash,
         pub plaintext_size: u64,
@@ -96,6 +98,7 @@ pub mod init_private_content_upload {
 pub mod store_private_content_chunk {
     use candid::CandidType;
     use candid::Nat;
+    use core_nft_common::EntryName;
     use core_nft_common::Sha256Hash;
     use serde::{Deserialize, Serialize};
     use serde_bytes::ByteBuf;
@@ -103,7 +106,7 @@ pub mod store_private_content_chunk {
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct Args {
         pub token_id_opt: Option<Nat>,
-        pub entry_name: Option<String>,
+        pub entry_name: Option<EntryName>,
         pub plaintext_hash: Sha256Hash,
         pub storage_path: String,
         pub chunk_index: Nat,
@@ -167,13 +170,14 @@ impl From<store_chunk::StoreChunkError>
 pub mod finalize_private_content_upload {
     use candid::CandidType;
     use candid::Nat;
+    use core_nft_common::EntryName;
     use core_nft_common::Sha256Hash;
     use serde::{Deserialize, Serialize};
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct Args {
         pub token_id_opt: Option<Nat>,
-        pub entry_name: Option<String>,
+        pub entry_name: Option<EntryName>,
         pub hash: Sha256Hash,
         pub storage_path: String,
     }
@@ -319,6 +323,7 @@ pub mod set_readers {
     use candid::CandidType;
     use candid::Nat;
     use candid::Principal;
+    use core_nft_common::EntryName;
     use core_nft_common::ReaderInfo;
     use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
@@ -326,7 +331,7 @@ pub mod set_readers {
     #[derive(Serialize, Deserialize, CandidType, Clone, Debug)]
     pub struct Args {
         pub token_id: Nat,
-        pub entry_name: String,
+        pub entry_name: EntryName,
         pub readers: HashMap<Principal, ReaderInfo>,
     }
 
@@ -335,13 +340,14 @@ pub mod set_readers {
 
 pub mod __get_private_entry_test {
     use candid::{CandidType, Nat};
+    use core_nft_common::EntryName;
     use core_nft_common::PrivateEntry;
     use serde::{Deserialize, Serialize};
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct Args {
         pub token_id: Nat,
-        pub entry_name: String,
+        pub entry_name: EntryName,
     }
 
     pub type Response = Result<PrivateEntry, String>;

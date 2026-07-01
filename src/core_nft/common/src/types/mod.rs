@@ -24,6 +24,8 @@ pub use value_custom::*;
 pub use wrapped_types::*;
 
 pub type Sha256Hash = [u8; 32];
+pub type EntryName = String;
+pub type FilePath = String;
 
 pub const MAX_CONTENT_SIZE: u64 = 100 * 1024 * 1024; // 100MB
 pub const CHUNK_SIZE: usize = 1024 * 1024; // 1MB
