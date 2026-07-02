@@ -84,6 +84,5 @@ bity-ic-icrc3                   = "0.7.0"
 bity-ic-icrc3-macros            = "0.4.0" 
 bity-ic-icrc3-archive-c2c-client    = "0.4.0"
 bity-ic-icrc3-c2c-client    = "0.2.0"
-# bity-ic-storage-canister-api = "0.2.0"
-bity-ic-storage-canister-api = { path = "/Users/victoria/storage-canister/api" }
-bity-ic-storage-canister-c2c = { path = "/Users/victoria/storage-canister/c2c" }
+bity-ic-storage-canister-api = "0.5.0"
+bity-ic-storage-canister-c2c = "0.5.0"
