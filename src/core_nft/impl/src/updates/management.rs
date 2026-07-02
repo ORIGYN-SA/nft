@@ -351,19 +351,6 @@ pub fn append_file(req: management::append_file::Args) -> management::append_fil
     let _guard_principal = GuardManagement::new(caller)
         .map_err(|_| management::append_file::AppendFileError::ConcurrentManagementCall)?;
 
-    // 1. Validate Memo
-    for request in &req.append_file_requests {
-        match check_memo(&request.memo) {
-            Ok(_) => {}
-            Err(_) => {
-                return Err(management::append_file::AppendFileError::InvalidMemo);
-            }
-        }
-    }
-
-    let mut seen_hashes = std::collections::HashSet::new();
-
-    // 2. Validate all request details
     for request in &req.append_file_requests {
         // Validate that token exists
         let token_exists =
@@ -428,83 +415,8 @@ pub fn append_file(req: management::append_file::Args) -> management::append_fil
                 }
             }
         }
-
-        // Validate private content if present
-        if let Some(priv_c) = &request.private_content {
-            let token_owner = read_state(|state| {
-                state
-                    .data
-                    .tokens_list
-                    .get(&request.token_id)
-                    .map(|t| t.token_owner.owner)
-            })
-            .ok_or(management::append_file::AppendFileError::TokenDoesNotExists)?;
-
-            for (entry_name, entry_hash) in &priv_c.entries {
-                if !seen_hashes.insert(*entry_hash) {
-                    return Err(
-                        management::append_file::AppendFileError::StorageCanisterError(format!(
-                            "Duplicate private content hash '{}' in batch",
-                            hex::encode(entry_hash)
-                        )),
-                    );
-                }
-
-                // Check for duplicate entry name
-                let entry_exists = read_state(|state| {
-                    state
-                        .data
-                        .private_content_system
-                        .nft_private
-                        .get(&request.token_id)
-                        .map(|record| record.entries.contains_key(entry_name))
-                        .unwrap_or(false)
-                });
-                if entry_exists {
-                    return Err(management::append_file::AppendFileError::FileAlreadyExists);
-                }
-
-                let entry = read_state(|state| {
-                    state
-                        .data
-                        .private_content_system
-                        .temp_file_cache
-                        .get(entry_hash)
-                        .cloned()
-                })
-                .ok_or(management::append_file::AppendFileError::NotFound)?;
-
-                if entry.status != PrivateContentStatus::PendingMinting
-                    && entry.status != PrivateContentStatus::Active
-                {
-                    return Err(management::append_file::AppendFileError::InvalidStateTransition);
-                }
-
-                if entry.plaintext_size > MAX_PRIVATE_CONTENT_SIZE {
-                    return Err(
-                        management::append_file::AppendFileError::StorageCanisterError(format!(
-                            "Private entry '{}' exceeds maximum size",
-                            entry_name
-                        )),
-                    );
-                }
-
-                let expected_identity = construct_canonical_identity(
-                    token_owner,
-                    &entry.readers,
-                    &priv_c.default_readers,
-                );
-
-                if entry.canonical_identity != expected_identity {
-                    return Err(management::append_file::AppendFileError::StorageCanisterError(format!(
-                        "Private content identity mismatch for entry '{}'. It may have been initialized for a different owner.", entry_name
-                    )));
-                }
-            }
-        }
     }
 
-    // 3. Mutate state
     mutate_state(|state| {
         for request in req.append_file_requests {
             // Append public content
@@ -548,53 +460,6 @@ pub fn append_file(req: management::append_file::Args) -> management::append_fil
                         .insert(file_identity);
 
                     public_record.entries.insert(entry_name, entry);
-                }
-            }
-
-            // Append private content
-            if let Some(priv_c) = request.private_content {
-                let token_owner = state
-                    .data
-                    .tokens_list
-                    .get(&request.token_id)
-                    .unwrap()
-                    .token_owner
-                    .owner;
-                for entry_hash in priv_c.entries.values() {
-                    if let Some(entry) = state
-                        .data
-                        .private_content_system
-                        .temp_file_cache
-                        .get(entry_hash)
-                    {
-                        state
-                            .data
-                            .public_content_system
-                            .temp_file_cache
-                            .remove(&entry.storage_path);
-                    }
-                }
-                state
-                    .data
-                    .private_content_system
-                    .append_private_content(
-                        priv_c.default_readers,
-                        priv_c.entries,
-                        request.token_id.clone(),
-                        token_owner,
-                    )
-                    .unwrap_or_else(|e| {
-                        ic_cdk::trap(&format!(
-                            "Failed to register private content for token {}: {:?}",
-                            request.token_id, e
-                        ));
-                    });
-            }
-
-            // Update metadata
-            if !request.metadata.is_empty() {
-                if let Some(token) = state.data.tokens_list.get_mut(&request.token_id) {
-                    __METADATA.with_borrow_mut(|m| token.add_metadata(m, request.metadata));
                 }
             }
         }

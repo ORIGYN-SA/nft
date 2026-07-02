@@ -21,11 +21,7 @@ type AppendFileError = variant {
 };
 type AppendFileRequest = record {
   token_id : nat;
-  metadata : vec record { text; ICRC3Value_1 };
-  memo : opt blob;
-  private_content : opt NftPrivateRecordAppend;
   public_content : opt NftPublicRecordAppend;
-  token_owner : Account;
 };
 type ApprovalInfo = record {
   memo : opt blob;
@@ -142,17 +138,6 @@ type Args_8 = record {
   entry_name : opt text;
 };
 type Args_9 = record { "principal" : principal };
-type BTreeMap = vec record {
-  text;
-  variant {
-    Int : int;
-    Map : BTreeMap;
-    Nat : nat;
-    Blob : blob;
-    Text : text;
-    Array : vec ICRC3Value;
-  };
-};
 // A block with an ID. Returned as part of [`GetBlocksResult`].
 type BlockWithId = record { id : nat; block : ICRC3Value };
 // Represents a semantic version number following the MAJOR.MINOR.PATCH format.
@@ -322,15 +307,6 @@ type ICRC3Properties = record {
 // A value defined in [the ICRC-3 standard](https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-3/README.md#value).
 type ICRC3Value = variant {
   Int : int;
-  Map : BTreeMap;
-  Nat : nat;
-  Blob : blob;
-  Text : text;
-  Array : vec ICRC3Value;
-};
-// A value defined in [the ICRC-3 standard](https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-3/README.md#value).
-type ICRC3Value_1 = variant {
-  Int : int;
   Map : vec record { text; ICRC3Value };
   Nat : nat;
   Blob : blob;
@@ -391,15 +367,11 @@ type MintError = variant {
   ConcurrentManagementCall;
 };
 type MintRequest = record {
-  metadata : vec record { text; ICRC3Value_1 };
+  metadata : vec record { text; ICRC3Value };
   memo : opt blob;
   private_content : opt NftPrivateRecordMint;
   public_content : opt NftPublicRecordMint;
   token_owner : Account;
-};
-type NftPrivateRecordAppend = record {
-  entries : vec record { text; blob };
-  default_readers : vec record { principal; ReaderInfo };
 };
 type NftPrivateRecordMint = record {
   entries : vec record { text; blob };
@@ -653,7 +625,7 @@ type Vec = vec record {
           id : nat;
           block : variant {
             Int : int;
-            Map : BTreeMap;
+            Map : vec record { text; ICRC3Value };
             Nat : nat;
             Blob : blob;
             Text : text;
@@ -712,7 +684,7 @@ service : (Args_20) -> {
   icrc3_supported_block_types : (null) -> (vec SupportedBlockType) query;
   icrc7_atomic_batch_transfers : () -> (opt bool) query;
   icrc7_balance_of : (vec Account) -> (vec nat) query;
-  icrc7_collection_metadata : () -> (vec record { text; ICRC3Value_1 }) query;
+  icrc7_collection_metadata : () -> (vec record { text; ICRC3Value }) query;
   icrc7_default_take_value : () -> (opt nat) query;
   icrc7_description : () -> (opt text) query;
   icrc7_logo : () -> (opt text) query;
@@ -726,7 +698,7 @@ service : (Args_20) -> {
   icrc7_supply_cap : () -> (opt nat) query;
   icrc7_symbol : () -> (text) query;
   icrc7_token_metadata : (vec nat) -> (
-      vec opt vec record { text; ICRC3Value_1 },
+      vec opt vec record { text; ICRC3Value },
     ) query;
   icrc7_tokens : (opt nat, opt nat) -> (vec nat) query;
   icrc7_tokens_of : (Account, opt nat, opt nat) -> (vec nat) query;

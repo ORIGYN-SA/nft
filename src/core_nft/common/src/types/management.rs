@@ -58,10 +58,6 @@ pub mod append_file {
     #[derive(CandidType, Serialize, Deserialize, Clone)]
     pub struct AppendFileRequest {
         pub token_id: Nat,
-        pub token_owner: Account,
-        pub memo: Option<serde_bytes::ByteBuf>,
-        pub metadata: Vec<(String, ICRC3Value)>,
-        pub private_content: Option<NftPrivateRecordAppend>,
         pub public_content: Option<NftPublicRecordAppend>,
     }
 
@@ -73,7 +69,7 @@ pub mod append_file {
 
     #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
     pub struct NftPublicRecordAppend {
-        pub entries: HashMap<String, String>,
+        pub entries: HashMap<EntryName, FilePath>,
     }
 
     #[derive(CandidType, Serialize, Deserialize, Clone)]

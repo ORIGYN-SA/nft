@@ -2006,13 +2006,6 @@ fn test_append_file_authorized() {
         &(append_file::Args {
             append_file_requests: vec![AppendFileRequest {
                 token_id: token_id.clone(),
-                token_owner: Account {
-                    owner: nft_owner1,
-                    subaccount: None,
-                },
-                memo: None,
-                metadata: vec![],
-                private_content: None,
                 public_content: Some(
                     core_nft_common::types::management::append_file::NftPublicRecordAppend {
                         entries,

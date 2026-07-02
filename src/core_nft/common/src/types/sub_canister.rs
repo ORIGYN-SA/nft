@@ -2,6 +2,7 @@ use crate::types::management::{
     cancel_upload, finalize_upload, init_upload, remove_file, store_chunk,
 };
 use crate::utils::trace;
+use bity_ic_storage_canister_c2c::get_stored_files_size_bytes;
 use bity_ic_storage_canister_c2c::{
     cancel_upload, finalize_upload, get_storage_size, init_upload, remove_file, store_chunk,
 };
@@ -210,6 +211,20 @@ impl bity_ic_subcanister_manager::Canister for StorageCanister {
 impl StorageCanister {
     pub async fn get_storage_size(&self) -> Result<u128, String> {
         let res = retry_async(|| get_storage_size(self.canister_id, ()), 3).await;
+
+        trace(&format!(
+            "Checking storage : {:?}. storage size {res:?}.",
+            self.canister_id
+        ));
+
+        match res {
+            Ok(size) => Ok(size),
+            Err(err) => Err(err),
+        }
+    }
+
+    pub async fn get_stored_files_size_bytes(&self) -> Result<u64, String> {
+        let res = retry_async(|| get_stored_files_size_bytes(self.canister_id, ()), 3).await;
 
         trace(&format!(
             "Checking storage : {:?}. storage size {res:?}.",

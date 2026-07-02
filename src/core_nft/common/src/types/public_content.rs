@@ -13,20 +13,6 @@ use candid::{CandidType, Principal};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
-pub enum PublicContentError {
-    FileAlreadyExists,
-    InvalidStateTransition,
-    NotEnabled,
-    NotFound,
-    Unauthorized,
-    InvalidStatus,
-    ContentTooLarge,
-    InvalidChunk,
-    ConcurrentManagementCall,
-    StorageCanisterError(String),
-}
-
 // NOTE: there are a lot of denormalizing introduced to allow faster access to files needed
 #[derive(Serialize, Deserialize, Clone)]
 pub struct PublicContentSystem {
@@ -579,6 +565,20 @@ pub struct PendingUpload {
     pub received_chunks: HashMap<Nat, Vec<u8>>,
     pub chunk_size: usize,
     pub timestamp_ns: u64,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+pub enum PublicContentError {
+    FileAlreadyExists,
+    InvalidStateTransition,
+    NotEnabled,
+    NotFound,
+    Unauthorized,
+    InvalidStatus,
+    ContentTooLarge,
+    InvalidChunk,
+    ConcurrentManagementCall,
+    StorageCanisterError(String),
 }
 
 #[cfg(test)]

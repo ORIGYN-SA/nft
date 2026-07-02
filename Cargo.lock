@@ -463,7 +463,7 @@ dependencies = [
 
 [[package]]
 name = "bity-ic-storage-canister-api"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "bity-ic-canister-logger",
@@ -494,7 +494,7 @@ dependencies = [
 
 [[package]]
 name = "bity-ic-storage-canister-c2c"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "bity-ic-storage-canister-api",
  "bity-ic-types",
