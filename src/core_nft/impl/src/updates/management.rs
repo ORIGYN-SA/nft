@@ -878,12 +878,36 @@ pub fn get_upload_status(file_path: String) -> management::get_upload_status::Re
             .public_content_system
             .get_public_file_by_path(&file_path)
         {
+            ic_cdk::println!("get_upload_status: found in public_content_system: {:?}", status.state);
             return Some(status.state);
+        }
+        for entry in state.data.private_content_system.temp_file_cache.values() {
+            if entry.storage_path == file_path {
+                ic_cdk::println!("get_upload_status: found in temp_file_cache: status={:?}, pending={:?}", entry.status, entry.pending_upload.is_some());
+                if let Some(pending) = &entry.pending_upload {
+                    if pending.received_chunks.is_empty() {
+                        return Some(UploadState::Init);
+                    } else {
+                        return Some(UploadState::InProgress);
+                    }
+                } else {
+                    return Some(UploadState::Finalized);
+                }
+            }
         }
         for record in state.data.private_content_system.nft_private.values() {
             for entry in record.entries.values() {
                 if entry.storage_path == file_path {
-                    return Some(UploadState::Finalized);
+                    ic_cdk::println!("get_upload_status: found in nft_private: status={:?}, pending={:?}", entry.status, entry.pending_upload.is_some());
+                    if let Some(pending) = &entry.pending_upload {
+                        if pending.received_chunks.is_empty() {
+                            return Some(UploadState::InitReupload);
+                        } else {
+                            return Some(UploadState::ChunkReupload);
+                        }
+                    } else {
+                        return Some(UploadState::Finalized);
+                    }
                 }
             }
         }

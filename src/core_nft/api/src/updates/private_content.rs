@@ -289,6 +289,19 @@ impl From<init_private_content_upload::Args> for init_upload::Args {
     }
 }
 
+// 1b. From init_private_content_upload::Args -> init_reupload::Args
+use core_nft_common::types::init_reupload;
+impl From<init_private_content_upload::Args> for init_reupload::Args {
+    fn from(args: init_private_content_upload::Args) -> Self {
+        init_reupload::Args {
+            file_path: args.storage_path,
+            file_hash: hex::encode(args.file_hash),
+            file_size: args.file_size,
+            chunk_size: args.chunk_size,
+        }
+    }
+}
+
 // 2. From store_private_content_chunk::Args -> store_chunk::Args
 impl From<store_private_content_chunk::Args> for store_chunk::Args {
     fn from(args: store_private_content_chunk::Args) -> Self {

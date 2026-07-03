@@ -1,4 +1,4 @@
-use crate::guards::caller_has_update_uploads_permission;
+use crate::guards::{caller_has_update_uploads_permission, GuardManagement};
 use crate::state::mutate_state;
 use crate::state::read_state;
 pub use core_nft_api::__get_premint_entry_test;
@@ -11,10 +11,7 @@ pub use core_nft_api::set_readers;
 pub use core_nft_api::store_private_content_chunk;
 pub use core_nft_api::{derive_vetkey, derive_vetkey_public_key};
 use core_nft_common::resolve_readers;
-pub use core_nft_common::types::management::{
-    cancel_upload, finalize_upload, get_user_permissions, grant_permission, has_permission,
-    init_upload, migration_icrc3_add_transaction, revoke_permission, store_chunk,
-};
+use core_nft_common::types::management;
 pub use core_nft_common::PrivateContentError;
 use ic_cdk::update;
 use serde_bytes::ByteBuf;
@@ -24,6 +21,9 @@ pub async fn init_private_content_upload(
     args: init_private_content_upload::Args,
 ) -> init_private_content_upload::Response {
     let caller = ic_cdk::api::msg_caller();
+    let _guard_principal = GuardManagement::new(caller)
+        .map_err(|e| PrivateContentError::StorageError(e))?;
+
     match args.token_id_opt.as_ref() {
         Some(token_id) => {
             let entry_name = args
@@ -49,13 +49,37 @@ pub async fn init_private_content_upload(
                     &args.plaintext_hash,
                     args.plaintext_size,
                     args.file_size,
+                    args.storage_canister_id,
+                    args.storage_path.clone(),
                 )
             })?;
 
-            let args_cloned = args.clone();
-            crate::updates::management::init_upload(args_cloned.into())
+            // Retrieve the canister_id and storage path from the existing private entry
+            let (entry_canister_id, entry_storage_path) = read_state(|state| {
+                let entry = state.data.private_content_system.get_nft_private_entry(token_id.clone(), &entry_name)
+                    .map_err(|_| PrivateContentError::StorageError("Private entry not found".to_string()))?;
+                Ok::<_, PrivateContentError>((entry.storage_canister_id, entry.storage_path.clone()))
+            })?;
+
+            // Check if the storage path is identical to the existing entry's storage path
+            if args.storage_path != entry_storage_path {
+                return Err(PrivateContentError::StorageError("Cannot change storage path during reupload".to_string()));
+            }
+
+            // Retrieve the canister directly
+            let canister = read_state(|state| {
+                state.data.sub_canister_manager.get_canister(entry_canister_id)
+            }).ok_or_else(|| PrivateContentError::StorageError("Canister not found".to_string()))?;
+
+            let reupload_args = management::init_reupload::Args {
+                file_path: args.storage_path.clone(),
+                file_hash: hex::encode(args.file_hash),
+                file_size: args.file_size,
+                chunk_size: args.chunk_size,
+            };
+
+            canister.init_reupload(reupload_args)
                 .await
-                .map(|_| ())
                 .map_err(|err| PrivateContentError::StorageError(format!("{:?}", err)))?;
 
             mutate_state(|state| {
@@ -63,6 +87,8 @@ pub async fn init_private_content_upload(
                     token_id,
                     &entry_name,
                     args.expected_chunks,
+                    entry_canister_id,
+                    args.storage_path,
                 )
             })
         }
@@ -78,20 +104,26 @@ pub async fn init_private_content_upload(
                 )
             })?;
 
-            let args_cloned = args.clone();
-            crate::updates::management::init_upload(args_cloned.into())
-                .await
-                .map(|_| ())
-                .map_err(|err| PrivateContentError::StorageError(format!("{:?}", err)))?;
+            let mut sub_canister_manager = read_state(|state| state.data.sub_canister_manager.clone());
+            let upload_args = management::init_upload::Args {
+                file_path: args.storage_path.clone(),
+                file_hash: hex::encode(args.file_hash),
+                file_size: args.file_size,
+                chunk_size: args.chunk_size,
+            };
+
+            let (_, canister_id) = sub_canister_manager.init_upload(upload_args).await
+                .map_err(|err| PrivateContentError::StorageError(err))?;
 
             mutate_state(|state| {
+                state.data.sub_canister_manager = sub_canister_manager;
                 let caller = ic_cdk::api::msg_caller();
                 state.data.private_content_system.init_upload_register(
                     args.plaintext_hash,
                     args.salt,
                     caller,
                     args.readers,
-                    args.storage_canister_id,
+                    canister_id,
                     args.storage_path,
                     args.encryption_mode,
                     args.plaintext_size,
@@ -109,6 +141,9 @@ pub async fn store_private_content_chunk(
     args: store_private_content_chunk::Args,
 ) -> store_private_content_chunk::Response {
     let caller = ic_cdk::api::msg_caller();
+    let _guard_principal = GuardManagement::new(caller)
+        .map_err(|_| store_private_content_chunk::StorePrivateContentChunkError::ConcurrentManagementCall)?;
+
     if let Some(token_id) = args.token_id_opt.as_ref() {
         let entry_name = args
             .entry_name
@@ -136,14 +171,34 @@ pub async fn store_private_content_chunk(
         .map_err(|_| store_private_content_chunk::StorePrivateContentChunkError::InvalidChunk)?;
     let chunk_data = args.chunk_data.clone().into_vec();
 
-    let storage_result = crate::updates::management::store_chunk(args.clone().into())
-        .await
-        .map(|_| ())
-        .map_err(Into::into);
+    // Get the canister id
+    let canister_id = read_state(|state| {
+        if let Some(token_id) = args.token_id_opt.as_ref() {
+            let entry_name = args.entry_name.as_deref().ok_or(
+                store_private_content_chunk::StorePrivateContentChunkError::NotFound
+            )?;
+            let entry = state.data.private_content_system.get_nft_private_entry(token_id.clone(), &entry_name)
+                .map_err(|_| store_private_content_chunk::StorePrivateContentChunkError::NotFound)?;
+            Ok::<_, store_private_content_chunk::StorePrivateContentChunkError>(entry.storage_canister_id)
+        } else {
+            let entry = state.data.private_content_system.temp_file_cache.get(&args.plaintext_hash)
+                .ok_or(store_private_content_chunk::StorePrivateContentChunkError::NotFound)?;
+            Ok::<_, store_private_content_chunk::StorePrivateContentChunkError>(entry.storage_canister_id)
+        }
+    })?;
 
-    if let Err(err) = storage_result {
-        return Err(err);
-    }
+    let canister = read_state(|state| {
+        state.data.sub_canister_manager.get_canister(canister_id)
+    }).ok_or_else(|| store_private_content_chunk::StorePrivateContentChunkError::StorageCanisterError("Canister not found".to_string()))?;
+
+    let store_args = management::store_chunk::Args {
+        chunk_id: args.chunk_index.clone(),
+        file_path: args.storage_path.clone(),
+        chunk_data: args.chunk_data.clone().into_vec(),
+    };
+
+    canister.store_chunk(store_args).await
+        .map_err(|err| store_private_content_chunk::StorePrivateContentChunkError::from(err))?;
 
     let result = mutate_state(|state| {
         if let Some(token_id) = args.token_id_opt.as_ref() {
@@ -192,6 +247,9 @@ pub async fn finalize_private_content_upload(
     args: finalize_private_content_upload::Args,
 ) -> finalize_private_content_upload::Response {
     let caller = ic_cdk::api::msg_caller();
+    let _guard_principal = GuardManagement::new(caller)
+        .map_err(|_| finalize_private_content_upload::FinalizePrivateContentUploadError::ConcurrentManagementCall)?;
+
     if let Some(token_id) = args.token_id_opt.as_ref() {
         let entry_name = args
             .entry_name
@@ -209,14 +267,52 @@ pub async fn finalize_private_content_upload(
             .map_err(|e| finalize_private_content_upload::FinalizePrivateContentUploadError::StorageCanisterError(e))?;
     }
 
-    let storage_result = crate::updates::management::finalize_upload(args.clone().into())
-        .await
-        .map(|_| ())
-        .map_err(Into::into);
+    let canister_id = read_state(|state| {
+        if let Some(token_id) = args.token_id_opt.as_ref() {
+            let entry_name = args.entry_name.as_deref().ok_or(
+                finalize_private_content_upload::FinalizePrivateContentUploadError::NotFound
+            )?;
+            let entry = state.data.private_content_system.get_nft_private_entry(token_id.clone(), &entry_name)
+                .map_err(|_| finalize_private_content_upload::FinalizePrivateContentUploadError::NotFound)?;
+            Ok::<_, finalize_private_content_upload::FinalizePrivateContentUploadError>(entry.storage_canister_id)
+        } else {
+            let entry = state.data.private_content_system.temp_file_cache.get(&args.hash)
+                .ok_or(finalize_private_content_upload::FinalizePrivateContentUploadError::NotFound)?;
+            Ok::<_, finalize_private_content_upload::FinalizePrivateContentUploadError>(entry.storage_canister_id)
+        }
+    })?;
 
-    if let Err(err) = storage_result {
-        return Err(err);
-    }
+    let canister = read_state(|state| {
+        state.data.sub_canister_manager.get_canister(canister_id)
+    }).ok_or_else(|| finalize_private_content_upload::FinalizePrivateContentUploadError::StorageCanisterError("Canister not found".to_string()))?;
+
+    let finalize_args = management::finalize_upload::Args {
+        file_path: args.storage_path.clone(),
+    };
+
+    canister.finalize_upload(finalize_args).await
+        .map_err(|err| finalize_private_content_upload::FinalizePrivateContentUploadError::from(err))?;
+
+    let (base_url_template, is_test_mode) =
+        read_state(|state| (state.data.base_url.clone(), state.env.is_test_mode()));
+    let construct_url = |canister_id_str: &str, file_path: &str| -> String {
+        match &base_url_template {
+            Some(template) => {
+                let base = template.replace("{canister_id}", canister_id_str);
+                format!("{}{}", base.trim_end_matches('/'), file_path)
+            }
+            None => {
+                if is_test_mode {
+                    format!("http://{}.localhost:4943{}", canister_id_str, file_path)
+                } else {
+                    format!("https://{}.raw.icp0.io{}", canister_id_str, file_path)
+                }
+            }
+        }
+    };
+
+    let redirection_url = construct_url(&canister_id.to_string(), &args.storage_path);
+    core_nft_common::types::http::add_redirection(args.storage_path.clone(), redirection_url);
 
     let result = mutate_state(|state| {
         if let Some(token_id) = args.token_id_opt.as_ref() {
@@ -260,14 +356,26 @@ pub async fn finalize_private_content_upload(
 pub async fn cancel_private_content_upload(
     args: cancel_private_content_upload::Args,
 ) -> cancel_private_content_upload::Response {
-    let storage_result = crate::updates::management::cancel_upload(args.clone().into())
-        .await
-        .map(|_| ())
-        .map_err(Into::into);
+    let caller = ic_cdk::api::msg_caller();
+    let _guard_principal = GuardManagement::new(caller)
+        .map_err(|_| cancel_private_content_upload::CancelPrivateContentUploadError::ConcurrentManagementCall)?;
 
-    if let Err(err) = storage_result {
-        return Err(err);
-    }
+    let canister_id = read_state(|state| {
+        let entry = state.data.private_content_system.temp_file_cache.get(&args.entry_hash)
+            .ok_or(cancel_private_content_upload::CancelPrivateContentUploadError::UploadNotInitialized)?;
+        Ok::<_, cancel_private_content_upload::CancelPrivateContentUploadError>(entry.storage_canister_id)
+    })?;
+
+    let canister = read_state(|state| {
+        state.data.sub_canister_manager.get_canister(canister_id)
+    }).ok_or_else(|| cancel_private_content_upload::CancelPrivateContentUploadError::StorageCanisterError("Canister not found".to_string()))?;
+
+    let cancel_args = management::cancel_upload::Args {
+        file_path: args.storage_path.clone(),
+    };
+
+    canister.cancel_upload(cancel_args).await
+        .map_err(|err| cancel_private_content_upload::CancelPrivateContentUploadError::from(err))?;
 
     mutate_state(|state| {
         let _ = state

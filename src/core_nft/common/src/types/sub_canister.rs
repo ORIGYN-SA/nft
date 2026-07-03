@@ -2,7 +2,9 @@ use crate::types::management::{
     cancel_upload, finalize_upload, init_upload, remove_file, store_chunk,
 };
 use crate::utils::trace;
+use bity_ic_storage_canister_api::init_reupload;
 use bity_ic_storage_canister_c2c::get_stored_files_size_bytes;
+use bity_ic_storage_canister_c2c::init_reupload;
 use bity_ic_storage_canister_c2c::{
     cancel_upload, finalize_upload, get_storage_size, init_upload, remove_file, store_chunk,
 };
@@ -278,6 +280,35 @@ impl StorageCanister {
             }
             Err(e) => Err(
                 crate::types::management::init_upload::InitUploadError::StorageCanisterError(
+                    format!("{e:?}"),
+                ),
+            ),
+        }
+    }
+
+    pub async fn init_reupload(
+        &self,
+        data: init_reupload::Args,
+    ) -> crate::types::management::init_reupload::Response {
+        if self.state != bity_ic_subcanister_manager::CanisterState::Installed {
+            return Err(
+                crate::types::management::init_reupload::InitReuploadError::StorageCanisterError(
+                    "Canister is not installed".to_string(),
+                ),
+            );
+        }
+
+        let res = retry_async(|| init_reupload(self.canister_id, data.clone()), 3).await;
+        trace(&format!("init_reupload response: {:?}", res));
+
+        match res {
+            Ok(init_reupload_response) => {
+                crate::types::management::init_reupload::from_storage_response(
+                    init_reupload_response,
+                )
+            }
+            Err(e) => Err(
+                crate::types::management::init_reupload::InitReuploadError::StorageCanisterError(
                     format!("{e:?}"),
                 ),
             ),

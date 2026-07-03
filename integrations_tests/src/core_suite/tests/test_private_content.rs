@@ -1370,7 +1370,7 @@ fn test_private_content_reencryption_workflow() {
     let cipher_new = Aes256Gcm::new_from_slice(&sk_new).unwrap();
     let ciphertext_new = cipher_new.encrypt(nonce, plaintext.as_ref()).unwrap();
     let file_size_new = ciphertext_new.len() as u64;
-    let storage_path_new = "/private/overwritten.bin".to_string();
+    let storage_path_new = storage_path.clone();
 
     let hash_bytes_new = Sha256::digest(&ciphertext_new);
     let mut file_hash_new = [0u8; 32];
@@ -1416,7 +1416,6 @@ fn test_private_content_reencryption_workflow() {
         PrivateContentStatus::PendingReencryption
     );
 
-    // FIXME: should not be FInalized in the storage cnaister (?)
     assert_eq!(
         get_upload_status(
             pic,
@@ -1425,7 +1424,7 @@ fn test_private_content_reencryption_workflow() {
             &storage_path.clone()
         )
         .unwrap(),
-        UploadState::Finalized
+        UploadState::InitReupload
     );
 
     store_private_content_chunk(
@@ -2450,7 +2449,7 @@ fn test_private_content_security_requirements() {
     );
 
     // 3. Reader with ReadWrite (ReadAndUpdate) rights (nft_owner2) reencrypts and reuploads!
-    let storage_path_new = "/private/test_security_new.bin".to_string();
+    let storage_path_new = storage_path.clone();
     let re_init_args = core_nft_api::init_private_content_upload::Args {
         token_id_opt: Some(token_id.clone()),
         entry_name: Some("test_file".to_string()),
@@ -3068,7 +3067,7 @@ fn test_private_content_reencryption_edgecases() {
             salt: salt.clone(),
             default_readers: HashMap::new(),
             storage_canister_id: collection_canister_id,
-            storage_path: "/private/mismatch_hash.bin".to_string(),
+            storage_path: storage_path.clone(),
             plaintext_size: plaintext.len() as u64,
             expected_chunks: 1,
             chunk_size: Some(file_size),
@@ -3095,7 +3094,7 @@ fn test_private_content_reencryption_edgecases() {
             salt: salt.clone(),
             default_readers: HashMap::new(),
             storage_canister_id: collection_canister_id,
-            storage_path: "/private/mismatch_size.bin".to_string(),
+            storage_path: storage_path.clone(),
             plaintext_size: (plaintext.len() + 10) as u64, // wrong size
             expected_chunks: 1,
             chunk_size: Some(file_size),
@@ -3140,7 +3139,7 @@ fn test_private_content_reencryption_edgecases() {
             salt: salt.clone(),
             default_readers: HashMap::new(),
             storage_canister_id: collection_canister_id,
-            storage_path: "/private/unauthorized.bin".to_string(),
+            storage_path: storage_path.clone(),
             plaintext_size: plaintext.len() as u64,
             expected_chunks: 1,
             chunk_size: Some(file_size),

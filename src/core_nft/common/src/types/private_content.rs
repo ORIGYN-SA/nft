@@ -295,6 +295,8 @@ impl PrivateContentSystem {
         plaintext_hash: &Sha256Hash,
         plaintext_size: u64,
         file_size: u64,
+        storage_canister_id: Principal,
+        storage_path: String,
     ) -> Result<(), PrivateContentError> {
         let record = self
             .nft_private
@@ -308,6 +310,12 @@ impl PrivateContentSystem {
 
         if entry.status != PrivateContentStatus::PendingReencryption {
             return Err(PrivateContentError::InvalidStateTransition);
+        }
+
+        if entry.storage_path != storage_path {
+            return Err(PrivateContentError::StorageError(
+                "Storage paht should be the same for file reupload".to_string(),
+            ));
         }
 
         if entry.hash != *plaintext_hash {
@@ -336,6 +344,8 @@ impl PrivateContentSystem {
         token_id: &Nat,
         entry_name: &str,
         expected_chunks: usize,
+        storage_canister_id: Principal,
+        storage_path: String,
         // encryption_mode: EncryptionMode, // NOTE: cannot be changed for now, since this affects the file size. If the filesize is smaller than the initially uploaded ciphertext- then it should be acceptible
     ) -> Result<(), PrivateContentError> {
         let record = self
@@ -348,6 +358,8 @@ impl PrivateContentSystem {
             .get_mut(entry_name)
             .ok_or(PrivateContentError::NotFound)?;
 
+        entry.storage_canister_id = storage_canister_id;
+        entry.storage_path = storage_path;
         entry.pending_upload = Some(PendingUpload {
             expected_chunks,
             received_chunks: HashMap::new(),
