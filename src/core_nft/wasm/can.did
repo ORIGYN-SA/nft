@@ -1,0 +1,723 @@
+// Access rights of a user to a vetKey in [`crate::key_manager::KeyManager`] and/or an encrypted map in [`crate::encrypted_maps::EncryptedMaps`].
+type AccessRights = variant {
+  // User can retrieve the vetKey or encrypted map.
+  Read;
+  // User can update values in the encrypted map.
+  ReadWrite;
+  // User can view/share/revoke access to the vetKey or encrypted map.
+  ReadWriteManage;
+};
+// [Account](https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-3/README.md#value)
+// representation of ledgers supporting the ICRC-1 standard.
+type Account = record { owner : principal; subaccount : opt blob };
+type AppendFileError = variant {
+  StorageCanisterError : text;
+  InvalidStateTransition;
+  NotFound;
+  InvalidMemo;
+  ConcurrentManagementCall;
+  TokenDoesNotExists;
+  FileAlreadyExists;
+};
+type AppendFileRequest = record {
+  token_id : nat;
+  public_content : opt NftPublicRecordAppend;
+};
+type ApprovalInfo = record {
+  memo : opt blob;
+  from_subaccount : opt blob;
+  created_at_time : nat64;
+  expires_at : opt nat64;
+  spender : Account;
+};
+type ApproveCollectionArg = record { approval_info : ApprovalInfo };
+type ApproveCollectionError = variant {
+  GenericError : record { message : text; error_code : nat };
+  InvalidSpender;
+  CreatedInFuture : record { ledger_time : nat64 };
+  GenericBatchError : record { message : text; error_code : nat };
+  TooOld;
+};
+type ApproveCollectionResult = variant {
+  Ok : nat;
+  Err : ApproveCollectionError;
+};
+type ApproveTokenArg = record { token_id : nat; approval_info : ApprovalInfo };
+type ApproveTokenError = variant {
+  GenericError : record { message : text; error_code : nat };
+  InvalidSpender;
+  NonExistingTokenId;
+  Unauthorized;
+  CreatedInFuture : record { ledger_time : nat64 };
+  GenericBatchError : record { message : text; error_code : nat };
+  TooOld;
+};
+type ApproveTokenResult = variant { Ok : nat; Err : ApproveTokenError };
+// Information about where to find archived blocks. Returned as part of [`GetBlocksResult`].
+type ArchivedBlocks = record {
+  args : vec GetBlocksRequest;
+  callback : func (vec GetBlocksRequest) -> (GetBlocksResult) query;
+};
+type Args = record { hash : blob };
+type Args_1 = record { token_id : nat; entry_name : text };
+type Args_10 = record { permission : Permission; "principal" : principal };
+type Args_11 = record { permission : Permission; "principal" : principal };
+type Args_12 = record {
+  readers : vec record { principal; ReaderInfo };
+  plaintext_size : nat64;
+  storage_path : text;
+  token_id_opt : opt nat;
+  storage_canister_id : principal;
+  expected_chunks : nat64;
+  salt : blob;
+  entry_name : opt text;
+  file_hash : blob;
+  file_size : nat64;
+  default_readers : vec record { principal; ReaderInfo };
+  encryption_mode : EncryptionMode;
+  chunk_size : opt nat64;
+  plaintext_hash : blob;
+};
+type Args_13 = record {
+  file_hash : text;
+  file_path : text;
+  file_size : nat64;
+  chunk_size : opt nat64;
+};
+type Args_14 = record { mint_requests : vec MintRequest };
+type Args_15 = record {
+  readers : vec record { principal; ReaderInfo };
+  token_id : nat;
+  entry_name : text;
+};
+type Args_16 = record { chunk_id : nat; file_path : text; chunk_data : blob };
+type Args_17 = record {
+  storage_path : text;
+  chunk_index : nat;
+  token_id_opt : opt nat;
+  entry_name : opt text;
+  chunk_data : blob;
+  plaintext_hash : blob;
+};
+type Args_18 = record {
+  supply_cap : opt nat;
+  tx_window : opt nat;
+  default_take_value : opt nat;
+  max_canister_storage_threshold : opt nat;
+  logo : opt text;
+  permitted_drift : opt nat;
+  name : opt text;
+  description : opt text;
+  max_take_value : opt nat;
+  max_update_batch_size : opt nat;
+  max_query_batch_size : opt nat;
+  max_memo_size : opt nat;
+  atomic_batch_transfers : opt bool;
+  collection_metadata : opt vec record { text; CustomValue };
+  symbol : opt text;
+};
+type Args_19 = record {
+  token_id : nat;
+  metadata : vec record { text; CustomValue };
+};
+type Args_2 = record { token_id : nat; entry_name : text };
+type Args_20 = variant { Upgrade : UpgradeArgs; Init : InitArgs };
+type Args_3 = record { append_file_requests : vec AppendFileRequest };
+type Args_4 = record { storage_path : text; entry_hash : blob };
+type Args_5 = record { file_path : text };
+type Args_6 = record { input : blob; transport_public_key : blob };
+type Args_7 = record {
+  token_id : nat;
+  entry_name : text;
+  transport_public_key : blob;
+};
+type Args_8 = record {
+  storage_path : text;
+  token_id_opt : opt nat;
+  hash : blob;
+  entry_name : opt text;
+};
+type Args_9 = record { "principal" : principal };
+// A block with an ID. Returned as part of [`GetBlocksResult`].
+type BlockWithId = record { id : nat; block : ICRC3Value };
+// Represents a semantic version number following the MAJOR.MINOR.PATCH format.
+// 
+// # Examples
+// 
+// ```
+// use types::BuildVersion;
+// 
+// let version = BuildVersion::new(1, 2, 3);
+// assert_eq!(version.to_string(), "1.2.3");
+// 
+// let parsed = "1.2.3".parse::<BuildVersion>().unwrap();
+// assert_eq!(version, parsed);
+// ```
+type BuildVersion = record {
+  // Major version number, incremented for incompatible API changes
+  major : nat32;
+  // Minor version number, incremented for backwards-compatible functionality additions
+  minor : nat32;
+  // Patch version number, incremented for backwards-compatible bug fixes
+  patch : nat32;
+};
+type BurnNftError = variant {
+  StorageCanisterError : text;
+  TokenDoesNotExist;
+  ConcurrentManagementCall;
+  NotTokenOwner;
+};
+type CancelPrivateContentUploadError = variant {
+  InvalidFilePath;
+  StorageCanisterError : text;
+  ConcurrentManagementCall;
+  UploadNotInitialized;
+  UploadAlreadyFinalized;
+};
+type CancelUploadError = variant {
+  InvalidFilePath;
+  UploadNotInitialized;
+  UploadAlreadyFinalized;
+};
+type ConsentInfo = record {
+  metadata : ConsentMessageMetadata;
+  consent_message : ConsentMessage;
+};
+type ConsentMessage = variant {
+  FieldsDisplayMessage : FieldsDisplay;
+  GenericDisplayMessage : text;
+};
+type ConsentMessageMetadata = record {
+  utc_offset_minutes : opt int16;
+  language : text;
+};
+type ConsentMessageRequest = record {
+  arg : blob;
+  method : text;
+  user_preferences : ConsentMessageSpec;
+};
+type ConsentMessageSpec = record {
+  metadata : ConsentMessageMetadata;
+  device_spec : opt DisplayMessageType;
+};
+type CustomValue = variant {
+  Int : int;
+  Map : vec record { text; ICRC3Value };
+  Nat : nat;
+  Blob : blob;
+  Text : text;
+  Array : vec ICRC3Value;
+};
+type DeriveVetkeyPublicKeyResp = record { public_key : blob };
+type DeriveVetkeyResp = record { encrypted_key : blob };
+type DisplayMessageType = variant { GenericDisplay; FieldsDisplay };
+type Duration = record { secs : nat64; nanos : nat32 };
+type EncryptionMode = variant { AES256 };
+type ErrorInfo = record { description : text };
+type FieldsDisplay = record {
+  fields : vec record { text; Value };
+  intent : text;
+};
+type FinalizePrivateContentUploadError = variant {
+  StorageCanisterError : text;
+  InvalidStateTransition;
+  IncompleteUpload;
+  NotFound;
+  ConcurrentManagementCall;
+};
+type FinalizeUploadError = variant {
+  InvalidFilePath;
+  InvalidStateTransition;
+  IncompleteUpload;
+  FileSizeMismatch;
+  FileHashMismatch;
+  UploadNotStarted;
+  UploadAlreadyFinalized;
+};
+type FinalizeUploadResp = record { url : text };
+type GetAllUploadsError = variant { StorageCanisterError : text };
+// The arguments for the
+// [ICRC-3 `icrc3_get_blocks`](https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-3/README.md#icrc3_get_blocks)
+// endpoint.
+type GetBlocksRequest = record { start : nat; length : nat };
+// The result type for the
+// [ICRC-3 `icrc3_get_blocks`](https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-3/README.md#icrc3_get_blocks)
+// endpoint.
+type GetBlocksResult = record {
+  log_length : nat;
+  blocks : vec BlockWithId;
+  archived_blocks : Vec;
+};
+// The result type for the
+// [ICRC-3 `icrc3_get_blocks`](https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-3/README.md#icrc3_get_blocks)
+// endpoint.
+type GetBlocksResult_1 = record {
+  log_length : nat;
+  blocks : vec BlockWithId;
+  archived_blocks : vec ArchivedBlocks;
+};
+type GetUploadStatusError = variant {
+  StorageCanisterError : text;
+  UploadNotFound;
+};
+type GetUserPermissionsError = variant { DefaultError : text; UserNotFound };
+type GrantPermissionError = variant {
+  ConcurrentManagementCall;
+  DefaultError : text;
+};
+type HasPermissionError = variant { DefaultError : text };
+// The information returned as part of the return value for the
+// [`icrc3_get_archives`](https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-3/README.md)
+// endpoint.
+type ICRC3ArchiveInfo = record {
+  end : nat;
+  canister_id : principal;
+  start : nat;
+};
+// The data certificate returned from the
+// [ICRC-3 `icrc3_get_tip_certificate`](https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-3/README.md#icrc3_get_tip_certificate)
+// endpoint.
+type ICRC3DataCertificate = record { certificate : blob; hash_tree : blob };
+// System constants and limits for the ICRC3 implementation.
+// 
+// This struct defines various system parameters that control the behavior
+// of the ICRC3 implementation, such as transaction windows, memory limits,
+// and cycle management.
+type ICRC3Properties = record {
+  // Maximum number of blocks per response
+  max_blocks_per_response : nat;
+  // Initial number of cycles
+  initial_cycles : nat;
+  // Time window for transaction validation
+  tx_window : Duration;
+  // Maximum size of local stable memory for transactions before archiving.
+  // If None, transactions are directly archived in a new canister, not stored in the local stable memory.
+  max_tx_local_stable_memory_size_bytes : opt nat;
+  // Threshold for archiving blocks to the external archive canister
+  threshold_for_archiving_to_external_archive : opt nat64;
+  // Maximum number of transactions to purge at once
+  max_transactions_to_purge : nat;
+  // Maximum memory size in bytes
+  max_memory_size_bytes : nat;
+  // Maximum number of transactions allowed in the window
+  max_transactions_in_window : nat;
+  // Number of cycles to reserve
+  reserved_cycles : nat;
+};
+// A value defined in [the ICRC-3 standard](https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-3/README.md#value).
+type ICRC3Value = variant {
+  Int : int;
+  Map : vec record { text; ICRC3Value };
+  Nat : nat;
+  Blob : blob;
+  Text : text;
+  Array : vec ICRC3Value;
+};
+type Icrc21Error = variant {
+  GenericError : record { description : text; error_code : nat };
+  InsufficientPayment : ErrorInfo;
+  UnsupportedCanisterCall : ErrorInfo;
+  ConsentMessageUnavailable : ErrorInfo;
+};
+type InitApprovalsArg = record {
+  max_approvals_per_token_or_collection : opt nat;
+  max_revoke_approvals : opt nat;
+};
+type InitArgs = record {
+  base_url : opt text;
+  permissions : PermissionManager;
+  supply_cap : opt nat;
+  tx_window : opt nat;
+  test_mode : bool;
+  default_take_value : opt nat;
+  max_canister_storage_threshold : opt nat;
+  logo : opt text;
+  permitted_drift : opt nat;
+  name : text;
+  description : opt text;
+  version : BuildVersion;
+  max_take_value : opt nat;
+  max_update_batch_size : opt nat;
+  vetkd_context : text;
+  max_query_batch_size : opt nat;
+  commit_hash : text;
+  max_memo_size : opt nat;
+  atomic_batch_transfers : opt bool;
+  collection_metadata : vec record { text; CustomValue };
+  symbol : text;
+  approval_init : InitApprovalsArg;
+  vetkd_key_name : text;
+};
+type InitUploadError = variant {
+  StorageCanisterError : text;
+  ContentTooLarge;
+  ConcurrentManagementCall;
+  FileAlreadyExists;
+};
+type IsApprovedArg = record {
+  token_id : nat;
+  from_subaccount : opt blob;
+  spender : Account;
+};
+type MintError = variant {
+  TokenAlreadyExists;
+  StorageCanisterError : text;
+  ExceedMaxAllowedSupplyCap;
+  InvalidMemo;
+  ConcurrentManagementCall;
+};
+type MintRequest = record {
+  metadata : vec record { text; ICRC3Value };
+  memo : opt blob;
+  private_content : opt NftPrivateRecordMint;
+  public_content : opt NftPublicRecordMint;
+  token_owner : Account;
+};
+type NftPrivateRecordMint = record {
+  entries : vec record { text; blob };
+  default_readers : vec record { principal; ReaderInfo };
+};
+type NftPublicRecordAppend = record { entries : vec record { text; text } };
+type NftPublicRecordMint = record { entries : vec record { text; text } };
+type PendingUpload = record {
+  timestamp_ns : nat64;
+  expected_chunks : nat64;
+  received_chunks : vec record { nat64; blob };
+  chunk_size : nat64;
+};
+type PendingUpload_1 = record {
+  timestamp_ns : nat64;
+  expected_chunks : nat64;
+  received_chunks : vec record { nat; blob };
+  chunk_size : nat64;
+};
+type Permission = variant {
+  UpdateMetadata;
+  Minting;
+  UpdateCollectionMetadata;
+  UpdateUploads;
+  ManageAuthorities;
+  ReadUploads;
+};
+type PermissionManager = record {
+  user_permissions : vec record { principal; vec Permission };
+};
+type PrivateContentError = variant {
+  VetkdNotConfigured;
+  InvalidStateTransition;
+  VetkdError : text;
+  NotEnabled;
+  InvalidStatus;
+  ContentTooLarge;
+  NotFound;
+  Unauthorized;
+  AlreadyExists;
+  InvalidChunk;
+  TooManyReaders;
+  StorageError : text;
+};
+type PrivateContentStatus = variant {
+  Active;
+  PendingMinting;
+  PendingUpload;
+  PendingReencryption;
+};
+type PrivateEntry = record {
+  readers : vec record { principal; ReaderInfo };
+  plaintext_size : nat64;
+  storage_path : text;
+  status : PrivateContentStatus;
+  storage_canister_id : principal;
+  format_version : nat8;
+  previous_canonical_identity : opt blob;
+  hash : blob;
+  salt : blob;
+  file_size : nat64;
+  canonical_identity : blob;
+  encryption_mode : EncryptionMode;
+  pending_upload : opt PendingUpload;
+};
+type PublicEntry = record {
+  storage_path : text;
+  storage_canister_id : principal;
+  format_version : nat8;
+  hash : text;
+  file_size : nat64;
+  created_at_ns : nat64;
+  state : UploadState;
+  pending_upload : opt PendingUpload_1;
+};
+type ReaderInfo = record { alias : opt text; rights : AccessRights };
+type Result = variant { Ok : PrivateEntry; Err : text };
+type Result_1 = variant { Ok : PublicEntry; Err : text };
+type Result_10 = variant {
+  Ok : vec record { text; UploadState };
+  Err : GetAllUploadsError;
+};
+type Result_11 = variant { Ok : UploadState; Err : GetUploadStatusError };
+type Result_12 = variant { Ok : vec Permission; Err : GetUserPermissionsError };
+type Result_13 = variant { Ok; Err : GrantPermissionError };
+type Result_14 = variant { Ok : bool; Err : HasPermissionError };
+type Result_15 = variant { Ok : ConsentInfo; Err : Icrc21Error };
+type Result_16 = variant {
+  Ok : vec opt ApproveCollectionResult;
+  Err : ApproveCollectionError;
+};
+type Result_17 = variant {
+  Ok : vec opt ApproveTokenResult;
+  Err : ApproveTokenError;
+};
+type Result_18 = variant {
+  Ok : vec opt RevokeCollectionApprovalResult;
+  Err : RevokeCollectionApprovalError;
+};
+type Result_19 = variant {
+  Ok : vec opt RevokeTokenApprovalResponse;
+  Err : RevokeTokenApprovalError;
+};
+type Result_2 = variant { Ok; Err : AppendFileError };
+type Result_20 = variant {
+  Ok : vec opt TransferFromResult;
+  Err : TransferFromError;
+};
+type Result_21 = variant { Ok : nat; Err : TransferError };
+type Result_22 = variant { Ok; Err : PrivateContentError };
+type Result_23 = variant { Ok : record {}; Err : InitUploadError };
+type Result_24 = variant { Ok : nat; Err : MintError };
+type Result_25 = variant { Ok; Err : text };
+type Result_26 = variant { Ok : record {}; Err : StoreChunkError };
+type Result_27 = variant { Ok; Err : StorePrivateContentChunkError };
+type Result_28 = variant { Ok; Err : UpdateCollectionMetadataError };
+type Result_29 = variant { Ok : nat; Err : UpdateNftMetadataError };
+type Result_3 = variant { Ok; Err : BurnNftError };
+type Result_4 = variant { Ok; Err : CancelPrivateContentUploadError };
+type Result_5 = variant { Ok : record {}; Err : CancelUploadError };
+type Result_6 = variant { Ok : DeriveVetkeyResp; Err : text };
+type Result_7 = variant { Ok : DeriveVetkeyPublicKeyResp; Err : text };
+type Result_8 = variant { Ok; Err : FinalizePrivateContentUploadError };
+type Result_9 = variant { Ok : FinalizeUploadResp; Err : FinalizeUploadError };
+type RevokeCollectionApprovalArg = record {
+  memo : opt blob;
+  from_subaccount : opt blob;
+  created_at_time : opt nat64;
+  spender : opt Account;
+};
+type RevokeCollectionApprovalError = variant {
+  GenericError : record { message : text; error_code : nat };
+  CreatedInFuture : record { ledger_time : nat64 };
+  ApprovalDoesNotExist;
+  GenericBatchError : record { message : text; error_code : nat };
+  TooOld;
+};
+type RevokeCollectionApprovalResult = variant {
+  Ok : nat;
+  Err : RevokeCollectionApprovalError;
+};
+type RevokeTokenApprovalArg = record {
+  token_id : nat;
+  memo : opt blob;
+  from_subaccount : opt blob;
+  created_at_time : opt nat64;
+  spender : opt Account;
+};
+type RevokeTokenApprovalError = variant {
+  GenericError : record { message : text; error_code : nat };
+  NonExistingTokenId;
+  Unauthorized;
+  CreatedInFuture : record { ledger_time : nat64 };
+  ApprovalDoesNotExist;
+  GenericBatchError : record { message : text; error_code : nat };
+  TooOld;
+};
+type RevokeTokenApprovalResponse = variant {
+  Ok : nat;
+  Err : RevokeTokenApprovalError;
+};
+type StoreChunkError = variant {
+  InvalidFilePath;
+  StorageCanisterError : text;
+  InvalidStateTransition;
+  ConcurrentManagementCall;
+  InvalidChunkId;
+  UploadNotInitialized;
+  InvalidChunkData;
+  UploadAlreadyFinalized;
+};
+type StorePrivateContentChunkError = variant {
+  StorageCanisterError : text;
+  ContentTooLarge;
+  NotFound;
+  ConcurrentManagementCall;
+  InvalidChunk;
+};
+// The return type of the
+// [ICRC-3 `icrc3_supported_block_types`](https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-3/README.md#icrc3_supported_block_types)
+// endpoint.
+type SupportedBlockType = record { url : text; block_type : text };
+type SupportedStandard = record { url : text; name : text };
+type TransferArg = record {
+  to : Account;
+  token_id : nat;
+  memo : opt blob;
+  from_subaccount : opt blob;
+  created_at_time : opt nat64;
+};
+type TransferError = variant {
+  GenericError : record { message : text; error_code : nat };
+  Duplicate : record { duplicate_of : nat };
+  NonExistingTokenId;
+  Unauthorized;
+  CreatedInFuture : record { ledger_time : nat };
+  InvalidRecipient;
+  GenericBatchError : record { message : text; error_code : nat };
+  TooOld;
+};
+type TransferFromArg = record {
+  to : Account;
+  spender_subaccount : opt blob;
+  token_id : nat;
+  from : Account;
+  memo : opt blob;
+  created_at_time : opt nat64;
+};
+type TransferFromError = variant {
+  GenericError : record { message : text; error_code : nat };
+  Duplicate : record { duplicate_of : nat };
+  NonExistingTokenId;
+  Unauthorized;
+  CreatedInFuture : record { ledger_time : nat64 };
+  InvalidRecipient;
+  GenericBatchError : record { message : text; error_code : nat };
+  TooOld;
+};
+type TransferFromResult = variant { Ok : nat; Err : TransferFromError };
+type UpdateCollectionMetadataError = variant {
+  StorageCanisterError : text;
+  ConcurrentManagementCall;
+};
+type UpdateNftMetadataError = variant {
+  StorageCanisterError : text;
+  TokenDoesNotExist;
+  ConcurrentManagementCall;
+};
+type UpgradeArgs = record {
+  base_url : opt text;
+  version : BuildVersion;
+  vetkd_context : opt text;
+  commit_hash : text;
+  vetkd_key_name : opt text;
+};
+type UploadState = variant {
+  Init;
+  Finalized;
+  FinalizeReupload;
+  ReuploadInit;
+  InProgress;
+  InitReupload;
+  ChunkReupload;
+};
+type Value = variant {
+  Text : record { content : text };
+  TokenAmount : record { decimals : nat8; amount : nat64; symbol : text };
+  TimestampSeconds : record { amount : nat64 };
+  DurationSeconds : record { amount : nat64 };
+};
+type Vec = vec record {
+  args : vec record { start : nat; length : nat };
+  callback : func (vec record { start : nat; length : nat }) -> (
+      record {
+        log_length : nat;
+        blocks : vec record {
+          id : nat;
+          block : variant {
+            Int : int;
+            Map : vec record { text; ICRC3Value };
+            Nat : nat;
+            Blob : blob;
+            Text : text;
+            Array : vec ICRC3Value;
+          };
+        };
+        archived_blocks : Vec;
+      },
+    ) query;
+};
+service : (Args_20) -> {
+  __get_premint_entry_test : (Args) -> (Result) query;
+  __get_private_entry_test : (Args_1) -> (Result) query;
+  __get_public_entry_test : (Args_2) -> (Result_1) query;
+  append_file : (Args_3) -> (Result_2);
+  burn_nft : (nat) -> (Result_3);
+  cancel_private_content_upload : (Args_4) -> (Result_4);
+  cancel_upload : (Args_5) -> (Result_5);
+  derive_vetkey : (Args_6) -> (Result_6);
+  derive_vetkey_by_entry : (Args_7) -> (Result_6);
+  derive_vetkey_public_key : (null) -> (Result_7);
+  finalize_private_content_upload : (Args_8) -> (Result_8);
+  finalize_upload : (Args_5) -> (Result_9);
+  get_all_storage_subcanisters : () -> (vec principal) query;
+  get_all_uploads : (opt nat, opt nat) -> (Result_10) query;
+  get_upload_status : (text) -> (Result_11) query;
+  get_user_permissions : (Args_9) -> (Result_12) query;
+  grant_permission : (Args_10) -> (Result_13);
+  has_permission : (Args_11) -> (Result_14) query;
+  icrc10_supported_standards : () -> (vec SupportedStandard) query;
+  icrc21_canister_call_consent_message : (ConsentMessageRequest) -> (
+      Result_15,
+    ) query;
+  icrc37_approve_collection : (vec ApproveCollectionArg) -> (Result_16);
+  icrc37_approve_tokens : (vec ApproveTokenArg) -> (Result_17);
+  icrc37_get_collection_approvals : (
+      Account,
+      opt ApproveCollectionArg,
+      opt nat,
+    ) -> (vec ApproveCollectionArg) query;
+  icrc37_get_token_approvals : (nat, opt ApproveTokenArg, opt nat) -> (
+      vec ApproveTokenArg,
+    ) query;
+  icrc37_is_approved : (vec IsApprovedArg) -> (vec bool) query;
+  icrc37_max_approvals_per_token_or_collection : () -> (opt nat) query;
+  icrc37_max_revoke_approvals : () -> (opt nat) query;
+  icrc37_revoke_collection_approvals : (vec RevokeCollectionApprovalArg) -> (
+      Result_18,
+    );
+  icrc37_revoke_token_approvals : (vec RevokeTokenApprovalArg) -> (Result_19);
+  icrc37_transfer_from : (vec TransferFromArg) -> (Result_20);
+  icrc3_get_archives : (null) -> (vec ICRC3ArchiveInfo) query;
+  icrc3_get_blocks : (vec GetBlocksRequest) -> (GetBlocksResult_1) query;
+  icrc3_get_properties : (null) -> (ICRC3Properties) query;
+  icrc3_get_tip_certificate : (null) -> (ICRC3DataCertificate) query;
+  icrc3_supported_block_types : (null) -> (vec SupportedBlockType) query;
+  icrc7_atomic_batch_transfers : () -> (opt bool) query;
+  icrc7_balance_of : (vec Account) -> (vec nat) query;
+  icrc7_collection_metadata : () -> (vec record { text; ICRC3Value }) query;
+  icrc7_default_take_value : () -> (opt nat) query;
+  icrc7_description : () -> (opt text) query;
+  icrc7_logo : () -> (opt text) query;
+  icrc7_max_memo_size : () -> (opt nat) query;
+  icrc7_max_query_batch_size : () -> (opt nat) query;
+  icrc7_max_take_value : () -> (opt nat) query;
+  icrc7_max_update_batch_size : () -> (opt nat) query;
+  icrc7_name : () -> (text) query;
+  icrc7_owner_of : (vec nat) -> (vec opt Account) query;
+  icrc7_permitted_drift : () -> (opt nat) query;
+  icrc7_supply_cap : () -> (opt nat) query;
+  icrc7_symbol : () -> (text) query;
+  icrc7_token_metadata : (vec nat) -> (
+      vec opt vec record { text; ICRC3Value },
+    ) query;
+  icrc7_tokens : (opt nat, opt nat) -> (vec nat) query;
+  icrc7_tokens_of : (Account, opt nat, opt nat) -> (vec nat) query;
+  icrc7_total_supply : () -> (nat) query;
+  icrc7_transfer : (vec TransferArg) -> (vec opt Result_21);
+  icrc7_tx_window : () -> (opt nat) query;
+  init_private_content_upload : (Args_12) -> (Result_22);
+  init_upload : (Args_13) -> (Result_23);
+  mint : (Args_14) -> (Result_24);
+  revoke_permission : (Args_11) -> (Result_13);
+  set_readers : (Args_15) -> (Result_25);
+  store_chunk : (Args_16) -> (Result_26);
+  store_private_content_chunk : (Args_17) -> (Result_27);
+  update_collection_metadata : (Args_18) -> (Result_28);
+  update_nft_metadata : (Args_19) -> (Result_29);
+}

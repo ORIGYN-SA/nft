@@ -1,0 +1,33 @@
+integration tests trigger:
+  stage: integration_testing
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "{src,integrations_tests}/**/*.{rs,toml,lock,did,wasm,gz}"
+        - "Cargo.{lock,toml}"
+      when: manual
+  script:
+    - echo "Triggering integration tests"
+
+integration tests:
+  stage: integration_testing
+  extends: .rust template
+  variables:
+    KUBERNETES_MEMORY_LIMIT: "5Gi"
+    KUBERNETES_MEMORY_REQUEST: "5Gi"
+    KUBERNETES_CPU_LIMIT: "2"
+    KUBERNETES_CPU_REQUEST: "1"
+    POCKET_IC_BIN: ./integrations_tests/pocket-ic
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "{src,integrations_tests}/**/*.{rs,toml,lock,did,wasm,gz}"
+        - "Cargo.{lock,toml}"
+  needs:
+    [
+      "build",
+      "integration tests trigger",
+    ]
+  script:
+    - bash ./scripts/run_integration_tests.sh
+  timeout: 45m

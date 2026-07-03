@@ -3,15 +3,15 @@ use crate::client::indexer::get_blocks;
 use crate::index_suite::setup::setup::MINUTE_IN_MS;
 use crate::utils::{mint_nft, tick_n_blocks};
 use candid::Nat;
-use core_nft::types::icrc7;
-use core_nft::types::update_nft_metadata::Args as UpdateTokenMetadataArg;
+use core_nft_common::types::icrc7;
+use core_nft_common::types::update_nft_metadata::Args as UpdateTokenMetadataArg;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
 use icrc_ledger_types::icrc1::account::Account;
 use std::time::Duration;
 
 use crate::index_suite::setup::setup::TestEnv;
 use crate::index_suite::setup::{default_test_setup, test_setup_no_limit};
-use index_icrc7::{index::IndexType, types::get_blocks::Args};
+use index_icrc7_api::{index::IndexType, types::get_blocks::get_blocks::Args};
 
 #[test]
 fn test_icrc7_transfer_simple_index() {
@@ -921,7 +921,7 @@ fn test_get_blocks_complex_filters_and_ordering() {
             start: 0,
             length: 20,
             filters: vec![],
-            sort_by: Some(index_icrc7::index::SortBy::Ascending),
+            sort_by: Some(index_icrc7_api::index::SortBy::Ascending),
         },
     );
 
@@ -950,7 +950,7 @@ fn test_get_blocks_complex_filters_and_ordering() {
             start: 0,
             length: 20,
             filters: vec![],
-            sort_by: Some(index_icrc7::index::SortBy::Descending),
+            sort_by: Some(index_icrc7_api::index::SortBy::Descending),
         },
     );
 
@@ -974,13 +974,13 @@ fn test_get_blocks_complex_filters_and_ordering() {
         &Args {
             start: 0,
             length: 20,
-            filters: vec![index_icrc7::index::IndexType::Account(
-                index_icrc7::wrapped_values::WrappedAccount(Account {
+            filters: vec![index_icrc7_api::index::IndexType::Account(
+                index_icrc7_api::WrappedAccount(Account {
                     owner: nft_owner1,
                     subaccount: None,
                 }),
             )],
-            sort_by: Some(index_icrc7::index::SortBy::Ascending),
+            sort_by: Some(index_icrc7_api::index::SortBy::Ascending),
         },
     );
 
@@ -1010,13 +1010,13 @@ fn test_get_blocks_complex_filters_and_ordering() {
         &Args {
             start: 0,
             length: 20,
-            filters: vec![index_icrc7::index::IndexType::Account(
-                index_icrc7::wrapped_values::WrappedAccount(Account {
+            filters: vec![index_icrc7_api::index::IndexType::Account(
+                index_icrc7_api::WrappedAccount(Account {
                     owner: nft_owner2,
                     subaccount: None,
                 }),
             )],
-            sort_by: Some(index_icrc7::index::SortBy::Descending),
+            sort_by: Some(index_icrc7_api::index::SortBy::Descending),
         },
     );
 
@@ -1046,10 +1046,10 @@ fn test_get_blocks_complex_filters_and_ordering() {
         &Args {
             start: 0,
             length: 20,
-            filters: vec![index_icrc7::index::IndexType::BlockType(
+            filters: vec![index_icrc7_api::index::IndexType::BlockType(
                 "7mint".to_string(),
             )],
-            sort_by: Some(index_icrc7::index::SortBy::Ascending),
+            sort_by: Some(index_icrc7_api::index::SortBy::Ascending),
         },
     );
 
@@ -1073,10 +1073,10 @@ fn test_get_blocks_complex_filters_and_ordering() {
         &Args {
             start: 0,
             length: 20,
-            filters: vec![index_icrc7::index::IndexType::BlockType(
+            filters: vec![index_icrc7_api::index::IndexType::BlockType(
                 "7xfer".to_string(),
             )],
-            sort_by: Some(index_icrc7::index::SortBy::Descending),
+            sort_by: Some(index_icrc7_api::index::SortBy::Descending),
         },
     );
 
@@ -1105,15 +1105,15 @@ fn test_get_blocks_complex_filters_and_ordering() {
             start: 0,
             length: 20,
             filters: vec![
-                index_icrc7::index::IndexType::Account(
-                    index_icrc7::wrapped_values::WrappedAccount(Account {
+                index_icrc7_api::index::IndexType::Account(index_icrc7_api::WrappedAccount(
+                    Account {
                         owner: nft_owner1,
                         subaccount: None,
-                    }),
-                ),
-                index_icrc7::index::IndexType::BlockType("7mint".to_string()),
+                    },
+                )),
+                index_icrc7_api::index::IndexType::BlockType("7mint".to_string()),
             ],
-            sort_by: Some(index_icrc7::index::SortBy::Ascending),
+            sort_by: Some(index_icrc7_api::index::SortBy::Ascending),
         },
     );
 
@@ -1144,15 +1144,15 @@ fn test_get_blocks_complex_filters_and_ordering() {
             start: 1,  // Start from 2nd block
             length: 1, // Get 1 blocks
             filters: vec![
-                index_icrc7::index::IndexType::Account(
-                    index_icrc7::wrapped_values::WrappedAccount(Account {
+                index_icrc7_api::index::IndexType::Account(index_icrc7_api::WrappedAccount(
+                    Account {
                         owner: nft_owner1,
                         subaccount: None,
-                    }),
-                ),
-                index_icrc7::index::IndexType::BlockType("7mint".to_string()),
+                    },
+                )),
+                index_icrc7_api::index::IndexType::BlockType("7mint".to_string()),
             ],
-            sort_by: Some(index_icrc7::index::SortBy::Ascending),
+            sort_by: Some(index_icrc7_api::index::SortBy::Ascending),
         },
     );
 
@@ -1284,7 +1284,7 @@ fn test_get_blocks_descending_order_with_limit() {
             start: 0,
             length: 50, // Large enough to get all blocks
             filters: vec![],
-            sort_by: Some(index_icrc7::index::SortBy::Descending),
+            sort_by: Some(index_icrc7_api::index::SortBy::Descending),
         },
     );
 
@@ -1316,7 +1316,7 @@ fn test_get_blocks_descending_order_with_limit() {
             start: 0,
             length: 10,
             filters: vec![],
-            sort_by: Some(index_icrc7::index::SortBy::Descending),
+            sort_by: Some(index_icrc7_api::index::SortBy::Descending),
         },
     );
 
@@ -1365,7 +1365,7 @@ fn test_get_blocks_descending_order_with_limit() {
             start: 10,
             length: 10,
             filters: vec![],
-            sort_by: Some(index_icrc7::index::SortBy::Descending),
+            sort_by: Some(index_icrc7_api::index::SortBy::Descending),
         },
     );
 
@@ -1515,9 +1515,9 @@ fn test_get_blocks_filter_by_token_id() {
 
     // Test 2: Filter by specific token ID (first token)
     println!("=== Test 2: Filter by first token ID ===");
-    let token_0_filter = index_icrc7::index::IndexType::TokenId(
-        index_icrc7::wrapped_values::WrappedNat(token_ids[0].clone()),
-    );
+    let token_0_filter = index_icrc7_api::index::IndexType::TokenId(index_icrc7_api::WrappedNat(
+        token_ids[0].clone(),
+    ));
 
     let blocks_token_0 = get_blocks(
         pic,
@@ -1527,7 +1527,7 @@ fn test_get_blocks_filter_by_token_id() {
             start: 0,
             length: 20,
             filters: vec![token_0_filter],
-            sort_by: Some(index_icrc7::index::SortBy::Ascending),
+            sort_by: Some(index_icrc7_api::index::SortBy::Ascending),
         },
     );
 
@@ -1563,9 +1563,9 @@ fn test_get_blocks_filter_by_token_id() {
 
     // Test 3: Filter by another token ID (second token)
     println!("=== Test 3: Filter by second token ID ===");
-    let token_1_filter = index_icrc7::index::IndexType::TokenId(
-        index_icrc7::wrapped_values::WrappedNat(token_ids[1].clone()),
-    );
+    let token_1_filter = index_icrc7_api::index::IndexType::TokenId(index_icrc7_api::WrappedNat(
+        token_ids[1].clone(),
+    ));
 
     let blocks_token_1 = get_blocks(
         pic,
@@ -1575,7 +1575,7 @@ fn test_get_blocks_filter_by_token_id() {
             start: 0,
             length: 20,
             filters: vec![token_1_filter],
-            sort_by: Some(index_icrc7::index::SortBy::Descending),
+            sort_by: Some(index_icrc7_api::index::SortBy::Descending),
         },
     );
 
@@ -1591,9 +1591,9 @@ fn test_get_blocks_filter_by_token_id() {
 
     // Test 4: Filter by token ID that only has mint (no transfers)
     println!("=== Test 4: Filter by token ID with only mint ===");
-    let token_4_filter = index_icrc7::index::IndexType::TokenId(
-        index_icrc7::wrapped_values::WrappedNat(token_ids[4].clone()),
-    );
+    let token_4_filter = index_icrc7_api::index::IndexType::TokenId(index_icrc7_api::WrappedNat(
+        token_ids[4].clone(),
+    ));
 
     let blocks_token_4 = get_blocks(
         pic,
@@ -1619,9 +1619,8 @@ fn test_get_blocks_filter_by_token_id() {
 
     // Test 5: Filter by non-existent token ID
     println!("=== Test 5: Filter by non-existent token ID ===");
-    let non_existent_token_filter = index_icrc7::index::IndexType::TokenId(
-        index_icrc7::wrapped_values::WrappedNat(Nat::from(999u64)),
-    );
+    let non_existent_token_filter =
+        index_icrc7_api::index::IndexType::TokenId(index_icrc7_api::WrappedNat(Nat::from(999u64)));
 
     let blocks_non_existent = get_blocks(
         pic,
@@ -1654,10 +1653,10 @@ fn test_get_blocks_filter_by_token_id() {
     // Test 6: Combined filters - token ID + block type
     println!("=== Test 6: Combined filters - token ID + block type ===");
     let combined_filters = vec![
-        index_icrc7::index::IndexType::TokenId(index_icrc7::wrapped_values::WrappedNat(
+        index_icrc7_api::index::IndexType::TokenId(index_icrc7_api::WrappedNat(
             token_ids[0].clone(),
         )),
-        index_icrc7::index::IndexType::BlockType("7mint".to_string()),
+        index_icrc7_api::index::IndexType::BlockType("7mint".to_string()),
     ];
 
     let blocks_combined = get_blocks(

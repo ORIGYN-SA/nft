@@ -1,126 +1,113 @@
-image: debian:bullseye
-
-stages:
-  - build
-  - test
-  - deploy
-
-variables:
-  CARGO_TERM_COLOR: always
-  RUST_BACKTRACE: 1
-  FF_USE_FASTZIP: "true"
-  ARTIFACT_COMPRESSION_LEVEL: "fast"
-  GIT_DEPTH: 1
-  CARGO_HOME: ${CI_PROJECT_DIR}/.cargo
-  PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${CI_PROJECT_DIR}/.cargo/bin"
-
-cache:
-  key: ${CI_COMMIT_REF_SLUG}
-  paths:
-    - src/storage_canister/wasm/storage_canister_canister.wasm.gz
-    - src/core_nft/wasm/core_nft_canister.wasm.gz
-    - src/core_nft/wasm/can.did
-    - src/storage_canister/wasm/can.did
-
 default:
   interruptible: true
   retry:
     max: 2
     when:
       - runner_system_failure
+      - stuck_or_timeout_failure
+      - api_failure
+      - runner_unsupported
+      - unknown_failure
 
-before_script:
-  - apt-get update
-  - apt-get install -y curl build-essential ca-certificates git wget
-  - curl https://sh.rustup.rs -sSf | sh -s -- -y
-  - export PATH="$HOME/.cargo/bin:$PATH"
-  - rustup default stable
-  - rustup target add wasm32-unknown-unknown
-  - cargo install candid-extractor
+variables:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  GIT_DEPTH: 1
+
+stages:
+  - lint
+  - build
+  - integration_testing
+  - deploy
+
+include:
+  - local: scripts/ci-cd/.rust_template.yml
+  - local: scripts/ci-cd/.canister_tests.yml
 
 build:
   stage: build
+  needs: ["rust lint"]
+  extends: .rust template
+  variables:
+    KUBERNETES_MEMORY_LIMIT: "5Gi"
+    KUBERNETES_MEMORY_REQUEST: "4Gi"
+    KUBERNETES_CPU_LIMIT: "2"
+    KUBERNETES_CPU_REQUEST: "2"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "Cargo.{lock,toml}"
+        - "{src,integrations_tests}/**/*.{rs,toml,lock}"
+    - if: $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_REF_NAME == "master"
   script:
-    - cargo install ic-wasm
-    - export PATH="$PATH:$HOME/.cargo/bin"
-    - wget https://github.com/dfinity/pocketic/releases/download/8.0.0/pocket-ic-x86_64-linux.gz
-    - gunzip pocket-ic-x86_64-linux.gz
-    - chmod +x pocket-ic-x86_64-linux
-    - cp pocket-ic-x86_64-linux ./src/pocket-ic
+    - wget -q -O pocket-ic.gz https://github.com/dfinity/pocketic/releases/download/9.0.1/pocket-ic-x86_64-linux.gz
+    - gzip -d pocket-ic.gz
+    - chmod +x ./pocket-ic
+    - mv ./pocket-ic ./integrations_tests/pocket-ic
     - bash ./scripts/build.sh
   artifacts:
     paths:
-      - src/storage_canister/wasm/storage_canister_canister.wasm.gz
-      - src/core_nft/wasm/core_nft_canister.wasm.gz
-      - src/core_nft/wasm/can.did
-      - src/storage_canister/wasm/can.did
-      - src/pocket-ic
-    expire_in: 1 week
-  resource_group: build
+      - src/core_nft/wasm/
+      - src/index_icrc7/wasm/
+      - integrations_tests/wasm/
+      - integrations_tests/pocket-ic
+    expire_in: 1 day
 
-test:
-  stage: test
-  variables:
-    POCKET_IC_BIN: ./src/pocket-ic
-  needs: ["build"]
-  resource_group: test
+rust lint:
+  stage: lint
+  extends: .rust template
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - "Cargo.{lock,toml}"
+        - "{src,integrations_tests}/**/*.{rs,toml,lock}"
+    - if: $CI_OPEN_MERGE_REQUESTS
+      when: never
+      changes:
+        - "Cargo.{lock,toml}"
+        - "{src,integrations_tests}/**/*.{rs,toml,lock}"
+    - if: $CI_COMMIT_REF_NAME == "master"
+      changes:
+        - "Cargo.{lock,toml}"
+        - "{src,integrations_tests}/**/*.{rs,toml,lock}"
   script:
-    - apt-get update
-    - apt-get install -y pkg-config libssl-dev libunwind8
-    - bash ./scripts/run_integrations_tests.sh
-  timeout: 30m
+    - cargo clippy
 
 deploy:
   stage: deploy
+  extends: .rust template
   needs: ["build"]
-  image: debian:bullseye
+  rules:
+    - if: $CI_COMMIT_REF_NAME == "master"
   script:
-    - apt-get update
-    - apt-get install -y curl jq
     - |
       RELEASE_TAG="v$(date +'%Y.%m.%d')-$(echo $CI_COMMIT_SHA | cut -c1-7)"
-      RELEASE_NAME="Release $RELEASE_TAG"
-      
       RELEASE_RESPONSE=$(curl -s -X POST \
         -H "Authorization: token $GITHUB_TOKEN" \
         -H "Accept: application/vnd.github.v3+json" \
         "https://api.github.com/repos/$GITHUB_REPO/releases" \
         -d "{
           \"tag_name\": \"$RELEASE_TAG\",
-          \"name\": \"$RELEASE_NAME\",
-          \"body\": \"Release automatique depuis GitLab CI\",
+          \"name\": \"Release $RELEASE_TAG\",
+          \"body\": \"Automated release from GitLab CI\",
           \"draft\": false,
           \"prerelease\": false
         }")
-      
       UPLOAD_URL=$(echo $RELEASE_RESPONSE | jq -r '.upload_url' | sed 's/{?name,label}//')
-      
-      curl -s -X POST \
-        -H "Authorization: token $GITHUB_TOKEN" \
-        -H "Content-Type: application/octet-stream" \
-        --data-binary @"src/storage_canister/wasm/storage_canister_canister.wasm.gz" \
-        "$UPLOAD_URL?name=storage_canister_canister.wasm.gz"
-        
-      curl -s -X POST \
-        -H "Authorization: token $GITHUB_TOKEN" \
-        -H "Content-Type: application/octet-stream" \
-        --data-binary @"src/core_nft/wasm/core_nft_canister.wasm.gz" \
-        "$UPLOAD_URL?name=core_nft_canister.wasm.gz"
-
-      curl -s -X POST \
-        -H "Authorization: token $GITHUB_TOKEN" \
-        -H "Content-Type: application/octet-stream" \
-        --data-binary @"./src/core_nft/wasm/can.did" \
-        "$UPLOAD_URL?name=core_nft_canister.did"
-
-      curl -s -X POST \
-        -H "Authorization: token $GITHUB_TOKEN" \
-        -H "Content-Type: application/octet-stream" \
-        --data-binary @"./src/storage_canister/wasm/can.did" \
-        "$UPLOAD_URL?name=storage_canister.did"
-        
-  only:
-    - master
+      for CANISTER in core_nft index_icrc7; do
+        curl -s -X POST \
+          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Content-Type: application/octet-stream" \
+          --data-binary @"src/${CANISTER}/wasm/${CANISTER}_canister.wasm.gz" \
+          "$UPLOAD_URL?name=${CANISTER}_canister.wasm.gz"
+        curl -s -X POST \
+          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Content-Type: application/octet-stream" \
+          --data-binary @"src/${CANISTER}/wasm/can.did" \
+          "$UPLOAD_URL?name=${CANISTER}.did"
+      done
   variables:
     GITHUB_TOKEN: ${GITHUB_TOKEN}
-    GITHUB_REPO: ${GITHUB_REPO} 
+    GITHUB_REPO: ${GITHUB_REPO}

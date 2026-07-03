@@ -19,4 +19,5 @@ url = "2.5.0"
 hex = "0.4.3"
 base64 = "0.21.0"
 
-core_nft = { path = "../src/core_nft" }
+core_nft_api = { path = "../src/core_nft/api" }
+core_nft_common = { path = "../src/core_nft/common" }

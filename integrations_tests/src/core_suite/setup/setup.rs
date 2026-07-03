@@ -1,11 +1,11 @@
 use crate::core_suite::setup::setup_core::setup_core_canister;
+use crate::core_suite::setup::setup_core::setup_old_core_canister;
 use crate::utils::random_principal;
 use bity_ic_types::{CanisterId, Milliseconds};
 use candid::{CandidType, Deserialize, Principal};
-use core_nft::init::InitArgs;
-use core_nft::lifecycle::Args;
+use core_nft_api::init::InitArgs;
+use core_nft_api::lifecycle::Args;
 use pocket_ic::{common::rest::BlobCompression, PocketIc, PocketIcBuilder};
-
 use std::time::Duration;
 
 pub const SECOND_IN_MS: Milliseconds = 1000;
@@ -106,7 +106,55 @@ impl TestEnvBuilder {
         pic.advance_time(Duration::from_millis(MINUTE_IN_MS * 30));
 
         println!(
-            "buyback_burn_canister_id: {}",
+            "collection_canister_id: {}",
+            collection_canister_id.to_text()
+        );
+
+        TestEnv {
+            controller: self.controller,
+            nft_owner1: self.nft_owner1,
+            nft_owner2: self.nft_owner2,
+            collection_canister_id: collection_canister_id,
+            pic,
+        }
+    }
+
+    pub fn build_old(&mut self, init_args: InitArgs) -> TestEnv {
+        println!("Start building TestEnv");
+
+        let mut pic = PocketIcBuilder::new()
+            .with_application_subnet()
+            .with_application_subnet()
+            .with_sns_subnet()
+            .with_fiduciary_subnet()
+            .with_nns_subnet()
+            .with_system_subnet()
+            .build();
+
+        self.collection_id = pic.create_canister_with_settings(Some(self.controller.clone()), None);
+        self.registry_id = pic
+            .create_canister_with_id(
+                Some(self.controller.clone()),
+                None,
+                Principal::from_text("rwlgt-iiaaa-aaaaa-aaaaa-cai").unwrap(),
+            )
+            .unwrap();
+
+        pic.tick();
+        pic.advance_time(Duration::from_millis(MINUTE_IN_MS * 10));
+
+        println!("collection_id: {}", self.collection_id.to_text());
+
+        let nft_init_args = Args::Init(init_args);
+
+        let collection_canister_id =
+            setup_old_core_canister(&mut pic, self.collection_id, nft_init_args, self.controller);
+
+        pic.tick();
+        pic.advance_time(Duration::from_millis(MINUTE_IN_MS * 30));
+
+        println!(
+            "collection_canister_id: {}",
             collection_canister_id.to_text()
         );
 

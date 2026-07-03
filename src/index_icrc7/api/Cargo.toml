@@ -1,0 +1,16 @@
+[package]
+name = "index_icrc7_api"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+candid = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+icrc-ledger-types = { workspace = true }
+ic-ledger-types = { workspace = true }
+minicbor = { workspace = true }
+bity-ic-types = { workspace = true }

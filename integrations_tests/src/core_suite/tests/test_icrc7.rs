@@ -10,8 +10,8 @@ use crate::utils::{
     fetch_metadata_json, mint_nft, random_principal, setup_http_client, upload_metadata,
 };
 use candid::{Encode, Nat, Principal};
-use core_nft::types::icrc7;
-use core_nft::types::update_nft_metadata;
+use core_nft_common::types::icrc7;
+use core_nft_common::types::update_nft_metadata;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
 use icrc_ledger_types::icrc1::account::Account;
 use icrc_ledger_types::icrc3::blocks::GetBlocksRequest;
@@ -242,6 +242,7 @@ fn test_icrc7_token_metadata_simple() {
                 &http_gateway,
                 collection_canister_id,
                 &metadata_file_path,
+                true,
             );
             assert_eq!(
                 parsed_metadata
@@ -457,6 +458,7 @@ fn test_icrc7_token_metadata_multiple_insert() {
                 &http_gateway,
                 collection_canister_id,
                 &metadata_file_path,
+                true,
             );
             assert_eq!(
                 parsed_metadata
@@ -666,6 +668,7 @@ fn test_icrc7_token_metadata_multiple_insert_dup_name() {
                 &http_gateway,
                 collection_canister_id,
                 &metadata_file_path,
+                true,
             );
 
             assert_eq!(
@@ -940,6 +943,7 @@ fn test_icrc7_transfer_with_metadata_updates() {
                 &http_gateway,
                 collection_canister_id,
                 &metadata_file_path,
+                true,
             );
 
             assert_eq!(
@@ -1469,7 +1473,7 @@ fn test_icrc7_tokens() {
         nft_owner2,
     } = test_env;
 
-    let tokens: core_nft::types::icrc7::icrc7_tokens::Response =
+    let tokens: core_nft_common::types::icrc7::icrc7_tokens::Response =
         crate::client::pocket::unwrap_response(pic.query_call(
             collection_canister_id,
             controller,
@@ -1493,7 +1497,7 @@ fn test_icrc7_tokens() {
 
     tick_n_blocks(pic, 5);
 
-    let tokens: core_nft::types::icrc7::icrc7_tokens::Response =
+    let tokens: core_nft_common::types::icrc7::icrc7_tokens::Response =
         crate::client::pocket::unwrap_response(pic.query_call(
             collection_canister_id,
             controller,
@@ -1517,7 +1521,7 @@ fn test_icrc7_tokens() {
 
     tick_n_blocks(pic, 5);
 
-    let tokens: core_nft::types::icrc7::icrc7_tokens::Response =
+    let tokens: core_nft_common::types::icrc7::icrc7_tokens::Response =
         crate::client::pocket::unwrap_response(pic.query_call(
             collection_canister_id,
             controller,
@@ -1541,7 +1545,7 @@ fn test_icrc7_tokens_of() {
         nft_owner2,
     } = test_env;
 
-    let tokens_of_owner1: core_nft::types::icrc7::icrc7_tokens_of::Response =
+    let tokens_of_owner1: core_nft_common::types::icrc7::icrc7_tokens_of::Response =
         crate::client::pocket::unwrap_response(
             pic.query_call(
                 collection_canister_id,
@@ -1575,7 +1579,7 @@ fn test_icrc7_tokens_of() {
 
     tick_n_blocks(pic, 5);
 
-    let tokens_of_owner1: core_nft::types::icrc7::icrc7_tokens_of::Response =
+    let tokens_of_owner1: core_nft_common::types::icrc7::icrc7_tokens_of::Response =
         crate::client::pocket::unwrap_response(
             pic.query_call(
                 collection_canister_id,
@@ -1609,7 +1613,7 @@ fn test_icrc7_tokens_of() {
 
     tick_n_blocks(pic, 5);
 
-    let tokens_of_owner2: core_nft::types::icrc7::icrc7_tokens_of::Response =
+    let tokens_of_owner2: core_nft_common::types::icrc7::icrc7_tokens_of::Response =
         crate::client::pocket::unwrap_response(
             pic.query_call(
                 collection_canister_id,
@@ -3356,7 +3360,7 @@ fn test_icrc7_balance_of_comprehensive() {
 
             // Test icrc37_transfer_from from nft_owner2 to nft_owner3
             // First approve nft_owner1 to transfer on behalf of nft_owner2
-            let approval_info = core_nft::types::icrc37::ApprovalInfo {
+            let approval_info = core_nft_common::types::icrc37::ApprovalInfo {
                 spender: Account {
                     owner: nft_owner1,
                     subaccount: None,
@@ -3368,7 +3372,7 @@ fn test_icrc7_balance_of_comprehensive() {
             };
 
             let approve_args = vec![
-                core_nft::types::icrc37::icrc37_approve_tokens::ApproveTokenArg {
+                core_nft_common::types::icrc37::icrc37_approve_tokens::ApproveTokenArg {
                     token_id: token_id.clone(),
                     approval_info: approval_info.clone(),
                 },
@@ -3387,7 +3391,7 @@ fn test_icrc7_balance_of_comprehensive() {
 
             // Now transfer using icrc37_transfer_from
             let transfer_from_args = vec![
-                core_nft::types::icrc37::icrc37_transfer_from::TransferFromArg {
+                core_nft_common::types::icrc37::icrc37_transfer_from::TransferFromArg {
                     spender_subaccount: None,
                     from: Account {
                         owner: nft_owner2,
@@ -3416,10 +3420,12 @@ fn test_icrc7_balance_of_comprehensive() {
             let results = transfer_from_response.unwrap();
             assert!(results[0].is_some());
             match results[0].as_ref().unwrap() {
-                core_nft::types::icrc37::icrc37_transfer_from::TransferFromResult::Ok(_) => {
+                core_nft_common::types::icrc37::icrc37_transfer_from::TransferFromResult::Ok(_) => {
                     assert!(true)
                 }
-                core_nft::types::icrc37::icrc37_transfer_from::TransferFromResult::Err(_) => {
+                core_nft_common::types::icrc37::icrc37_transfer_from::TransferFromResult::Err(
+                    _,
+                ) => {
                     assert!(false)
                 }
             }

@@ -6,7 +6,9 @@ use bity_ic_storage_canister_api::{finalize_upload, init_upload, store_chunk};
 use bity_ic_types::Cycles;
 use bytes::Bytes;
 use candid::{Nat, Principal};
-use core_nft::types::management::mint::{Args as MintArgs, MintRequest, Response as MintResponse};
+use core_nft_common::types::management::mint::{
+    Args as MintArgs, MintRequest, Response as MintResponse,
+};
 use http::Request;
 use http_body_util::BodyExt;
 use ic_agent::Agent;
@@ -48,6 +50,8 @@ pub fn mint_nft(
             token_owner: owner,
             memo: Some(serde_bytes::ByteBuf::from("memo")),
             metadata,
+            private_content: None,
+            public_content: None,
         }],
     };
 
@@ -164,7 +168,7 @@ pub fn upload_metadata(
     .map_err(|e| format!("upload_file error: {:?}", e))?;
 
     Ok(Url::parse(&format!(
-        "https://{}.raw.icp0.io/{}",
+        "https://{}.localhost:4943/{}",
         storage_canister_id, upload_path
     ))
     .unwrap())
@@ -210,6 +214,7 @@ pub fn fetch_metadata_json(
     http_gateway: &HttpGatewayClient,
     collection_canister_id: Principal,
     metadata_file_path: &str,
+    test_mode: bool,
 ) -> serde_json::Value {
     println!("metadata_file_path : {}", metadata_file_path);
 
@@ -226,6 +231,8 @@ pub fn fetch_metadata_json(
             .await
     });
 
+    let http = if test_mode { "http://" } else { "https://" };
+
     assert_eq!(
         response.canister_response.status(),
         307,
@@ -234,6 +241,7 @@ pub fn fetch_metadata_json(
 
     if let Some(location) = response.canister_response.headers().get("location") {
         let location_str = location.to_str().unwrap();
+
         println!("Redirection to: {}", location_str);
 
         let canister_id = Principal::from_str(
@@ -241,10 +249,12 @@ pub fn fetch_metadata_json(
                 .split('.')
                 .next()
                 .unwrap()
-                .replace("https://", "")
+                .replace(http, "")
                 .as_str(),
         )
         .unwrap();
+
+        println!("Canister_id: {}", canister_id);
 
         let redirected_response = rt.block_on(async {
             http_gateway
