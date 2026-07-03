@@ -56,10 +56,16 @@ async fn upload_garbage_collector() {
 
         match result {
             Ok(_) => {
-                debug!("Successfully canceled public upload for file {}", storage_path);
+                debug!(
+                    "Successfully canceled public upload for file {}",
+                    storage_path
+                );
             }
             Err(err) => {
-                info!("Failed to cancel public upload for file {}: {:?}", storage_path, err);
+                info!(
+                    "Failed to cancel public upload for file {}: {:?}",
+                    storage_path, err
+                );
             }
         }
 
@@ -106,10 +112,16 @@ async fn upload_garbage_collector() {
 
         match result {
             Ok(_) => {
-                debug!("Successfully canceled private upload for file {}", storage_path);
+                debug!(
+                    "Successfully canceled private upload for file {}",
+                    storage_path
+                );
             }
             Err(err) => {
-                info!("Failed to cancel private upload for file {}: {:?}", storage_path, err);
+                info!(
+                    "Failed to cancel private upload for file {}: {:?}",
+                    storage_path, err
+                );
             }
         }
 

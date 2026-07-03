@@ -83,15 +83,23 @@ impl StorageSubCanisterManager {
         }
 
         for canister in self.get_subcanisters_installed() {
-            match canister.get_storage_size().await {
-                Ok(size) if size + file_size <= MAX_STORAGE_SIZE => {
-                    match canister.init_upload(data.clone()).await {
-                        Ok(_) => {
-                            trace(&format!("Initialized upload"));
-                            return Ok((init_upload::InitUploadResp {}, canister.canister_id()));
-                        }
-                        Err(_) => {
-                            continue;
+            let storage_size = canister.get_storage_size().await;
+            let stored_files_size = canister.get_stored_files_size_bytes().await;
+            match (storage_size, stored_files_size) {
+                (Ok(size), Ok(files_size)) => {
+                    let expected_size = size.max((files_size as u128) + file_size);
+                    if expected_size <= MAX_STORAGE_SIZE {
+                        match canister.init_upload(data.clone()).await {
+                            Ok(_) => {
+                                trace(&format!("Initialized upload"));
+                                return Ok((
+                                    init_upload::InitUploadResp {},
+                                    canister.canister_id(),
+                                ));
+                            }
+                            Err(_) => {
+                                continue;
+                            }
                         }
                     }
                 }

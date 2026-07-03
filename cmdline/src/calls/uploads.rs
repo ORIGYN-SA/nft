@@ -17,11 +17,7 @@ pub async fn init(agent: &Agent, canister_id: &Principal, args: init_upload::Arg
     Ok(())
 }
 
-pub async fn store(
-    agent: &Agent,
-    canister_id: &Principal,
-    args: store_chunk::Args,
-) -> Result<()> {
+pub async fn store(agent: &Agent, canister_id: &Principal, args: store_chunk::Args) -> Result<()> {
     let bytes = Encode!(&args)?;
     agent
         .update(canister_id, "store_chunk")
@@ -113,5 +109,3 @@ pub async fn upload_file(
 
     Ok(url)
 }
-
-
