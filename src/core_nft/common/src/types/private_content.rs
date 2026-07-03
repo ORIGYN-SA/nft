@@ -20,6 +20,16 @@ pub struct PrivateContentSystem {
     pub config: PrivateContentConfig,
 }
 
+impl Default for PrivateContentSystem {
+    fn default() -> Self {
+        Self {
+            nft_private: HashMap::new(),
+            temp_file_cache: HashMap::new(),
+            config: PrivateContentConfig::default(),
+        }
+    }
+}
+
 impl PrivateContentSystem {
     pub fn get_nft_private_entry(
         &self,
@@ -559,6 +569,15 @@ pub enum EncryptionMode {
 pub struct PrivateContentConfig {
     pub vetkd_key_name: String,
     pub vetkd_context: String,
+}
+
+impl Default for PrivateContentConfig {
+    fn default() -> Self {
+        Self {
+            vetkd_key_name: "dfx_test_key".to_string(),
+            vetkd_context: "vetkd_context".to_string(),
+        }
+    }
 }
 
 impl PrivateContentConfig {

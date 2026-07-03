@@ -14,10 +14,10 @@ mod guards;
 mod jobs;
 pub mod lifecycle;
 mod memory;
+mod migrations;
 pub mod queries;
 pub mod updates;
 mod utils;
-// mod migrations;
 
 mod state;
 pub mod types;

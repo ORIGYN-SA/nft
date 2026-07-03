@@ -600,7 +600,13 @@ type UpdateNftMetadataError = variant {
   TokenDoesNotExist;
   ConcurrentManagementCall;
 };
-type UpgradeArgs = record { version : BuildVersion; commit_hash : text };
+type UpgradeArgs = record {
+  base_url : opt text;
+  version : BuildVersion;
+  vetkd_context : opt text;
+  commit_hash : text;
+  vetkd_key_name : opt text;
+};
 type UploadState = variant {
   Init;
   Finalized;

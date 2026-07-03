@@ -643,6 +643,11 @@ pub async fn init_upload(data: core_nft_api::InitUploadArgs) -> core_nft_api::In
     let _guard_principal = GuardManagement::new(caller)
         .map_err(|_| management::init_upload::InitUploadError::ConcurrentManagementCall)?;
 
+    let file_exists = read_state(|state| state.internal_filestorage.contains_path(&data.file_path));
+    if file_exists {
+        return Err(management::init_upload::InitUploadError::FileAlreadyExists);
+    }
+
     read_state(|state| {
         state
             .data
@@ -666,14 +671,26 @@ pub async fn init_upload(data: core_nft_api::InitUploadArgs) -> core_nft_api::In
     let expected_chunks = data.file_size.div_ceil(chunk_size).try_into().unwrap();
     mutate_state(|state| {
         state.data.sub_canister_manager = sub_canister_manager;
-        state.data.public_content_system.init_upload_register(
+        let register_res = state.data.public_content_system.init_upload_register(
             data.file_path.clone(),
             canister,
-            data.file_path,
+            data.file_path.clone(),
             expected_chunks,
             data.file_size,
             timestamp,
-        )
+        );
+        if register_res.is_ok() {
+            state.internal_filestorage.insert(
+                data.file_path.clone(),
+                crate::state::InternalFilestorageData {
+                    init_timestamp: timestamp,
+                    state: UploadState::InProgress,
+                    canister,
+                    path: data.file_path,
+                },
+            );
+        }
+        register_res
     })
 }
 
@@ -758,7 +775,7 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
     let _guard_principal = GuardManagement::new(caller)
         .map_err(|_| finalize_upload::FinalizeUploadError::ConcurrentManagementCall)?;
 
-    let (_init_timestamp, media_path, canister_id) = match read_state(|state| {
+    let (init_timestamp, media_path, canister_id) = match read_state(|state| {
         state
             .data
             .public_content_system
@@ -857,6 +874,20 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
             .data
             .media_redirections
             .insert(path.clone(), redirection_url);
+
+        if let Some(entry) = state.internal_filestorage.map.get_mut(&data.file_path) {
+            entry.state = UploadState::Finalized;
+        } else {
+            state.internal_filestorage.insert(
+                data.file_path.clone(),
+                crate::state::InternalFilestorageData {
+                    init_timestamp: init_timestamp,
+                    state: UploadState::Finalized,
+                    canister: canister_id,
+                    path: media_path,
+                },
+            );
+        }
     });
 
     let main_canister_id = ic_cdk::api::canister_self().to_string();
@@ -878,12 +909,19 @@ pub fn get_upload_status(file_path: String) -> management::get_upload_status::Re
             .public_content_system
             .get_public_file_by_path(&file_path)
         {
-            ic_cdk::println!("get_upload_status: found in public_content_system: {:?}", status.state);
+            ic_cdk::println!(
+                "get_upload_status: found in public_content_system: {:?}",
+                status.state
+            );
             return Some(status.state);
         }
         for entry in state.data.private_content_system.temp_file_cache.values() {
             if entry.storage_path == file_path {
-                ic_cdk::println!("get_upload_status: found in temp_file_cache: status={:?}, pending={:?}", entry.status, entry.pending_upload.is_some());
+                ic_cdk::println!(
+                    "get_upload_status: found in temp_file_cache: status={:?}, pending={:?}",
+                    entry.status,
+                    entry.pending_upload.is_some()
+                );
                 if let Some(pending) = &entry.pending_upload {
                     if pending.received_chunks.is_empty() {
                         return Some(UploadState::Init);
@@ -898,7 +936,11 @@ pub fn get_upload_status(file_path: String) -> management::get_upload_status::Re
         for record in state.data.private_content_system.nft_private.values() {
             for entry in record.entries.values() {
                 if entry.storage_path == file_path {
-                    ic_cdk::println!("get_upload_status: found in nft_private: status={:?}, pending={:?}", entry.status, entry.pending_upload.is_some());
+                    ic_cdk::println!(
+                        "get_upload_status: found in nft_private: status={:?}, pending={:?}",
+                        entry.status,
+                        entry.pending_upload.is_some()
+                    );
                     if let Some(pending) = &entry.pending_upload {
                         if pending.received_chunks.is_empty() {
                             return Some(UploadState::InitReupload);
@@ -976,6 +1018,7 @@ pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response
                     .data
                     .public_content_system
                     .cancel_upload_register(&key_to_remove);
+                state.internal_filestorage.remove(&data.file_path);
             });
             return Err(cancel_upload::CancelUploadError::StorageCanisterError(
                 "Storage canister not found. Cancelling the upload.".to_string(),
@@ -996,6 +1039,7 @@ pub async fn cancel_upload(data: cancel_upload::Args) -> cancel_upload::Response
             .data
             .public_content_system
             .cancel_upload_register(&key_to_remove);
+        state.internal_filestorage.remove(&data.file_path);
     });
 
     Ok(cancel_upload::CancelUploadResp {})

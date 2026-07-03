@@ -2671,6 +2671,9 @@ fn test_icrc37_approvals_persistence_after_upgrade() {
             let storage_upgrade_args = Args::Upgrade(UpgradeArgs {
                 version: BuildVersion::min(),
                 commit_hash: "commit_hash 2".to_string(),
+                vetkd_key_name: None,
+                vetkd_context: None,
+                base_url: None,
             });
 
             upgrade_core_canister(

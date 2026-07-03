@@ -35,8 +35,11 @@ canister_state!(RuntimeState);
 pub struct RuntimeState {
     pub env: CanisterEnv,
     pub data: Data,
+    #[serde(default)]
     pub principal_guards: BTreeSet<Principal>,
+    #[serde(default)]
     pub sliding_window_guards: HashMap<candid::Nat, Vec<TimestampNanos>>, // per token id
+    pub internal_filestorage: InternalFilestorage,
 }
 
 impl RuntimeState {
@@ -46,6 +49,7 @@ impl RuntimeState {
             data,
             principal_guards: BTreeSet::new(),
             sliding_window_guards: HashMap::new(),
+            internal_filestorage: InternalFilestorage::new(),
         }
     }
 
@@ -83,7 +87,9 @@ pub struct Data {
     pub max_canister_storage_threshold: Option<Nat>,
     pub tokens_list: HashMap<Nat, Icrc7Token>,
     pub tokens_list_by_owner: HashMap<Account, Vec<Nat>>,
+    #[serde(default)]
     pub private_content_system: PrivateContentSystem,
+    #[serde(default)]
     pub public_content_system: PublicContentSystem,
     pub approval_init: InitApprovalsArg,
     pub sub_canister_manager: StorageSubCanisterManager,
@@ -316,9 +322,26 @@ pub struct InternalFilestorageData {
     pub path: String,
 }
 
+impl Default for InternalFilestorageData {
+    fn default() -> Self {
+        Self {
+            init_timestamp: 0,
+            state: UploadState::Init,
+            canister: Principal::anonymous(),
+            path: String::new(),
+        }
+    }
+}
+
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
 pub struct InternalFilestorage {
     pub map: HashMap<String, InternalFilestorageData>,
+}
+
+impl Default for InternalFilestorage {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl InternalFilestorage {

@@ -99,6 +99,9 @@ fn test_upgrade_storage_canister() {
     let storage_upgrade_args = Args::Upgrade(UpgradeArgs {
         version: BuildVersion::min(),
         commit_hash: "commit_hash 2".to_string(),
+        vetkd_key_name: None,
+        vetkd_context: None,
+        base_url: Some("test".to_string()),
     });
 
     upgrade_core_canister(

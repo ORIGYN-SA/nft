@@ -1,5 +1,6 @@
 use crate::lifecycle::init_canister;
 use crate::memory::get_upgrades_memory;
+use crate::migrations::types::state::RuntimeStateV0;
 use crate::state::{read_state, replace_icrc3, start_default_archive_job, RuntimeState};
 use bity_ic_canister_logger::LogEntry;
 use bity_ic_canister_tracing_macros::trace;
@@ -34,17 +35,28 @@ fn post_upgrade(args: Args) {
             let reader = get_reader(&memory);
 
             // uncomment these lines if you want to do a normal upgrade
-            let (mut state, logs, traces, icrc3): (RuntimeState, Vec<LogEntry>, Vec<LogEntry>, ICRC3) = bity_ic_serializer
-                ::deserialize(reader)
-                .unwrap();
+            // let (mut state, logs, traces, icrc3): (RuntimeState, Vec<LogEntry>, Vec<LogEntry>, ICRC3) = bity_ic_serializer
+            //     ::deserialize(reader)
+            //     .unwrap();
 
             // uncomment these lines if you want to do an upgrade with migration
-            // let (runtime_state_v0, logs, traces): (
-            //     RuntimeStateV0,
-            //     Vec<LogEntry>,
-            //     Vec<LogEntry>,
-            // ) = serializer::deserialize(reader).unwrap();
-            // let mut state = RuntimeState::from(runtime_state_v0);
+            let (runtime_state_v0,logs, traces, icrc3): (
+                RuntimeStateV0,
+                Vec<LogEntry>,
+                Vec<LogEntry>,
+                ICRC3,
+            ) = bity_ic_serializer::deserialize(reader).unwrap();
+            let mut state = RuntimeState::from(runtime_state_v0);
+
+            if let Some(key_name) = upgrade_args.vetkd_key_name.clone() {
+                state.data.private_content_system.config.vetkd_key_name = key_name;
+            }
+            if let Some(context) = upgrade_args.vetkd_context.clone() {
+                state.data.private_content_system.config.vetkd_context = context;
+            }
+            if let Some(base_url) = upgrade_args.base_url.clone() {
+                state.data.base_url = Some(base_url);
+            }
 
             state.data.sub_canister_manager.sub_canister_manager.wasm = STORAGE_WASM.to_vec();
             state.data.sub_canister_manager.sub_canister_manager.update_canisters(bity_ic_storage_canister_api::lifecycle::Args::Upgrade(bity_ic_storage_canister_api::post_upgrade::UpgradeArgs{version: upgrade_args.version.clone(), commit_hash: upgrade_args.commit_hash.clone()}));

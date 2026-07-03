@@ -23,6 +23,18 @@ pub struct PublicContentSystem {
     pub all_files_index: HashMap<String, PublicEntry>, // files that was already saved
 }
 
+impl Default for PublicContentSystem {
+    fn default() -> Self {
+        Self {
+            nft_public: HashMap::new(),
+            temp_file_cache: HashMap::new(),
+            file_to_nfts: HashMap::new(),
+            nft_to_files: HashMap::new(),
+            all_files_index: HashMap::new(),
+        }
+    }
+}
+
 impl PublicContentSystem {
     pub fn get_nft_public_entry(
         &self,
