@@ -4,7 +4,7 @@ use crate::client::core_nft::{
 };
 use crate::utils::{mint_nft, tick_n_blocks};
 use candid::Nat;
-use core_nft_api::types::icrc7;
+use core_nft_common::types::icrc7;
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
 use icrc_ledger_types::icrc1::account::Account;
 use icrc_ledger_types::icrc3::blocks::GetBlocksRequest;

@@ -2,10 +2,10 @@ use candid::Decode;
 use ic_cdk::query;
 
 use crate::state::read_state;
-pub use crate::types::icrc21;
-pub use crate::types::icrc37;
-pub use crate::types::icrc7;
-pub use crate::types::management;
+pub use core_nft_api::types::icrc21;
+pub use core_nft_common::types::icrc37;
+pub use core_nft_common::types::icrc7;
+pub use core_nft_common::types::management;
 
 use icrc_ledger_types::icrc21::errors::{ErrorInfo, Icrc21Error};
 use icrc_ledger_types::icrc21::requests::ConsentMessageMetadata;

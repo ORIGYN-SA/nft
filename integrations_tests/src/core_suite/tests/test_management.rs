@@ -1,17 +1,19 @@
 use crate::client::core_nft::{
-    cancel_upload, finalize_upload, get_upload_status, grant_permission, init_upload, mint,
-    revoke_permission, store_chunk, update_collection_metadata, update_nft_metadata,
+    __get_public_entry_test, append_file, cancel_upload, finalize_upload, get_upload_status,
+    grant_permission, init_upload, mint, revoke_permission, store_chunk,
+    update_collection_metadata, update_nft_metadata,
 };
 use crate::utils::create_default_icrc97_metadata;
 
 use candid::{Encode, Nat, Principal};
-use core_nft_api::types::permissions::Permission;
+use core_nft_common::types::permissions::Permission;
 use icrc_ledger_types::icrc1::account::Account;
 
 use bity_ic_storage_canister_api::types::storage::UploadState;
-use core_nft_api::types::management::{
-    cancel_upload, finalize_upload, grant_permission, init_upload, mint, mint::MintRequest,
-    revoke_permission, store_chunk, update_collection_metadata, update_nft_metadata,
+use core_nft_common::types::management::{
+    append_file, append_file::AppendFileRequest, cancel_upload, finalize_upload, grant_permission,
+    init_upload, mint, mint::MintRequest, revoke_permission, store_chunk,
+    update_collection_metadata, update_nft_metadata,
 };
 use ic_cdk::println;
 use sha2::{Digest, Sha256};
@@ -1099,6 +1101,8 @@ fn test_mint_unauthorized() {
                 },
                 memo: None,
                 metadata: create_default_icrc97_metadata(metadata_url),
+                private_content: None,
+                public_content: None,
             }],
         }),
     );
@@ -1153,6 +1157,8 @@ fn test_mint_authorized() {
                 },
                 memo: None,
                 metadata: create_default_icrc97_metadata(metadata_url.clone()),
+                private_content: None,
+                public_content: None,
             }],
         }),
     );
@@ -1246,6 +1252,8 @@ fn test_add_then_remove_minting_authorities_unauthorized() {
                 },
                 memo: None,
                 metadata: create_default_icrc97_metadata(metadata_url),
+                private_content: None,
+                public_content: None,
             }],
         }),
     );
@@ -1298,6 +1306,8 @@ fn test_mint_with_metadata() {
                 },
                 memo: None,
                 metadata: create_default_icrc97_metadata(metadata_url.clone()),
+                private_content: None,
+                public_content: None,
             }],
         }),
     );
@@ -1397,7 +1407,7 @@ fn test_get_upload_status() {
     assert!(
         matches!(
             status_before,
-            Err(core_nft_api::types::management::get_upload_status::GetUploadStatusError::UploadNotFound)
+            Err(core_nft_common::types::management::get_upload_status::GetUploadStatusError::UploadNotFound)
         ),
         "Should return error for non-existent upload"
     );
@@ -1474,7 +1484,7 @@ fn test_get_all_uploads() {
         upload_paths.push(upload_path);
     }
 
-    let all_uploads: core_nft_api::types::management::get_all_uploads::Response =
+    let all_uploads: core_nft_common::types::management::get_all_uploads::Response =
         crate::client::pocket::unwrap_response(pic.query_call(
             collection_canister_id,
             controller,
@@ -1485,7 +1495,7 @@ fn test_get_all_uploads() {
     assert_eq!(all_uploads.unwrap().len(), 3, "Should return all 3 uploads");
 
     // Test pagination
-    let first_page: core_nft_api::types::management::get_all_uploads::Response =
+    let first_page: core_nft_common::types::management::get_all_uploads::Response =
         crate::client::pocket::unwrap_response(pic.query_call(
             collection_canister_id,
             controller,
@@ -1499,7 +1509,7 @@ fn test_get_all_uploads() {
         "Should return 2 uploads for first page"
     );
 
-    let second_page: core_nft_api::types::management::get_all_uploads::Response =
+    let second_page: core_nft_common::types::management::get_all_uploads::Response =
         crate::client::pocket::unwrap_response(pic.query_call(
             collection_canister_id,
             controller,
@@ -1544,7 +1554,7 @@ fn test_update_collection_metadata() {
             atomic_batch_transfers: Some(true),
             tx_window: Some(Nat::from(3600u64)),
             permitted_drift: Some(Nat::from(60u64)),
-            max_canister_storage_threshold: Some(Nat::from(1000000u64)),
+            max_canister_storage_threshold: Some(Nat::from(0u64)),
             collection_metadata: Some(HashMap::new()),
         }),
     );
@@ -1592,7 +1602,7 @@ fn test_update_collection_metadata_unauthorized() {
     assert!(
         matches!(
             unauthorized_result,
-            Err(core_nft_api::types::management::update_collection_metadata::UpdateCollectionMetadataError::ConcurrentManagementCall)
+            Err(core_nft_common::types::management::update_collection_metadata::UpdateCollectionMetadataError::ConcurrentManagementCall)
         ),
         "Should fail for unauthorized principal"
     );
@@ -1654,6 +1664,8 @@ fn test_permissions_add_and_remove_one_by_one() {
                 },
                 memo: None,
                 metadata: create_default_icrc97_metadata(metadata_url),
+                private_content: None,
+                public_content: None,
             }],
         }),
     );
@@ -1914,4 +1926,550 @@ fn test_permissions_add_and_remove_one_by_one() {
         revoke_result.is_ok(),
         "Should revoke ManageAuthorities permission successfully"
     );
+}
+
+#[test]
+fn test_append_file_authorized() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+
+    // 1. Grant minting and update metadata permission
+    let result = grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: nft_owner1,
+            permission: Permission::Minting,
+        }),
+    );
+    assert!(result.is_ok(), "Should succeed with authorized principal");
+
+    let result = grant_permission(
+        pic,
+        controller,
+        collection_canister_id,
+        &(grant_permission::Args {
+            principal: nft_owner1,
+            permission: Permission::UpdateMetadata,
+        }),
+    );
+    assert!(result.is_ok(), "Should succeed with authorized principal");
+
+    // 2. Mint an NFT
+    let mint_result = mint(
+        pic,
+        nft_owner1,
+        collection_canister_id,
+        &(mint::Args {
+            mint_requests: vec![MintRequest {
+                token_owner: Account {
+                    owner: nft_owner1,
+                    subaccount: None,
+                },
+                memo: None,
+                metadata: vec![],
+                private_content: None,
+                public_content: None,
+            }],
+        }),
+    );
+    assert!(mint_result.is_ok());
+    let token_id = mint_result.unwrap();
+
+    // 3. Upload a public file
+    let file_path = "./src/core_suite/assets/test.png";
+    let upload_path = "/test_append.png";
+    upload_file(
+        pic,
+        controller,
+        collection_canister_id,
+        file_path,
+        upload_path,
+    )
+    .expect("Upload failed");
+
+    // 4. Append the file using append_file
+    let mut entries = HashMap::new();
+    entries.insert("test_entry".to_string(), upload_path.to_string());
+
+    let append_result = append_file(
+        pic,
+        nft_owner1,
+        collection_canister_id,
+        &(append_file::Args {
+            append_file_requests: vec![AppendFileRequest {
+                token_id: token_id.clone(),
+                public_content: Some(
+                    core_nft_common::types::management::append_file::NftPublicRecordAppend {
+                        entries,
+                    },
+                ),
+            }],
+        }),
+    );
+    assert!(append_result.is_ok(), "Append file should succeed");
+
+    // 5. Query the public entry using the test query to verify it was appended
+    let get_public_result = __get_public_entry_test(
+        pic,
+        controller,
+        collection_canister_id,
+        &core_nft_api::queries::public_content::__get_public_entry_test::Args {
+            token_id,
+            entry_name: "test_entry".to_string(),
+        },
+    );
+
+    assert!(
+        get_public_result.is_ok(),
+        "Query public entry should succeed"
+    );
+    let entry = get_public_result.unwrap();
+    assert_eq!(entry.hash, upload_path.to_string());
+}
+
+#[test]
+fn test_storage_size_checks() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        ..
+    } = test_env;
+
+    let file_path = "./src/core_suite/assets/test.png";
+    let upload_path = "/test_size_check.png";
+
+    // 1. Upload a file
+    let buffer = upload_file(
+        pic,
+        controller,
+        collection_canister_id,
+        file_path,
+        upload_path,
+    )
+    .expect("Upload failed");
+
+    let file_size = buffer.len() as u64;
+
+    // 2. Fetch storage canister ID via HTTP request redirect
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let url = pic.auto_progress();
+    let agent = Agent::builder().with_url(url).build().unwrap();
+    rt.block_on(async {
+        agent.fetch_root_key().await.unwrap();
+    });
+    let http_gateway = HttpGatewayClient::builder()
+        .with_agent(agent)
+        .build()
+        .unwrap();
+
+    let response = rt.block_on(async {
+        http_gateway
+            .request(HttpGatewayRequestArgs {
+                canister_id: collection_canister_id.clone(),
+                canister_request: Request::builder()
+                    .uri(upload_path)
+                    .body(Bytes::new())
+                    .unwrap(),
+            })
+            .send()
+            .await
+    });
+
+    let location = response
+        .canister_response
+        .headers()
+        .get("location")
+        .expect("Location header not found");
+    let location_str = location.to_str().unwrap();
+    let storage_canister_id = Principal::from_str(
+        location_str
+            .split('.')
+            .next()
+            .unwrap()
+            .replace("http://", "")
+            .as_str(),
+    )
+    .unwrap();
+
+    // 3. Check storage canister size metrics directly
+    let storage_size =
+        crate::client::storage::get_storage_size(pic, controller, storage_canister_id, &());
+    let stored_files_size = crate::client::storage::get_stored_files_size_bytes(
+        pic,
+        controller,
+        storage_canister_id,
+        &(),
+    );
+
+    println!("storage_size: {}", storage_size);
+    println!("stored_files_size: {}", stored_files_size);
+
+    assert_eq!(
+        stored_files_size, file_size,
+        "Stored files size should match the uploaded file size"
+    );
+    assert!(
+        storage_size >= stored_files_size as u128,
+        "Physical storage size must be greater than or equal to logical files size"
+    );
+}
+
+#[test]
+fn test_storage_limits_and_freeing_space() {
+    // 1. Initialize collection canister (using default setup, where storage canister test limit is 50 MB)
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        ..
+    } = test_env;
+
+    let temp_20mb_path = "./temp_20mb.bin";
+    let temp_55mb_path = "./temp_55mb.bin";
+    let temp_15mb_path = "./temp_15mb.bin";
+
+    // Create 20 MB file (filled with zeros)
+    std::fs::write(temp_20mb_path, vec![0u8; 20_000_000]).unwrap();
+    // Create 55 MB file (exceeds the 50 MB canister limit)
+    std::fs::write(temp_55mb_path, vec![0u8; 55_000_000]).unwrap();
+    // Create 15 MB file (will fit in pre-allocated space after delete)
+    std::fs::write(temp_15mb_path, vec![0u8; 15_000_000]).unwrap();
+
+    let upload_path_20mb = "/temp_20mb.bin";
+    let upload_path_55mb = "/temp_55mb.bin";
+    let upload_path_15mb = "/temp_15mb.bin";
+
+    // 2. Upload the 20 MB file (should succeed, expected size ~20MB <= 50MB)
+    let buffer_20mb = upload_file(
+        pic,
+        controller,
+        collection_canister_id,
+        temp_20mb_path,
+        upload_path_20mb,
+    );
+    assert!(buffer_20mb.is_ok(), "20 MB file upload should succeed");
+
+    // 3. Retrieve the storage canister ID via HTTP gateway redirect
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let url = pic.auto_progress();
+    let url_str = url.to_string();
+    let agent = Agent::builder().with_url(url).build().unwrap();
+    rt.block_on(async {
+        agent.fetch_root_key().await.unwrap();
+    });
+    let http_gateway = HttpGatewayClient::builder()
+        .with_agent(agent)
+        .build()
+        .unwrap();
+
+    let response = rt.block_on(async {
+        http_gateway
+            .request(HttpGatewayRequestArgs {
+                canister_id: collection_canister_id.clone(),
+                canister_request: Request::builder()
+                    .uri(upload_path_20mb)
+                    .body(Bytes::new())
+                    .unwrap(),
+            })
+            .send()
+            .await
+    });
+
+    let location = response
+        .canister_response
+        .headers()
+        .get("location")
+        .expect("Location header not found");
+    let location_str = location.to_str().unwrap();
+    let storage_canister_id = Principal::from_str(
+        location_str
+            .split('.')
+            .next()
+            .unwrap()
+            .replace("http://", "")
+            .as_str(),
+    )
+    .unwrap();
+
+    // 4. Verify initial sizes on the storage canister
+    let initial_storage_size =
+        crate::client::storage::get_storage_size(pic, controller, storage_canister_id, &());
+    let initial_stored_files_size = crate::client::storage::get_stored_files_size_bytes(
+        pic,
+        controller,
+        storage_canister_id,
+        &(),
+    );
+    println!("Initial storage size: {}", initial_storage_size);
+    println!("Initial stored files size: {}", initial_stored_files_size);
+    assert_eq!(initial_stored_files_size, 20_000_000);
+
+    // 5. Try to initialize upload of the 55 MB file (should FAIL/REJECT because 55MB > 50MB canister limit)
+    let init_result = crate::client::core_nft::init_upload(
+        pic,
+        controller,
+        collection_canister_id,
+        &core_nft_common::types::management::init_upload::Args {
+            file_path: upload_path_55mb.to_string(),
+            file_hash: "dummy_hash".to_string(),
+            file_size: 55_000_000,
+            chunk_size: None,
+        },
+    );
+    println!("DEBUG: init_result = {:?}", init_result);
+    assert!(
+        init_result.is_err(),
+        "55 MB file upload should fail due to storage limit"
+    );
+
+    // 6. Delete the 20 MB file directly from the storage canister
+    let remove_resp = crate::client::storage::remove_file(
+        pic,
+        controller,
+        storage_canister_id,
+        &bity_ic_storage_canister_api::updates::remove_file::Args {
+            file_path: upload_path_20mb.to_string(),
+        },
+    );
+    println!("Remove file response: {:?}", remove_resp);
+
+    // Verify stored files size dropped to 0
+    let after_remove_stored_files_size = crate::client::storage::get_stored_files_size_bytes(
+        pic,
+        controller,
+        storage_canister_id,
+        &(),
+    );
+    println!(
+        "Stored files size after remove: {}",
+        after_remove_stored_files_size
+    );
+    assert_eq!(after_remove_stored_files_size, 0);
+
+    // 7. Upload the 15 MB file (should SUCCEED now and fit inside the pre-allocated pages)
+    let buffer_15mb_success = upload_file(
+        pic,
+        controller,
+        collection_canister_id,
+        temp_15mb_path,
+        upload_path_15mb,
+    );
+    assert!(
+        buffer_15mb_success.is_ok(),
+        "15 MB file upload should succeed after freeing space"
+    );
+
+    // Verify final sizes and assert page reuse
+    let final_storage_size =
+        crate::client::storage::get_storage_size(pic, controller, storage_canister_id, &());
+    let final_stored_files_size = crate::client::storage::get_stored_files_size_bytes(
+        pic,
+        controller,
+        storage_canister_id,
+        &(),
+    );
+    println!("Final storage size: {}", final_storage_size);
+    println!("Final stored files size: {}", final_stored_files_size);
+    assert_eq!(final_stored_files_size, 15_000_000);
+    assert_eq!(
+        final_storage_size, initial_storage_size,
+        "Physical storage size should NOT grow (pages must be reused)"
+    );
+
+    // Verify that the 15 MB file was indeed uploaded to the same storage canister (reused space)
+    let final_canister_id =
+        resolve_storage_canister_id(url_str.as_str(), collection_canister_id, upload_path_15mb);
+    assert_eq!(
+        final_canister_id, storage_canister_id,
+        "The reused file must be stored in the same canister"
+    );
+
+    // 8. Clean up temporary files from disk
+    let _ = std::fs::remove_file(temp_20mb_path);
+    let _ = std::fs::remove_file(temp_55mb_path);
+    let _ = std::fs::remove_file(temp_15mb_path);
+}
+
+#[test]
+fn test_storage_threshold_splitting() {
+    let temp_30mb_path = "./temp_30mb.bin";
+    std::fs::write(temp_30mb_path, vec![0u8; 30_000_000]).unwrap();
+
+    let upload_path_file1 = "/temp_file1.bin";
+    let upload_path_file2 = "/temp_file2.bin";
+
+    let mut test_env = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        ..
+    } = test_env;
+
+    // Upload first 30 MB file
+    let _ = upload_file(
+        pic,
+        controller,
+        collection_canister_id,
+        temp_30mb_path,
+        upload_path_file1,
+    )
+    .unwrap();
+
+    // Upload second 30 MB file (since 30MB + 30MB = 60MB > 50MB limit, it should spawn canister 2)
+    let _ = upload_file(
+        pic,
+        controller,
+        collection_canister_id,
+        temp_30mb_path,
+        upload_path_file2,
+    )
+    .unwrap();
+
+    // Resolve storage canister IDs
+    let url = pic.auto_progress();
+    let id1 = resolve_storage_canister_id(url.as_str(), collection_canister_id, upload_path_file1);
+    let id2 = resolve_storage_canister_id(url.as_str(), collection_canister_id, upload_path_file2);
+
+    // Asserts they split into different canisters because the 50 MB threshold was exceeded
+    assert_ne!(
+        id1, id2,
+        "The second 30 MB file should trigger splitting to canister 2"
+    );
+
+    let _ = std::fs::remove_file(temp_30mb_path);
+}
+
+fn resolve_storage_canister_id(
+    url: &str,
+    collection_canister_id: Principal,
+    upload_path: &str,
+) -> Principal {
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let agent = Agent::builder().with_url(url.to_string()).build().unwrap();
+    rt.block_on(async {
+        agent.fetch_root_key().await.unwrap();
+    });
+    let http_gateway = HttpGatewayClient::builder()
+        .with_agent(agent)
+        .build()
+        .unwrap();
+
+    let response = rt.block_on(async {
+        http_gateway
+            .request(HttpGatewayRequestArgs {
+                canister_id: collection_canister_id.clone(),
+                canister_request: Request::builder()
+                    .uri(upload_path)
+                    .body(Bytes::new())
+                    .unwrap(),
+            })
+            .send()
+            .await
+    });
+
+    let location = response
+        .canister_response
+        .headers()
+        .get("location")
+        .expect("Location header not found");
+    let location_str = location.to_str().unwrap();
+    Principal::from_str(
+        location_str
+            .split('.')
+            .next()
+            .unwrap()
+            .replace("http://", "")
+            .as_str(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn test_storage_edge_cases() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        ..
+    } = test_env;
+
+    // Use exact free storage limit of an empty canister (43,974,656 bytes)
+    let limit_bytes = 43_974_656u64;
+
+    // --- Case 1: Exactly limit + 1 byte upload (fails/rejected) ---
+    let init_result = crate::client::core_nft::init_upload(
+        pic,
+        controller,
+        collection_canister_id,
+        &core_nft_common::types::management::init_upload::Args {
+            file_path: "/temp_limit_1b.bin".to_string(),
+            file_hash: "dummy_hash".to_string(),
+            file_size: limit_bytes + 1,
+            chunk_size: None,
+        },
+    );
+    assert!(
+        init_result.is_err(),
+        "Exactly limit + 1 byte file upload must fail"
+    );
+
+    // --- Case 2: Exactly limit upload (succeeds) ---
+    let temp_limit_path = "./temp_limit.bin";
+    std::fs::write(temp_limit_path, vec![0u8; limit_bytes as usize]).unwrap();
+    let upload_path_limit = "/temp_limit.bin";
+
+    let upload_result = upload_file(
+        pic,
+        controller,
+        collection_canister_id,
+        temp_limit_path,
+        upload_path_limit,
+    );
+    assert!(upload_result.is_ok(), "Exactly limit upload must succeed");
+
+    // Resolve the canister ID for the limit file
+    let url = pic.auto_progress();
+    let url_str = url.to_string();
+    let storage_canister_id =
+        resolve_storage_canister_id(url_str.as_str(), collection_canister_id, upload_path_limit);
+
+    // --- Case 3: Splitting when filling close to the limit ---
+    // The canister has ~2.03 MB of remaining space after the 43,974,656 bytes upload.
+    // Uploading a 3 MB (3,000,000 bytes) file will exceed this remaining space, triggering splitting to a new canister!
+    let temp_3mb_path = "./temp_3mb.bin";
+    std::fs::write(temp_3mb_path, vec![0u8; 3_000_000]).unwrap();
+    let upload_path_3mb = "/temp_3mb.bin";
+
+    let upload_3mb_result = upload_file(
+        pic,
+        controller,
+        collection_canister_id,
+        temp_3mb_path,
+        upload_path_3mb,
+    );
+    assert!(upload_3mb_result.is_ok(), "3 MB file upload after near-full canister should succeed via splitting");
+
+    // Assert that the 3 MB file was stored in a new canister
+    let new_canister_id = resolve_storage_canister_id(url_str.as_str(), collection_canister_id, upload_path_3mb);
+    assert_ne!(
+        new_canister_id, storage_canister_id,
+        "3 MB file must be split to a new storage canister"
+    );
+
+    // Cleanup temporary files
+    let _ = std::fs::remove_file(temp_limit_path);
+    let _ = std::fs::remove_file(temp_3mb_path);
 }

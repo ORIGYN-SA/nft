@@ -106,7 +106,7 @@ impl TestEnvBuilder {
         pic.advance_time(Duration::from_millis(MINUTE_IN_MS * 30));
 
         println!(
-            "buyback_burn_canister_id: {}",
+            "collection_canister_id: {}",
             collection_canister_id.to_text()
         );
 
@@ -154,7 +154,7 @@ impl TestEnvBuilder {
         pic.advance_time(Duration::from_millis(MINUTE_IN_MS * 30));
 
         println!(
-            "buyback_burn_canister_id: {}",
+            "collection_canister_id: {}",
             collection_canister_id.to_text()
         );
 

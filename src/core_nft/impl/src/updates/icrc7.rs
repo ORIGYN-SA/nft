@@ -1,11 +1,9 @@
+use crate::state::{icrc3_add_transaction, mutate_state, read_state};
 use crate::utils::check_memo;
-use crate::utils::trace;
-use crate::{
-    state::{icrc3_add_transaction, mutate_state, read_state},
-    types::icrc7,
-};
 use bity_ic_icrc3::transaction::{ICRC7Transaction, ICRC7TransactionData};
 use candid::{Nat, Principal};
+use core_nft_common::types::icrc7;
+use core_nft_common::utils::trace;
 use ic_cdk_macros::update;
 
 use crate::guards::guard_sliding_window;
@@ -18,14 +16,12 @@ fn transfer_nft(arg: &icrc7::TransferArg) -> Result<Nat, icrc7::icrc7_transfer::
         }
     })?;
 
-    let mut nft = mutate_state(|state| state.data.tokens_list.get(&arg.token_id).cloned())
+    let mut nft = read_state(|state| state.data.tokens_list.get(&arg.token_id).cloned())
         .ok_or(icrc7::icrc7_transfer::TransferError::NonExistingTokenId)?;
 
-    check_memo(arg.memo.clone()).map_err(|e| {
-        icrc7::icrc7_transfer::TransferError::GenericError {
-            error_code: Nat::from(0u64),
-            message: e,
-        }
+    check_memo(&arg.memo).map_err(|e| icrc7::icrc7_transfer::TransferError::GenericError {
+        error_code: Nat::from(0u64),
+        message: e,
     })?;
 
     if nft.token_owner.owner != ic_cdk::api::msg_caller()
@@ -98,6 +94,27 @@ fn transfer_nft(arg: &icrc7::TransferArg) -> Result<Nat, icrc7::icrc7_transfer::
                     .entry(previous_owner)
                     .or_insert(vec![])
                     .retain(|id| *id != nft.token_id.clone());
+
+                if let Some(private_record) = state
+                    .data
+                    .private_content_system
+                    .nft_private
+                    .get_mut(&arg.token_id)
+                {
+                    let default_readers = private_record.default_readers.clone();
+                    for entry in private_record.entries.values_mut() {
+                        if let Err(err) = entry.set_readers(
+                            arg.to.owner,
+                            std::collections::HashMap::new(),
+                            &default_readers,
+                        ) {
+                            trace(&format!(
+                                "Failed to reset private content readers for token {:?}: {}",
+                                arg.token_id, err
+                            ));
+                        }
+                    }
+                }
             });
             Ok(Nat::from(transaction_id))
         }

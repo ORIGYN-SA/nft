@@ -9,7 +9,7 @@ use canfund::{
 };
 use std::sync::Arc;
 
-use crate::utils::trace;
+use core_nft_common::utils::trace;
 
 pub fn add_canisters_to_fund_manager(
     fund_manager: &mut FundManager,

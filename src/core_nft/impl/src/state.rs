@@ -1,20 +1,23 @@
 use crate::types::nft::Icrc7Token;
-use crate::types::permissions::{Permission, PermissionManager};
-use crate::types::sub_canister::{
-    StorageSubCanisterManager, INITIAL_CYCLES_BALANCE, RESERVED_CYCLES_BALANCE,
-};
-use crate::types::{
-    sub_canister, INITIAL_CYCLES_BALANCE_TEST_MODE, RESERVED_CYCLES_BALANCE_TEST_MODE,
-};
-
 use bity_ic_canister_state_macros::canister_state;
 use bity_ic_icrc3::transaction::TransactionType;
 use bity_ic_icrc3_macros::icrc3_state;
-use bity_ic_storage_canister_api::types::storage::UploadState;
+use bity_ic_storage_canister_api::storage::UploadState;
 use bity_ic_types::{BuildVersion, TimestampNanos};
 use bity_ic_types::{Cycles, TimestampMillis};
 use bity_ic_utils::env::{CanisterEnv, Environment};
 use bity_ic_utils::memory::MemorySize;
+use core_nft_api::init::InitApprovalsArg;
+use core_nft_common::types::permissions::{Permission, PermissionManager};
+use core_nft_common::types::sub_canister::{
+    StorageSubCanisterManager, INITIAL_CYCLES_BALANCE, RESERVED_CYCLES_BALANCE,
+};
+use core_nft_common::types::{
+    sub_canister, INITIAL_CYCLES_BALANCE_TEST_MODE, RESERVED_CYCLES_BALANCE_TEST_MODE,
+};
+use core_nft_common::PrivateContentConfig;
+use core_nft_common::PrivateContentSystem;
+use core_nft_common::PublicContentSystem;
 
 use candid::{CandidType, Nat, Principal};
 use icrc_ledger_types::icrc1::account::Account;
@@ -32,7 +35,9 @@ canister_state!(RuntimeState);
 pub struct RuntimeState {
     pub env: CanisterEnv,
     pub data: Data,
+    #[serde(default)]
     pub principal_guards: BTreeSet<Principal>,
+    #[serde(default)]
     pub sliding_window_guards: HashMap<candid::Nat, Vec<TimestampNanos>>, // per token id
     pub internal_filestorage: InternalFilestorage,
 }
@@ -82,6 +87,10 @@ pub struct Data {
     pub max_canister_storage_threshold: Option<Nat>,
     pub tokens_list: HashMap<Nat, Icrc7Token>,
     pub tokens_list_by_owner: HashMap<Account, Vec<Nat>>,
+    #[serde(default)]
+    pub private_content_system: PrivateContentSystem,
+    #[serde(default)]
+    pub public_content_system: PublicContentSystem,
     pub approval_init: InitApprovalsArg,
     pub sub_canister_manager: StorageSubCanisterManager,
     pub last_token_id: Nat,
@@ -112,6 +121,8 @@ impl Data {
         max_canister_storage_threshold: Option<Nat>,
         approval_init: InitApprovalsArg,
         base_url: Option<String>,
+        vetkd_key_name: String,
+        vetkd_context: String,
     ) -> Self {
         let mut authorized_principals = vec![];
 
@@ -181,6 +192,21 @@ impl Data {
             max_canister_storage_threshold,
             tokens_list: HashMap::new(),
             tokens_list_by_owner: HashMap::new(),
+            private_content_system: PrivateContentSystem {
+                nft_private: HashMap::new(),
+                temp_file_cache: HashMap::new(),
+                config: PrivateContentConfig {
+                    vetkd_key_name,
+                    vetkd_context,
+                },
+            },
+            public_content_system: PublicContentSystem {
+                nft_public: HashMap::new(),
+                temp_file_cache: HashMap::new(),
+                file_to_nfts: HashMap::new(),
+                nft_to_files: HashMap::new(),
+                all_files_index: HashMap::new(),
+            },
             approval_init,
             sub_canister_manager,
             last_token_id: Nat::from(1u64), // 0 is the reserved value for the collection metadata
@@ -261,6 +287,8 @@ impl Clone for Data {
             max_canister_storage_threshold: self.max_canister_storage_threshold.clone(),
             tokens_list: self.tokens_list.clone(),
             tokens_list_by_owner: self.tokens_list_by_owner.clone(),
+            private_content_system: self.private_content_system.clone(),
+            public_content_system: self.public_content_system.clone(),
             approval_init: self.approval_init.clone(),
             sub_canister_manager: self.sub_canister_manager.clone(),
             last_token_id: self.last_token_id.clone(),
@@ -268,12 +296,6 @@ impl Clone for Data {
             base_url: self.base_url.clone(),
         }
     }
-}
-
-#[derive(CandidType, Deserialize, Serialize, Debug, Clone)]
-pub struct InitApprovalsArg {
-    pub max_approvals_per_token_or_collection: Option<Nat>,
-    pub max_revoke_approvals: Option<Nat>,
 }
 
 #[derive(CandidType, Serialize)]
@@ -300,9 +322,26 @@ pub struct InternalFilestorageData {
     pub path: String,
 }
 
+impl Default for InternalFilestorageData {
+    fn default() -> Self {
+        Self {
+            init_timestamp: 0,
+            state: UploadState::Init,
+            canister: Principal::anonymous(),
+            path: String::new(),
+        }
+    }
+}
+
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
 pub struct InternalFilestorage {
     pub map: HashMap<String, InternalFilestorageData>,
+}
+
+impl Default for InternalFilestorage {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl InternalFilestorage {

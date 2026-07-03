@@ -6,7 +6,7 @@ use ic_http_certification::{
 };
 use std::{cell::RefCell, rc::Rc};
 
-use crate::utils::trace;
+use core_nft_common::utils::trace;
 
 thread_local! {
     pub static HTTP_TREE: Rc<RefCell<HttpCertificationTree>> = Default::default();

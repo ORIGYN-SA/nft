@@ -1,7 +1,7 @@
-use crate::types::http::{
+use bity_ic_canister_logger::LogEntry;
+use core_nft_common::types::http::{
     get_asset_headers, ASSET_ROUTER, HTTP_TREE, NO_CACHE_ASSET_CACHE_CONTROL,
 };
-use bity_ic_canister_logger::LogEntry;
 use ic_cdk::api::data_certificate;
 use ic_cdk_macros::query;
 use ic_http_certification::{

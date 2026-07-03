@@ -24,3 +24,5 @@ bity-ic-subcanister-manager = { workspace = true }
 bity-ic-storage-canister-c2c = { workspace = true }
 bity-ic-icrc3 = { workspace = true }
 bity-ic-storage-canister-api = { workspace = true }
+core_nft_common = { path = "../common" }
+hex = { workspace = true }

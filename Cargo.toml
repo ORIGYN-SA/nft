@@ -2,6 +2,7 @@
 members = [
     "integrations_tests",
     "src/core_nft/api",
+    "src/core_nft/common",
     "src/core_nft/impl",
     "src/index_icrc7/api",
     "src/index_icrc7/impl",
@@ -15,20 +16,12 @@ panic = "abort"
 
 
 [workspace.dependencies]
-candid = { version = "0.10.17", features = ["value"] }
 ciborium = "0.2.2"
 futures = "0.3.29"
 # Enable `custom` feature of k256's getrandom dependency. See icp_neuron/impl/src/ecdsa.rs for more details.
 getrandom = { version = "0.3.4", features = ["custom"] }
 hex = "0.4.3"
-ic-cdk = "0.18.3"
-ic-cdk-macros = "0.18.4"
-ic-cdk-timers = "0.12.2"
-ic-ledger-types = "0.15.0"
-ic-stable-structures = "0.7.2"
-ic-transport-types = "0.44.3"
-ic0 = "1.0.1"
-icrc-ledger-types = "0.1.10"
+ic0 = "1.1.0"
 k256 = "0.13.1"
 proc-macro2 = "1.0.95"
 quote = "1.0.40"
@@ -40,7 +33,7 @@ serde_json = "1.0.143"
 serde_with = "3.7.0"
 serde_yaml = "0.9.33"
 serde_tokenstream = "0.2.2"
-sha2 = "0.10.9"
+sha2 = "0.11.0"
 syn = "2.0.110"
 tracing = "0.1.40"
 tracing-attributes = "0.1.30"
@@ -57,25 +50,39 @@ async-trait = "0.1.89"
 enum_dispatch = "0.3.13"
 typetag = "0.2.18"
 minicbor = { version = "1.0.0", features = ["alloc", "derive"] }
-canfund = "0.8.4"
-ic-asset-certification = "3.0.3"
-ic-http-certification = "3.0.3"
+
 lazy_static = "1.4.0"
 url = "2.5.4"
+strum = "0.28.0"
+strum_macros = "0.28.0"
 
-bity-ic-canister-client         = "0.2.5"
-bity-ic-canister-logger         = "0.2.1"
+candid = { version = "0.10.17", features = ["value"] }
+canfund = "0.8.5"
+ic-cdk = "0.19.0"
+ic-cdk-macros = "0.20.2"
+ic-cdk-timers = "1.0.0"
+icrc-ledger-types = "0.1.13"
+ic-ledger-types = "0.16.0"
+ic-stable-structures = "0.7.2"
+ic-transport-types = "0.47.3"
+ic-asset-certification = "3.0.3"
+ic-http-certification = "3.0.3"
+ic-vetkeys = "0.7.0"
+ic-management-canister-types = "0.8.0"
+
+bity-ic-canister-client         = "0.3.0"
+bity-ic-canister-logger         = "0.3.0"
 bity-ic-canister-state-macros   = "0.2.2"
 bity-ic-canister-tracing-macros = "0.1.1"
-bity-ic-canister-time           = "0.2.2"
-bity-ic-serializer              = "0.1.1"
-bity-ic-stable-memory           = "0.2.2"
-bity-ic-types                   = "0.1.1"
-bity-ic-utils                   = "0.2.2"
-bity-ic-subcanister-manager     = "0.3.1"
-bity-ic-icrc3                   = "0.6.1"
-bity-ic-icrc3-macros            = "0.3.4" 
-bity-ic-storage-canister-c2c    = "0.2.2"
-bity-ic-icrc3-archive-c2c-client    = "0.3.2"
-bity-ic-icrc3-c2c-client    = "0.1.1"
-bity-ic-storage-canister-api = "0.2.0"
+bity-ic-canister-time           = "0.3.0"
+bity-ic-serializer              = "0.2.0"
+bity-ic-stable-memory           = "0.3.0"
+bity-ic-types                   = "0.2.0"
+bity-ic-utils                   = "0.3.0"
+bity-ic-subcanister-manager     = "0.4.0"
+bity-ic-icrc3                   = "0.7.0"
+bity-ic-icrc3-macros            = "0.4.0" 
+bity-ic-icrc3-archive-c2c-client    = "0.4.0"
+bity-ic-icrc3-c2c-client    = "0.2.0"
+bity-ic-storage-canister-api = "0.5.0"
+bity-ic-storage-canister-c2c = "0.5.0"

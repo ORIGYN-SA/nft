@@ -2,7 +2,7 @@ use self::setup::{TestEnv, TestEnvBuilder};
 use bity_ic_types::{BuildVersion, CanisterId, Milliseconds};
 use candid::Nat;
 use core_nft_api::lifecycle::init::{InitApprovalsArg, InitArgs};
-use core_nft_api::types::permissions::{Permission, PermissionManager};
+use core_nft_common::types::permissions::{Permission, PermissionManager};
 use std::collections::HashMap;
 
 pub mod setup;
@@ -49,6 +49,8 @@ pub fn default_test_setup() -> TestEnv {
             max_revoke_approvals: Some(Nat::from(10u64)),
         },
         base_url: None,
+        vetkd_key_name: "dfx_test_key".to_string(),
+        vetkd_context: "vetkd_context".to_string(),
     };
 
     test_env.build(init_args)
@@ -95,6 +97,8 @@ pub fn old_test_setup() -> TestEnv {
             max_revoke_approvals: Some(Nat::from(10u64)),
         },
         base_url: None,
+        vetkd_key_name: "dfx_test_key".to_string(),
+        vetkd_context: "vetkd_context".to_string(),
     };
 
     test_env.build_old(init_args)
@@ -141,6 +145,8 @@ pub fn test_setup_atomic_batch_transfers() -> TestEnv {
             max_revoke_approvals: Some(Nat::from(10u64)),
         },
         base_url: None,
+        vetkd_key_name: "dfx_test_key".to_string(),
+        vetkd_context: "vetkd_context".to_string(),
     };
 
     test_env.build(init_args)
@@ -187,6 +193,8 @@ pub fn test_setup_no_limit() -> TestEnv {
             max_revoke_approvals: Some(Nat::from(10u64)),
         },
         base_url: None,
+        vetkd_key_name: "dfx_test_key".to_string(),
+        vetkd_context: "vetkd_context".to_string(),
     };
 
     test_env.build(init_args)

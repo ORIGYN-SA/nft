@@ -1,0 +1,30 @@
+[package]
+name = "core_nft_common"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+candid = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+icrc-ledger-types = { workspace = true }
+ic-ledger-types = { workspace = true }
+ic-stable-structures = { workspace = true }
+minicbor = { workspace = true }
+ic-cdk = { workspace = true }
+ic-asset-certification = { workspace = true }
+ic-http-certification = { workspace = true }
+canfund = { workspace = true }
+bity-ic-types = { workspace = true }
+bity-ic-utils = { workspace = true }
+bity-ic-subcanister-manager = { workspace = true }
+bity-ic-storage-canister-c2c = { workspace = true }
+bity-ic-icrc3 = { workspace = true }
+bity-ic-storage-canister-api = { workspace = true }
+ic0 = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+sha2 = { workspace = true }

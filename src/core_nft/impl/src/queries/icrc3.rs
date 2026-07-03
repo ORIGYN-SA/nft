@@ -6,7 +6,7 @@ use crate::state::icrc3_supported_block_types as icrc3_supported_block_types_imp
 
 use ic_cdk::query;
 
-pub use crate::types::icrc3::{
+pub use core_nft_api::types::icrc3::{
     icrc3_get_archives::{Args as GetArchivesArg, Response as GetArchivesResponse},
     icrc3_get_blocks::{Args as GetBlocksArg, Response as GetBlocksResponse},
     icrc3_get_properties::{Args as GetArchivePropsArg, Response as GetArchivePropsResponse},

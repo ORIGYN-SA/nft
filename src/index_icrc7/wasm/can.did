@@ -1,3 +1,5 @@
+// [Account](https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-3/README.md#value)
+// representation of ledgers supporting the ICRC-1 standard.
 type Account = record { owner : principal; subaccount : opt blob };
 type Args = record {
   sort_by : opt SortBy;
@@ -6,8 +8,30 @@ type Args = record {
   length : nat64;
 };
 type Args_1 = variant { Upgrade : UpgradeArgs; Init : InitArgs };
+// A block with an ID. Returned as part of [`GetBlocksResult`].
 type BlockWithId = record { id : nat; block : ICRC3Value };
-type BuildVersion = record { major : nat32; minor : nat32; patch : nat32 };
+// Represents a semantic version number following the MAJOR.MINOR.PATCH format.
+// 
+// # Examples
+// 
+// ```
+// use types::BuildVersion;
+// 
+// let version = BuildVersion::new(1, 2, 3);
+// assert_eq!(version.to_string(), "1.2.3");
+// 
+// let parsed = "1.2.3".parse::<BuildVersion>().unwrap();
+// assert_eq!(version, parsed);
+// ```
+type BuildVersion = record {
+  // Major version number, incremented for incompatible API changes
+  major : nat32;
+  // Minor version number, incremented for backwards-compatible functionality additions
+  minor : nat32;
+  // Patch version number, incremented for backwards-compatible bug fixes
+  patch : nat32;
+};
+// A value defined in [the ICRC-3 standard](https://github.com/dfinity/ICRC-1/blob/main/standards/ICRC-3/README.md#value).
 type ICRC3Value = variant {
   Int : int;
   Map : vec record { text; ICRC3Value };

@@ -1,8 +1,9 @@
 use crate::state::read_state;
-use crate::types::icrc7;
 use candid::Nat;
+use core_nft_common::types::icrc7;
+use core_nft_common::utils::trace;
 
-pub fn check_memo(memo: Option<serde_bytes::ByteBuf>) -> Result<(), String> {
+pub fn check_memo(memo: &Option<serde_bytes::ByteBuf>) -> Result<(), String> {
     if let Some(ref memo) = memo {
         let max_memo_size: usize = usize::try_from(
             read_state(|state| {
@@ -25,10 +26,6 @@ pub fn check_memo(memo: Option<serde_bytes::ByteBuf>) -> Result<(), String> {
         }
     }
     Ok(())
-}
-
-pub fn trace(msg: &str) {
-    ic0::debug_print(msg.as_bytes());
 }
 
 #[cfg(test)]

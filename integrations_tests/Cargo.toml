@@ -13,6 +13,7 @@ bity-ic-types = { workspace = true }
 bity-ic-utils = { workspace = true }
 bity-ic-canister-time = { workspace = true }
 bity-ic-storage-canister-api = { workspace = true }
+ic-vetkeys = { workspace = true }
 
 tokio = { version = "1.47.1", features = ["full"]}
 
@@ -26,11 +27,14 @@ serde_bytes                    = { workspace = true }
 serde_json                     = { workspace = true }
 tempfile                       = "3.21.0"
 core_nft_api                   = { path = "../src/core_nft/api"}
+core_nft_common                = { path = "../src/core_nft/common"}
 index_icrc7_api                = { path = "../src/index_icrc7/api"}
 ic-cdk                         = { workspace = true }
 reqwest                        = "0.12.23"
-# ic-agent                       = { version = "0.44.3"}
+# ic-agent                      = { version = "0.44.3"}
 ic-agent                       = { version = "0.40.1"}
+rand_chacha = "0.10.0"
+aes-gcm = "0.10.3"
 
 ic-http-gateway                = { version = "0.3.0"}
 http                           = "1.3.1"

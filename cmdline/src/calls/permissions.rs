@@ -1,6 +1,8 @@
 use anyhow::{anyhow, Result};
 use candid::{Encode, Principal};
-use core_nft_api::{get_user_permissions, grant_permission, has_permission, revoke_permission, Permission};
+use core_nft_common::{
+    get_user_permissions, grant_permission, has_permission, revoke_permission, Permission,
+};
 use ic_agent::Agent;
 
 pub fn parse_permission_from_str(input: &str) -> Result<Permission> {
@@ -30,7 +32,10 @@ pub async fn grant(
     principal: Principal,
     permission: Permission,
 ) -> Result<()> {
-    let args = grant_permission::Args { principal, permission };
+    let args = grant_permission::Args {
+        principal,
+        permission,
+    };
     let bytes = Encode!(&args)?;
     let response = agent
         .update(canister_id, "grant_permission")
@@ -49,7 +54,10 @@ pub async fn revoke(
     principal: Principal,
     permission: Permission,
 ) -> Result<()> {
-    let args = revoke_permission::Args { principal, permission };
+    let args = revoke_permission::Args {
+        principal,
+        permission,
+    };
     let bytes = Encode!(&args)?;
     let response = agent
         .update(canister_id, "revoke_permission")
@@ -86,7 +94,10 @@ pub async fn has(
     principal: Principal,
     permission: Permission,
 ) -> Result<bool> {
-    let args = has_permission::Args { principal, permission };
+    let args = has_permission::Args {
+        principal,
+        permission,
+    };
     let bytes = Encode!(&args)?;
     let response = agent
         .query(canister_id, "has_permission")
@@ -98,5 +109,3 @@ pub async fn has(
         .map_err(|e| anyhow!("Permission check failed: {:?}", e))?;
     Ok(has)
 }
-
-

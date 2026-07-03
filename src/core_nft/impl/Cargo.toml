@@ -6,8 +6,12 @@ edition = "2021"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[features]
+inttest = []
+
 [dependencies]
 core_nft_api = { path = "../api" }
+core_nft_common = { path = "../common" }
 
 candid = { workspace = true }
 ic-cdk = { workspace = true }
@@ -45,3 +49,4 @@ bity-ic-icrc3 = { workspace = true }
 bity-ic-icrc3-macros = { workspace = true }
 bity-ic-storage-canister-c2c = { workspace = true }
 bity-ic-storage-canister-api = { workspace = true }
+hex = { workspace = true }

@@ -602,9 +602,9 @@ pub async fn get_all_blocks(
 /// A vector of chunks, where each chunk contains consecutive block IDs
 ///
 /// # Example
-/// ```
+/// ```rust,ignore
 /// let block_ids = vec![1, 2, 3, 5, 6, 8, 9, 10];
-/// let chunks = group_consecutive_block_ids(block_ids);
+/// let chunks = group_consecutive_block_ids(&block_ids);
 /// // Result: [[1, 2, 3], [5, 6], [8, 9, 10]]
 /// ```
 pub fn group_consecutive_block_ids(block_ids: &[u64]) -> Vec<Vec<u64>> {

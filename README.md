@@ -19,6 +19,7 @@ This project provides a complete solution for NFT management on the Internet Com
 - Certified HTTP asset serving
 - Stable memory storage with heap caching
 - Fine-grained access control for assets
+- Storage of private content using VetKeys
 
 ## Components
 

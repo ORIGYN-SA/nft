@@ -1,13 +1,14 @@
 use crate::state::{icrc3_add_transaction, mutate_state, read_state};
-pub use crate::types::icrc37::{
+use crate::types::icrc37::__COLLECTION_APPROVALS;
+use crate::types::icrc37::__TOKEN_APPROVALS;
+use crate::types::nft::Icrc7Token;
+pub use core_nft_common::types::icrc37::{
     icrc37_approve_collection, icrc37_approve_tokens, icrc37_revoke_collection_approvals,
     icrc37_revoke_token_approvals, icrc37_transfer_from, Approval,
 };
-use crate::types::nft;
-use crate::types::wrapped_types::{WrappedAccount, WrappedApprovalValue, WrappedNat};
-use crate::types::{__COLLECTION_APPROVALS, __TOKEN_APPROVALS};
+use core_nft_common::types::wrapped_types::{WrappedAccount, WrappedApprovalValue, WrappedNat};
 
-use crate::utils::trace;
+use core_nft_common::utils::trace;
 
 use bity_ic_icrc3::{
     transaction::{ICRC37Transaction, ICRC37TransactionData},
@@ -21,15 +22,16 @@ use std::collections::HashMap;
 use crate::guards::guard_sliding_window;
 
 fn verify_approval_timing(created_at_time: u64, current_time: u64) -> Result<(), (bool, u64)> {
-    let permited_drift = read_state(|state| state.data.permitted_drift.clone())
-        .unwrap_or(Nat::from(crate::types::icrc7::DEFAULT_PERMITTED_DRIFT));
+    let permited_drift = read_state(|state| state.data.permitted_drift.clone()).unwrap_or(
+        Nat::from(core_nft_common::types::icrc7::DEFAULT_PERMITTED_DRIFT),
+    );
 
     if created_at_time
         > current_time
             + permited_drift
                 .0
                 .try_into()
-                .unwrap_or(crate::types::icrc7::DEFAULT_PERMITTED_DRIFT)
+                .unwrap_or(core_nft_common::types::icrc7::DEFAULT_PERMITTED_DRIFT)
     {
         return Err((true, current_time));
     }
@@ -39,7 +41,7 @@ fn verify_approval_timing(created_at_time: u64, current_time: u64) -> Result<(),
             .data
             .tx_window
             .clone()
-            .unwrap_or(Nat::from(crate::types::icrc7::DEFAULT_TX_WINDOW))
+            .unwrap_or(Nat::from(core_nft_common::types::icrc7::DEFAULT_TX_WINDOW))
     });
 
     if created_at_time + tx_window.0.try_into().unwrap_or(0) < current_time {
@@ -132,11 +134,11 @@ fn approve_token(
                 .clone()
         })
         .unwrap_or(Nat::from(
-            crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION,
+            core_nft_common::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION,
         ))
         .0,
     )
-    .unwrap_or(crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION);
+    .unwrap_or(core_nft_common::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION);
 
     let memo_clone = arg.approval_info.memo.clone();
 
@@ -318,11 +320,11 @@ fn approve_collection(
                 .clone()
         })
         .unwrap_or(Nat::from(
-            crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION,
+            core_nft_common::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION,
         ))
         .0,
     )
-    .unwrap_or(crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION);
+    .unwrap_or(core_nft_common::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION);
 
     let would_exceed_max_approvals = __COLLECTION_APPROVALS.with_borrow(|collection_approvals| {
         collection_approvals
@@ -415,11 +417,11 @@ fn icrc37_revoke_token_approvals(
     let max_revoke_approvals = usize::try_from(
         read_state(|state| state.data.approval_init.max_revoke_approvals.clone())
             .unwrap_or(Nat::from(
-                crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION,
+                core_nft_common::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION,
             ))
             .0,
     )
-    .unwrap_or(crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION);
+    .unwrap_or(core_nft_common::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION);
 
     Ok(args
         .into_iter()
@@ -541,11 +543,11 @@ fn icrc37_revoke_collection_approvals(
     let max_revoke_approvals = usize::try_from(
         read_state(|state| state.data.approval_init.max_revoke_approvals.clone())
             .unwrap_or(Nat::from(
-                crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION,
+                core_nft_common::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION,
             ))
             .0,
     )
-    .unwrap_or(crate::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION);
+    .unwrap_or(core_nft_common::types::icrc37::DEFAULT_MAX_APPROVALS_PER_TOKEN_OR_COLLECTION);
 
     Ok(args
         .into_iter()
@@ -699,7 +701,7 @@ fn transfer_from(
         }
     }
 
-    let mut nft: nft::Icrc7Token =
+    let mut nft: Icrc7Token =
         match mutate_state(|state| state.data.tokens_list.get(&arg.token_id).cloned()) {
             Some(token) => token,
             None => {
@@ -841,6 +843,27 @@ fn transfer_from(
             .entry(previous_owner)
             .or_insert(vec![])
             .retain(|id| *id != nft.token_id.clone());
+
+        if let Some(private_record) = state
+            .data
+            .private_content_system
+            .nft_private
+            .get_mut(&arg.token_id)
+        {
+            let default_readers = private_record.default_readers.clone();
+            for entry in private_record.entries.values_mut() {
+                if let Err(err) = entry.set_readers(
+                    arg.to.owner,
+                    std::collections::HashMap::new(),
+                    &default_readers,
+                ) {
+                    trace(&format!(
+                        "Failed to reset private content readers for token {:?}: {}",
+                        arg.token_id, err
+                    ));
+                }
+            }
+        }
     });
 
     __TOKEN_APPROVALS.with_borrow_mut(|token_approvals| {

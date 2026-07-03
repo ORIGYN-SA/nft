@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-use candid::{CandidType, Nat};
-use serde::{Deserialize, Serialize};
 use bity_ic_types::BuildVersion;
-use crate::types::permissions::PermissionManager;
-use crate::types::value_custom::CustomValue as Value;
+use candid::{CandidType, Nat};
+use core_nft_common::types::permissions::PermissionManager;
+use core_nft_common::types::value_custom::CustomValue as Value;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(CandidType, Serialize, Deserialize, Debug, Clone)]
 pub struct InitApprovalsArg {
@@ -34,4 +34,6 @@ pub struct InitArgs {
     pub collection_metadata: HashMap<String, Value>,
     pub approval_init: InitApprovalsArg,
     pub base_url: Option<String>,
+    pub vetkd_key_name: String,
+    pub vetkd_context: String,
 }

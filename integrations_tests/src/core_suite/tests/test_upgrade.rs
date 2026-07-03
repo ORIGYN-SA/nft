@@ -10,7 +10,7 @@ use bity_ic_types::BuildVersion;
 use candid::Nat;
 use core_nft_api::lifecycle::Args;
 use core_nft_api::post_upgrade::UpgradeArgs;
-use core_nft_api::types::management::{finalize_upload, init_upload, store_chunk};
+use core_nft_common::types::management::{finalize_upload, init_upload, store_chunk};
 use ic_cdk::println;
 use sha2::{Digest, Sha256};
 use std::fs::File;
@@ -99,6 +99,9 @@ fn test_upgrade_storage_canister() {
     let storage_upgrade_args = Args::Upgrade(UpgradeArgs {
         version: BuildVersion::min(),
         commit_hash: "commit_hash 2".to_string(),
+        vetkd_key_name: None,
+        vetkd_context: None,
+        base_url: Some("test".to_string()),
     });
 
     upgrade_core_canister(

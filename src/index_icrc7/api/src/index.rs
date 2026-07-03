@@ -1,18 +1,14 @@
 use candid::{CandidType, Nat};
-use serde::{Deserialize, Serialize};
 use icrc_ledger_types::icrc1::account::Account;
+use serde::{Deserialize, Serialize};
 
-#[derive(
-    CandidType, Deserialize, Serialize, Ord, PartialOrd, Eq, PartialEq, Clone, Debug,
-)]
+#[derive(CandidType, Deserialize, Serialize, Ord, PartialOrd, Eq, PartialEq, Clone, Debug)]
 pub enum SortBy {
     Ascending,
     Descending,
 }
 
-#[derive(
-    CandidType, Deserialize, Serialize, Ord, PartialOrd, Eq, PartialEq, Clone, Debug,
-)]
+#[derive(CandidType, Deserialize, Serialize, Ord, PartialOrd, Eq, PartialEq, Clone, Debug)]
 pub enum IndexType {
     Account(WrappedAccount),
     BlockType(String),
