@@ -35,6 +35,19 @@ pub struct StorageSubCanisterManager {
     upgrade_args: ArgsStorage,
 }
 
+/// Canfund options for storage sub-canisters. `SubCanisterManager.funding_config`
+/// is `#[serde(skip)]`, so this must be re-applied after every upgrade, not just
+/// at init.
+pub fn default_funding_config() -> FundManagerOptions {
+    FundManagerOptions::new()
+        .with_interval_secs(60)
+        .with_strategy(FundStrategy::BelowThreshold(
+            CyclesThreshold::new()
+                .with_min_cycles(1_000_000_000_000)
+                .with_fund_cycles(2_000_000_000_000),
+        ))
+}
+
 impl StorageSubCanisterManager {
     pub fn new(
         init_args: ArgsStorage,
@@ -49,13 +62,7 @@ impl StorageSubCanisterManager {
         commit_hash: String,
         wasm: Vec<u8>,
     ) -> Self {
-        let funding_config = FundManagerOptions::new()
-            .with_interval_secs(60)
-            .with_strategy(FundStrategy::BelowThreshold(
-                CyclesThreshold::new()
-                    .with_min_cycles(1_000_000_000_000)
-                    .with_fund_cycles(2_000_000_000_000),
-            ));
+        let funding_config = default_funding_config();
 
         Self {
             sub_canister_manager: bity_ic_subcanister_manager::SubCanisterManager::new(

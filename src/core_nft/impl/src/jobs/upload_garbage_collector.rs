@@ -75,6 +75,9 @@ async fn upload_garbage_collector() {
                 .public_content_system
                 .temp_file_cache
                 .remove(&key);
+            // init_upload also records the path here; without this the path
+            // stays blocked (FileAlreadyExists) forever after collection.
+            state.internal_filestorage.remove(&key);
         });
     }
 

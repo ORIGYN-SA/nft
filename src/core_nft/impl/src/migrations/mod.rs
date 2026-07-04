@@ -1,47 +1,84 @@
-use core_nft_common::PrivateContentSystem;
-use core_nft_common::PublicContentSystem;
-
-use crate::state::Data;
+use bity_ic_storage_canister_api::storage::UploadState;
+use core_nft_common::types::public_content::{PendingUpload, PublicEntry};
+use core_nft_common::types::CHUNK_SIZE;
+use std::collections::HashMap;
+use tracing::info;
 
 use crate::state::RuntimeState;
 
-use self::types::state::RuntimeStateV0;
+/// Makes files uploaded by pre-content-system versions of this canister visible
+/// to the current upload APIs (`get_upload_status`, `get_all_uploads`,
+/// `cancel_upload`, ...).
+///
+/// Older versions tracked uploads only in `internal_filestorage`; the content
+/// systems introduced later start empty after an upgrade, so without this step
+/// every pre-upgrade file would answer `UploadNotFound` even though it is still
+/// stored and served. Idempotent: paths already known to the public content
+/// system are left untouched, so re-running on every upgrade is safe.
+///
+/// * `Finalized` entries become finalized `temp_file_cache` entries (the same
+///   shape as a finalized-but-unminted upload). Their byte size was never
+///   recorded by the old bookkeeping, so `file_size` is 0.
+/// * `Init`/`InProgress` entries are abandoned pre-upgrade uploads. They are
+///   registered with their original timestamp and an empty pending upload, so
+///   the daily upload garbage collector cancels them and frees their paths.
+pub fn migrate_internal_filestorage_into_public_content(state: &mut RuntimeState) {
+    let entries: Vec<_> = state
+        .internal_filestorage
+        .map
+        .iter()
+        .map(|(path, data)| (path.clone(), data.clone()))
+        .collect();
 
-pub mod types;
+    let mut migrated = 0usize;
 
-impl From<RuntimeStateV0> for RuntimeState {
-    fn from(old_state: RuntimeStateV0) -> Self {
-        Self {
-            env: old_state.env,
-            data: Data {
-                permissions: old_state.data.permissions,
-                description: old_state.data.description,
-                symbol: old_state.data.symbol,
-                name: old_state.data.name,
-                logo: old_state.data.logo,
-                supply_cap: old_state.data.supply_cap,
-                max_query_batch_size: old_state.data.max_query_batch_size,
-                max_update_batch_size: old_state.data.max_update_batch_size,
-                max_take_value: old_state.data.max_take_value,
-                default_take_value: old_state.data.default_take_value,
-                max_memo_size: old_state.data.max_memo_size,
-                atomic_batch_transfers: old_state.data.atomic_batch_transfers,
-                tx_window: old_state.data.tx_window,
-                permitted_drift: old_state.data.permitted_drift,
-                max_canister_storage_threshold: old_state.data.max_canister_storage_threshold,
-                tokens_list: old_state.data.tokens_list,
-                tokens_list_by_owner: old_state.data.tokens_list_by_owner,
-                private_content_system: PrivateContentSystem::default(),
-                public_content_system: PublicContentSystem::default(),
-                approval_init: old_state.data.approval_init,
-                sub_canister_manager: old_state.data.sub_canister_manager,
-                last_token_id: old_state.data.last_token_id,
-                media_redirections: old_state.data.media_redirections,
-                base_url: Default::default(),
-            },
-            principal_guards: old_state.principal_guards,
-            sliding_window_guards: old_state.sliding_window_guards,
-            internal_filestorage: old_state.internal_filestorage,
+    for (path, entry) in entries {
+        let already_known = state
+            .data
+            .public_content_system
+            .get_public_file_by_path(&path)
+            .is_some()
+            || state
+                .data
+                .public_content_system
+                .file_to_nfts
+                .contains_key(&path);
+
+        if already_known {
+            continue;
         }
+
+        let pending_upload = match entry.state {
+            UploadState::Finalized => None,
+            _ => Some(PendingUpload {
+                expected_chunks: 0,
+                received_chunks: HashMap::new(),
+                chunk_size: CHUNK_SIZE,
+                timestamp_ns: entry.init_timestamp,
+            }),
+        };
+
+        let public_entry = PublicEntry {
+            state: entry.state.clone(),
+            hash: path.clone(),
+            file_size: 0,
+            storage_canister_id: entry.canister,
+            storage_path: entry.path.clone(),
+            pending_upload,
+            format_version: 1,
+            created_at_ns: entry.init_timestamp,
+        };
+
+        state
+            .data
+            .public_content_system
+            .temp_file_cache
+            .insert(path, public_entry);
+
+        migrated += 1;
+    }
+
+    if migrated > 0 {
+        info!("Migrated {migrated} legacy file entries into the public content system");
     }
 }
