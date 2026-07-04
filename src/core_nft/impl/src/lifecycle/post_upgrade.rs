@@ -47,9 +47,6 @@ fn post_upgrade(args: Args) {
             if let Some(context) = upgrade_args.vetkd_context.clone() {
                 state.data.private_content_system.config.vetkd_context = context;
             }
-            if let Some(base_url) = upgrade_args.base_url.clone() {
-                state.data.base_url = Some(base_url);
-            }
 
             state.data.sub_canister_manager.sub_canister_manager.wasm = STORAGE_WASM.to_vec();
             // funding_config is #[serde(skip)]: without this, canfund falls back to
@@ -61,6 +58,13 @@ fn post_upgrade(args: Args) {
                 .funding_config = default_funding_config();
 
             migrate_internal_filestorage_into_public_content(&mut state);
+
+            if let Some(base_url) = upgrade_args.base_url.clone() {
+                state.data.base_url = Some(base_url);
+                // Existing files keep serving from their old host otherwise;
+                // re-render the stored redirects so they move with the domain.
+                rerender_media_redirections(&mut state);
+            }
 
             state.env.set_version(upgrade_args.version);
             state.env.set_commit_hash(upgrade_args.commit_hash.clone());
@@ -79,6 +83,89 @@ fn post_upgrade(args: Args) {
 
             info!(version = %upgrade_args.version, "Post-upgrade complete");
         }
+    }
+}
+
+/// Renders a redirection target from the base_url template, mirroring the URL
+/// construction in `finalize_upload`.
+fn render_redirection_url(template: &str, canister_id: &str, path: &str) -> String {
+    let base = template.replace("{canister_id}", canister_id);
+    format!("{}{}", base.trim_end_matches('/'), path)
+}
+
+/// Re-renders every stored media redirection against the current base_url
+/// template so already-uploaded files move with the domain (e.g. switching
+/// the serving host from `{canister_id}.icp0.io` to `{canister_id}.raw.icp0.io`).
+///
+/// The storage canister that holds each file is looked up in the public
+/// content system (which includes migrated legacy entries) with a fallback to
+/// `internal_filestorage`; entries whose storage canister cannot be resolved
+/// are left untouched. The redirects are certified afterwards by the existing
+/// `add_redirection` loop in post_upgrade.
+fn rerender_media_redirections(state: &mut RuntimeState) {
+    let Some(template) = state.data.base_url.clone() else {
+        return;
+    };
+
+    let paths: Vec<String> = state.data.media_redirections.keys().cloned().collect();
+    let mut rendered = 0usize;
+
+    for path in paths {
+        // Redirection keys carry a leading slash; the content bookkeeping is
+        // keyed by the upload's original file_path, which may not.
+        let trimmed = path.trim_start_matches('/');
+
+        let storage_canister = state
+            .data
+            .public_content_system
+            .get_public_file_by_path(&path)
+            .or_else(|| state.data.public_content_system.get_public_file_by_path(trimmed))
+            .map(|entry| entry.storage_canister_id)
+            .or_else(|| state.internal_filestorage.get(&path).map(|d| d.canister))
+            .or_else(|| state.internal_filestorage.get(trimmed).map(|d| d.canister));
+
+        if let Some(canister_id) = storage_canister {
+            let new_url = render_redirection_url(&template, &canister_id.to_string(), &path);
+            state.data.media_redirections.insert(path, new_url);
+            rendered += 1;
+        }
+    }
+
+    if rendered > 0 {
+        info!("Re-rendered {rendered} media redirections against the current base_url");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::render_redirection_url;
+
+    #[test]
+    fn renders_template_with_canister_id() {
+        assert_eq!(
+            render_redirection_url(
+                "https://{canister_id}.raw.icp0.io",
+                "aaaaa-aa",
+                "/img/photo.png"
+            ),
+            "https://aaaaa-aa.raw.icp0.io/img/photo.png"
+        );
+    }
+
+    #[test]
+    fn strips_trailing_slash_from_base() {
+        assert_eq!(
+            render_redirection_url("https://{canister_id}.raw.icp0.io/", "aaaaa-aa", "/a.png"),
+            "https://aaaaa-aa.raw.icp0.io/a.png"
+        );
+    }
+
+    #[test]
+    fn renders_opaque_templates_verbatim() {
+        assert_eq!(
+            render_redirection_url("test", "aaaaa-aa", "/a.png"),
+            "test/a.png"
+        );
     }
 }
 
