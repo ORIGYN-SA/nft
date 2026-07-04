@@ -1,26 +1,22 @@
 use crate::lifecycle::init_canister;
 use crate::memory::get_upgrades_memory;
-use crate::migrations::types::state::RuntimeStateV0;
-use crate::state::{read_state, replace_icrc3, start_default_archive_job, RuntimeState};
+use crate::migrations::migrate_internal_filestorage_into_public_content;
+use crate::state::{
+    mutate_state, read_state, replace_icrc3, start_default_archive_job, RuntimeState,
+};
 use bity_ic_canister_logger::LogEntry;
 use bity_ic_canister_tracing_macros::trace;
 use bity_ic_icrc3::icrc3::ICRC3;
 use bity_ic_stable_memory::get_reader;
 use bity_ic_types::BuildVersion;
-use candid::CandidType;
 use core_nft_api::lifecycle::Args;
 use core_nft_common::types::http::add_redirection;
+use core_nft_common::types::sub_canister::default_funding_config;
 use ic_cdk_macros::post_upgrade;
-use serde::{Deserialize, Serialize};
-use tracing::info;
+use std::time::Duration;
+use tracing::{error, info};
 
 const STORAGE_WASM: &[u8] = include_bytes!("../../../../../wasm/storage_canister.wasm.gz");
-
-#[derive(CandidType, Serialize, Deserialize, Debug)]
-pub struct UpgradeArgs {
-    pub version: BuildVersion,
-    pub commit_hash: String,
-}
 
 #[post_upgrade]
 #[trace]
@@ -34,19 +30,16 @@ fn post_upgrade(args: Args) {
             let memory = get_upgrades_memory();
             let reader = get_reader(&memory);
 
-            // uncomment these lines if you want to do a normal upgrade
-            // let (mut state, logs, traces, icrc3): (RuntimeState, Vec<LogEntry>, Vec<LogEntry>, ICRC3) = bity_ic_serializer
-            //     ::deserialize(reader)
-            //     .unwrap();
-
-            // uncomment these lines if you want to do an upgrade with migration
-            let (runtime_state_v0,logs, traces, icrc3): (
-                RuntimeStateV0,
+            // Every field added after the first deployed generation carries
+            // #[serde(default)] (and the serializer encodes structs as field-name
+            // maps), so state written by ANY previous version deserializes here
+            // directly and repeated upgrades never reset accumulated state.
+            let (mut state, logs, traces, icrc3): (
+                RuntimeState,
                 Vec<LogEntry>,
                 Vec<LogEntry>,
                 ICRC3,
             ) = bity_ic_serializer::deserialize(reader).unwrap();
-            let mut state = RuntimeState::from(runtime_state_v0);
 
             if let Some(key_name) = upgrade_args.vetkd_key_name.clone() {
                 state.data.private_content_system.config.vetkd_key_name = key_name;
@@ -59,11 +52,18 @@ fn post_upgrade(args: Args) {
             }
 
             state.data.sub_canister_manager.sub_canister_manager.wasm = STORAGE_WASM.to_vec();
-            state.data.sub_canister_manager.sub_canister_manager.update_canisters(bity_ic_storage_canister_api::lifecycle::Args::Upgrade(bity_ic_storage_canister_api::post_upgrade::UpgradeArgs{version: upgrade_args.version.clone(), commit_hash: upgrade_args.commit_hash.clone()}));
-            ic_cdk::println!("Storage canister upgraded");
+            // funding_config is #[serde(skip)]: without this, canfund falls back to
+            // its defaults (daily / 250B threshold) after the upgrade.
+            state
+                .data
+                .sub_canister_manager
+                .sub_canister_manager
+                .funding_config = default_funding_config();
+
+            migrate_internal_filestorage_into_public_content(&mut state);
 
             state.env.set_version(upgrade_args.version);
-            state.env.set_commit_hash(upgrade_args.commit_hash);
+            state.env.set_commit_hash(upgrade_args.commit_hash.clone());
 
             bity_ic_canister_logger::init_with_logs(state.env.is_test_mode(), logs, traces);
             init_canister(state.clone());
@@ -75,7 +75,45 @@ fn post_upgrade(args: Args) {
                 add_redirection(path, redirection_url);
             }
 
+            schedule_storage_fleet_upgrade(upgrade_args.version, upgrade_args.commit_hash.clone());
+
             info!(version = %upgrade_args.version, "Post-upgrade complete");
         }
     }
+}
+
+/// Upgrades every existing storage sub-canister to the embedded storage wasm.
+/// Inter-canister calls are forbidden inside post_upgrade itself, so this runs
+/// on a zero-delay timer right after the upgrade completes.
+fn schedule_storage_fleet_upgrade(version: BuildVersion, commit_hash: String) {
+    ic_cdk_timers::set_timer(Duration::ZERO, async move {
+        let mut manager =
+            read_state(|state| state.data.sub_canister_manager.sub_canister_manager.clone());
+
+        if manager.sub_canisters.is_empty() {
+            return;
+        }
+
+        let result = manager
+            .update_canisters(bity_ic_storage_canister_api::lifecycle::Args::Upgrade(
+                bity_ic_storage_canister_api::post_upgrade::UpgradeArgs {
+                    version,
+                    commit_hash,
+                },
+            ))
+            .await;
+
+        mutate_state(|state| {
+            state.data.sub_canister_manager.sub_canister_manager = manager;
+        });
+
+        match result {
+            Ok(()) => info!("Storage canisters upgraded"),
+            Err(errors) => {
+                for e in errors {
+                    error!("Storage canister upgrade failed: {e}");
+                }
+            }
+        }
+    });
 }
