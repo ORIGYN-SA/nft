@@ -12,8 +12,8 @@ use icrc_ledger_types::icrc1::account::Account;
 use bity_ic_storage_canister_api::types::storage::UploadState;
 use core_nft_common::types::management::{
     append_file, append_file::AppendFileRequest, cancel_upload, finalize_upload, grant_permission,
-    init_upload, mint, mint::MintRequest, revoke_permission, store_chunk,
-    update_collection_metadata, update_nft_metadata,
+    init_upload, mint, mint::MintRequest, mint::NftPublicRecordMint, revoke_permission,
+    store_chunk, update_collection_metadata, update_nft_metadata,
 };
 use ic_cdk::println;
 use sha2::{Digest, Sha256};
@@ -2033,6 +2033,105 @@ fn test_append_file_authorized() {
     );
     let entry = get_public_result.unwrap();
     assert_eq!(entry.hash, upload_path.to_string());
+}
+
+#[test]
+fn test_mint_with_public_content() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        ..
+    } = test_env;
+
+    // 1. Upload a public file first (mint requires it finalized).
+    let upload_path = "/test_mint_public.png";
+    upload_file(
+        pic,
+        controller,
+        collection_canister_id,
+        "./src/core_suite/assets/test.png",
+        upload_path,
+    )
+    .expect("Upload failed");
+
+    // 2. Mint a token that attaches the uploaded file as public content.
+    let mut entries = HashMap::new();
+    entries.insert("main".to_string(), upload_path.to_string());
+
+    let mint_result = mint(
+        pic,
+        controller,
+        collection_canister_id,
+        &(mint::Args {
+            mint_requests: vec![MintRequest {
+                token_owner: Account {
+                    owner: controller,
+                    subaccount: None,
+                },
+                memo: None,
+                metadata: vec![],
+                private_content: None,
+                public_content: Some(NftPublicRecordMint { entries }),
+            }],
+        }),
+    );
+    assert!(mint_result.is_ok(), "mint with public content failed: {mint_result:?}");
+    let token_id = mint_result.unwrap();
+
+    // 3. The file is attached to the freshly minted token.
+    let get_public_result = __get_public_entry_test(
+        pic,
+        controller,
+        collection_canister_id,
+        &core_nft_api::queries::public_content::__get_public_entry_test::Args {
+            token_id,
+            entry_name: "main".to_string(),
+        },
+    );
+    assert!(
+        get_public_result.is_ok(),
+        "public entry should exist after mint: {get_public_result:?}"
+    );
+    assert_eq!(get_public_result.unwrap().hash, upload_path.to_string());
+}
+
+#[test]
+fn test_mint_with_missing_public_content_is_rejected() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        ..
+    } = test_env;
+
+    // Reference a file that was never uploaded -> mint must fail cleanly.
+    let mut entries = HashMap::new();
+    entries.insert("main".to_string(), "/never_uploaded.png".to_string());
+
+    let mint_result = mint(
+        pic,
+        controller,
+        collection_canister_id,
+        &(mint::Args {
+            mint_requests: vec![MintRequest {
+                token_owner: Account {
+                    owner: controller,
+                    subaccount: None,
+                },
+                memo: None,
+                metadata: vec![],
+                private_content: None,
+                public_content: Some(NftPublicRecordMint { entries }),
+            }],
+        }),
+    );
+    assert!(
+        mint_result.is_err(),
+        "mint referencing an unknown public file must be rejected"
+    );
 }
 
 #[test]
