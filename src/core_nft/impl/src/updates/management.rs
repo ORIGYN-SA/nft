@@ -254,6 +254,51 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
             }
         }
 
+        // Validate public content up front (same rules as append_file): every
+        // referenced file must be an already-finalized public upload. Registration
+        // happens in the atomic mutate block below via `mint_public_content`.
+        if let Some(pub_c) = &mint_request.public_content {
+            for (entry_name, file_path) in &pub_c.entries {
+                let entry_exists = read_state(|state| {
+                    state
+                        .data
+                        .public_content_system
+                        .temp_file_cache
+                        .contains_key(file_path)
+                        || state
+                            .data
+                            .public_content_system
+                            .nft_public
+                            .values()
+                            .any(|record| record.entries.values().any(|e| &e.hash == file_path))
+                });
+                if !entry_exists {
+                    return Err(management::mint::MintError::StorageCanisterError(format!(
+                        "Public entry '{}' with path '{}' not found",
+                        entry_name, file_path
+                    )));
+                }
+
+                let is_finalized = read_state(|state| {
+                    match state
+                        .data
+                        .public_content_system
+                        .temp_file_cache
+                        .get(file_path)
+                    {
+                        Some(entry) => entry.state == UploadState::Finalized,
+                        None => true,
+                    }
+                });
+                if !is_finalized {
+                    return Err(management::mint::MintError::StorageCanisterError(format!(
+                        "Public entry '{}' is not finalized",
+                        entry_name
+                    )));
+                }
+            }
+        }
+
         let mut new_token = Icrc7Token::new(token_id.clone(), mint_request.token_owner.clone());
         __METADATA.with_borrow_mut(|m| new_token.add_metadata(m, mint_request.metadata.clone()));
 
@@ -327,6 +372,22 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
                     .unwrap_or_else(|e| {
                         ic_cdk::trap(&format!(
                             "Failed to register private content for token {}: {:?}",
+                            tid, e
+                        ));
+                    });
+            }
+
+            // Attach public content at mint (validated above). Moves each
+            // finalized file from the public temp cache onto the new token.
+            if let Some(pub_c) = &mint_request.public_content {
+                let tid = current_token_id.clone() + Nat::from(i as u64);
+                state
+                    .data
+                    .public_content_system
+                    .mint_public_content(pub_c.entries.clone(), tid.clone())
+                    .unwrap_or_else(|e| {
+                        ic_cdk::trap(&format!(
+                            "Failed to register public content for token {}: {:?}",
                             tid, e
                         ));
                     });
