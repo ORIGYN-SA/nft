@@ -96,6 +96,9 @@ pub struct Data {
     pub last_token_id: Nat,
     pub media_redirections: HashMap<String, String>,
     pub base_url: Option<String>,
+    #[serde(default)]
+    pub custom_collection_metadata:
+        HashMap<String, core_nft_common::types::value_custom::CustomValue>,
 }
 
 impl Data {
@@ -212,6 +215,7 @@ impl Data {
             last_token_id: Nat::from(1u64), // 0 is the reserved value for the collection metadata
             media_redirections: HashMap::new(),
             base_url,
+            custom_collection_metadata: HashMap::new(),
         }
     }
 
@@ -294,6 +298,7 @@ impl Clone for Data {
             last_token_id: self.last_token_id.clone(),
             media_redirections: self.media_redirections.clone(),
             base_url: self.base_url.clone(),
+            custom_collection_metadata: self.custom_collection_metadata.clone(),
         }
     }
 }

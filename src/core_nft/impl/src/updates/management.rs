@@ -126,6 +126,19 @@ pub async fn update_collection_metadata(
         });
     }
 
+    if let Some(custom_collection_metadata) = req.collection_metadata {
+        for key in custom_collection_metadata.keys() {
+            if key.starts_with("icrc7:") {
+                return Err(management::update_collection_metadata::UpdateCollectionMetadataError::InvalidMetadataKey(
+                    format!("Cannot overwrite protected key '{}'", key)
+                ));
+            }
+        }
+        mutate_state(|state| {
+            state.data.custom_collection_metadata = custom_collection_metadata;
+        });
+    }
+
     Ok(())
 }
 

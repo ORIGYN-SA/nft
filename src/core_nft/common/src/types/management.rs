@@ -169,6 +169,7 @@ pub mod update_collection_metadata {
     pub enum UpdateCollectionMetadataError {
         ConcurrentManagementCall,
         StorageCanisterError(String),
+        InvalidMetadataKey(String),
     }
     pub type Response = Result<(), UpdateCollectionMetadataError>;
 }
