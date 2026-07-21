@@ -1565,6 +1565,107 @@ fn test_update_collection_metadata() {
 }
 
 #[test]
+fn test_update_collection_metadata_custom() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        ..
+    } = test_env;
+
+    use crate::client::core_nft::icrc7_collection_metadata;
+    use core_nft_common::types::value_custom::CustomValue;
+    use icrc_ledger_types::icrc::generic_value::ICRC3Value as Value;
+
+    let mut custom_metadata = HashMap::new();
+    custom_metadata.insert(
+        "custom:field1".to_string(),
+        CustomValue(Value::Text("value1".to_string())),
+    );
+    custom_metadata.insert(
+        "custom:field2".to_string(),
+        CustomValue(Value::Nat(Nat::from(42u64))),
+    );
+
+    // Test updating collection metadata with custom fields
+    let result = update_collection_metadata(
+        pic,
+        controller,
+        collection_canister_id,
+        &(update_collection_metadata::Args {
+            description: None,
+            symbol: None,
+            name: None,
+            logo: None,
+            supply_cap: None,
+            max_query_batch_size: None,
+            max_update_batch_size: None,
+            max_take_value: None,
+            default_take_value: None,
+            max_memo_size: None,
+            atomic_batch_transfers: None,
+            tx_window: None,
+            permitted_drift: None,
+            max_canister_storage_threshold: None,
+            collection_metadata: Some(custom_metadata),
+        }),
+    );
+    assert!(
+        result.is_ok(),
+        "Should update collection metadata successfully"
+    );
+
+    // Retrieve and verify custom metadata
+    let metadata = icrc7_collection_metadata(pic, controller, collection_canister_id, &());
+
+    assert!(metadata
+        .iter()
+        .any(|(key, value)| key == "custom:field1"
+            && matches!(value, Value::Text(s) if s == "value1")));
+    assert!(metadata.iter().any(|(key, value)| key == "custom:field2"
+        && matches!(value, Value::Nat(n) if n == &Nat::from(42u64))));
+
+    // Now test validation (rejecting protected keys in custom metadata)
+    let mut invalid_metadata = HashMap::new();
+    invalid_metadata.insert(
+        "icrc7:symbol".to_string(),
+        CustomValue(Value::Text("BAD".to_string())),
+    );
+
+    let invalid_result = update_collection_metadata(
+        pic,
+        controller,
+        collection_canister_id,
+        &(update_collection_metadata::Args {
+            description: None,
+            symbol: None,
+            name: None,
+            logo: None,
+            supply_cap: None,
+            max_query_batch_size: None,
+            max_update_batch_size: None,
+            max_take_value: None,
+            default_take_value: None,
+            max_memo_size: None,
+            atomic_batch_transfers: None,
+            tx_window: None,
+            permitted_drift: None,
+            max_canister_storage_threshold: None,
+            collection_metadata: Some(invalid_metadata),
+        }),
+    );
+
+    assert!(
+        matches!(
+            invalid_result,
+            Err(core_nft_common::types::management::update_collection_metadata::UpdateCollectionMetadataError::InvalidMetadataKey(_))
+        ),
+        "Should fail when trying to update with a protected key"
+    );
+}
+
+#[test]
 #[should_panic]
 fn test_update_collection_metadata_unauthorized() {
     let mut test_env: TestEnv = default_test_setup();
@@ -2077,7 +2178,10 @@ fn test_mint_with_public_content() {
             }],
         }),
     );
-    assert!(mint_result.is_ok(), "mint with public content failed: {mint_result:?}");
+    assert!(
+        mint_result.is_ok(),
+        "mint with public content failed: {mint_result:?}"
+    );
     let token_id = mint_result.unwrap();
 
     // 3. The file is attached to the freshly minted token.
@@ -2559,10 +2663,14 @@ fn test_storage_edge_cases() {
         temp_3mb_path,
         upload_path_3mb,
     );
-    assert!(upload_3mb_result.is_ok(), "3 MB file upload after near-full canister should succeed via splitting");
+    assert!(
+        upload_3mb_result.is_ok(),
+        "3 MB file upload after near-full canister should succeed via splitting"
+    );
 
     // Assert that the 3 MB file was stored in a new canister
-    let new_canister_id = resolve_storage_canister_id(url_str.as_str(), collection_canister_id, upload_path_3mb);
+    let new_canister_id =
+        resolve_storage_canister_id(url_str.as_str(), collection_canister_id, upload_path_3mb);
     assert_ne!(
         new_canister_id, storage_canister_id,
         "3 MB file must be split to a new storage canister"

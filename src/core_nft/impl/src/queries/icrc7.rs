@@ -98,6 +98,10 @@ pub fn icrc7_collection_metadata() -> core_nft_api::queries::icrc7::CollectionMe
             ));
         }
 
+        for (key, custom_val) in &state.data.custom_collection_metadata {
+            metadata.push((key.clone(), custom_val.0.clone()));
+        }
+
         metadata.sort_by(|a, b| a.0.cmp(&b.0));
         metadata
     })

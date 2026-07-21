@@ -593,6 +593,7 @@ type TransferFromError = variant {
 type TransferFromResult = variant { Ok : nat; Err : TransferFromError };
 type UpdateCollectionMetadataError = variant {
   StorageCanisterError : text;
+  InvalidMetadataKey : text;
   ConcurrentManagementCall;
 };
 type UpdateNftMetadataError = variant {
