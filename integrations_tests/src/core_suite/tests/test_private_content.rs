@@ -3,7 +3,7 @@ use crate::client::core_nft::{get_upload_status, grant_permission, mint};
 use crate::core_suite::setup::default_test_setup;
 use crate::core_suite::setup::setup::TestEnv;
 use crate::core_suite::tests::test_private_content::mint::NftPrivateRecordMint;
-use crate::utils::{setup_http_client, tick_n_blocks};
+use crate::utils::{raw_get, setup_http_client, tick_n_blocks};
 use aes_gcm::aead::Aead;
 use aes_gcm::Aes256Gcm;
 use aes_gcm::KeyInit;
@@ -2851,18 +2851,8 @@ fn test_private_content_download() {
                 .unwrap()
                 .to_string();
             println!("Redirecting again to: {}", location_bis);
-            final_response = rt.block_on(async {
-                http_gateway
-                    .request(HttpGatewayRequestArgs {
-                        canister_id: subcanister_id,
-                        canister_request: Request::builder()
-                            .uri(location_bis)
-                            .body(Bytes::new())
-                            .unwrap(),
-                    })
-                    .send()
-                    .await
-            });
+            // File bytes are only served on the raw domain.
+            final_response = raw_get(&rt, &http_gateway, subcanister_id, &location_bis);
         }
 
         assert_eq!(

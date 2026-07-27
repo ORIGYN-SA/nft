@@ -1,11 +1,11 @@
 use crate::lifecycle::init_canister;
 use crate::state::{init_icrc3, start_default_archive_job, Data, RuntimeState};
-use crate::types::http::certify_all_assets;
 use bity_ic_canister_tracing_macros::trace;
 use bity_ic_icrc3::config::{ICRC3Config, ICRC3Properties};
 use bity_ic_utils::env::{CanisterEnv, Environment};
 use candid::Nat;
 pub use core_nft_api::lifecycle::Args;
+use core_nft_common::types::http::certify_all_assets;
 use core_nft_common::types::permissions::Permission;
 use ic_cdk_macros::init;
 use icrc_ledger_types::icrc3::blocks::SupportedBlockType;

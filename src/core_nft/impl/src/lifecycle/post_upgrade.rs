@@ -10,7 +10,7 @@ use bity_ic_icrc3::icrc3::ICRC3;
 use bity_ic_stable_memory::get_reader;
 use bity_ic_types::BuildVersion;
 use core_nft_api::lifecycle::Args;
-use core_nft_common::types::http::add_redirection;
+use core_nft_common::types::http::{add_redirection, certify_all_assets};
 use core_nft_common::types::sub_canister::default_funding_config;
 use ic_cdk_macros::post_upgrade;
 use std::time::Duration;
@@ -74,6 +74,13 @@ fn post_upgrade(args: Args) {
             replace_icrc3(icrc3);
             start_default_archive_job();
 
+            // The certification tree is heap state and does not survive an
+            // upgrade. Without re-seeding it, the skip-certification entries for
+            // /metrics, /logs and /trace are missing and those endpoints answer
+            // 503 "expression path not found in the tree" on the certified
+            // domain, which is what every upgraded collection does today.
+            certify_all_assets();
+
             let media_redirections = read_state(|state| state.data.media_redirections.clone());
             for (path, redirection_url) in media_redirections {
                 add_redirection(path, redirection_url);
@@ -89,8 +96,7 @@ fn post_upgrade(args: Args) {
 /// Renders a redirection target from the base_url template, mirroring the URL
 /// construction in `finalize_upload`.
 fn render_redirection_url(template: &str, canister_id: &str, path: &str) -> String {
-    let base = template.replace("{canister_id}", canister_id);
-    format!("{}{}", base.trim_end_matches('/'), path)
+    crate::utils::render_media_url(&Some(template.to_string()), false, canister_id, path)
 }
 
 /// Re-renders every stored media redirection against the current base_url
@@ -119,7 +125,12 @@ fn rerender_media_redirections(state: &mut RuntimeState) {
             .data
             .public_content_system
             .get_public_file_by_path(&path)
-            .or_else(|| state.data.public_content_system.get_public_file_by_path(trimmed))
+            .or_else(|| {
+                state
+                    .data
+                    .public_content_system
+                    .get_public_file_by_path(trimmed)
+            })
             .map(|entry| entry.storage_canister_id)
             .or_else(|| state.internal_filestorage.get(&path).map(|d| d.canister))
             .or_else(|| state.internal_filestorage.get(trimmed).map(|d| d.canister));
