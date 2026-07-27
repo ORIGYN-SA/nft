@@ -925,19 +925,7 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
         read_state(|state| (state.data.base_url.clone(), state.env.is_test_mode()));
 
     let construct_url = |canister_id_str: &str, file_path: &str| -> String {
-        match &base_url_template {
-            Some(template) => {
-                let base = template.replace("{canister_id}", canister_id_str);
-                format!("{}{}", base.trim_end_matches('/'), file_path)
-            }
-            None => {
-                if is_test_mode {
-                    format!("http://{}.localhost:4943{}", canister_id_str, file_path)
-                } else {
-                    format!("https://{}.raw.icp0.io{}", canister_id_str, file_path)
-                }
-            }
-        }
+        crate::utils::render_media_url(&base_url_template, is_test_mode, canister_id_str, file_path)
     };
 
     let redirection_url = construct_url(&canister_id.to_string(), &path);

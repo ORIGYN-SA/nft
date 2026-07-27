@@ -208,6 +208,44 @@ pub fn extract_metadata_file_path(metadata_url: &Url) -> String {
     format!("/{}", metadata_file_path)
 }
 
+/// GETs a canister path the way a browser reaches the raw domain in production.
+///
+/// Two things the gateway test client does not do on its own and the real
+/// boundary node does: it derives no `host` header from the request uri, so the
+/// canister cannot tell a raw request from a certified one, and it always
+/// verifies certification, which the raw domain never does. Storage canisters
+/// only serve file bytes on raw, so a redirect has to be followed this way.
+///
+/// `target` may be a bare path or a full url such as a `location` header.
+pub fn raw_get(
+    rt: &tokio::runtime::Runtime,
+    http_gateway: &HttpGatewayClient,
+    canister_id: Principal,
+    target: &str,
+) -> ic_http_gateway::HttpGatewayResponse {
+    let path = match target.find("://") {
+        Some(i) => match target[i + 3..].find('/') {
+            Some(j) => &target[i + 3 + j..],
+            None => "/",
+        },
+        None => target,
+    }
+    .to_string();
+
+    rt.block_on(async {
+        let mut request = http_gateway.request(HttpGatewayRequestArgs {
+            canister_id,
+            canister_request: Request::builder()
+                .uri(path.as_str())
+                .header("host", format!("{}.raw.icp0.io", canister_id.to_text()))
+                .body(Bytes::new())
+                .unwrap(),
+        });
+        request.unsafe_set_skip_verification(true);
+        request.send().await
+    })
+}
+
 // Helper function to fetch JSON metadata via HTTP with redirections
 pub fn fetch_metadata_json(
     rt: &tokio::runtime::Runtime,
@@ -256,18 +294,8 @@ pub fn fetch_metadata_json(
 
         println!("Canister_id: {}", canister_id);
 
-        let redirected_response = rt.block_on(async {
-            http_gateway
-                .request(HttpGatewayRequestArgs {
-                    canister_id: canister_id,
-                    canister_request: Request::builder()
-                        .uri(location_str)
-                        .body(Bytes::new())
-                        .unwrap(),
-                })
-                .send()
-                .await
-        });
+        let redirected_response =
+            raw_get(rt, http_gateway, canister_id, location_str);
 
         println!(
             "Status of the first redirection: {}",
@@ -293,18 +321,8 @@ pub fn fetch_metadata_json(
                 )
                 .unwrap();
 
-                let second_redirected_response = rt.block_on(async {
-                    http_gateway
-                        .request(HttpGatewayRequestArgs {
-                            canister_id: canister_id,
-                            canister_request: Request::builder()
-                                .uri(location_str)
-                                .body(Bytes::new())
-                                .unwrap(),
-                        })
-                        .send()
-                        .await
-                });
+                let second_redirected_response =
+                    raw_get(rt, http_gateway, canister_id, location_str);
 
                 assert_eq!(
                     second_redirected_response.canister_response.status(),

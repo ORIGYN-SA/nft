@@ -21,7 +21,7 @@ use sha2::{Digest, Sha256};
 use crate::core_suite::setup::default_test_setup;
 use crate::core_suite::setup::setup::TestEnv;
 use crate::utils::{
-    extract_metadata_file_path, fetch_metadata_json, setup_http_client, upload_file,
+    extract_metadata_file_path, fetch_metadata_json, raw_get, setup_http_client, upload_file,
     upload_metadata,
 };
 use bytes::Bytes;
@@ -113,111 +113,52 @@ fn test_storage_simple() {
     //     assert!(response_headers.contains(&(key, value)));
     // }
 
-    if response.canister_response.status() == 307 {
-        if let Some(location) = response.canister_response.headers().get("location") {
-            let location_str = location.to_str().unwrap();
-            let canister_id = Principal::from_str(
-                location_str
-                    .split('.')
-                    .next()
-                    .unwrap()
-                    .replace("http://", "")
-                    .as_str(),
-            )
-            .unwrap();
+    assert_eq!(
+        response.canister_response.status(),
+        307,
+        "the collection must redirect to its storage canister"
+    );
 
-            let first_redirected_response = rt.block_on(async {
-                http_gateway
-                    .request(HttpGatewayRequestArgs {
-                        canister_id: canister_id,
-                        canister_request: Request::builder()
-                            .uri(location_str)
-                            .body(Bytes::new())
-                            .unwrap(),
-                    })
-                    .send()
-                    .await
-            });
+    let location = response
+        .canister_response
+        .headers()
+        .get("location")
+        .expect("redirect must carry a location")
+        .to_str()
+        .unwrap()
+        .to_string();
 
-            let first_redirected_response_headers = first_redirected_response
-                .canister_response
-                .headers()
-                .iter()
-                .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
-                .collect::<Vec<(&str, &str)>>();
+    let storage_canister_id = Principal::from_str(
+        location
+            .split('.')
+            .next()
+            .unwrap()
+            .replace("http://", "")
+            .replace("https://", "")
+            .as_str(),
+    )
+    .unwrap();
 
-            println!(
-                "redirected_response_headers: {:?}",
-                first_redirected_response_headers
-            );
-            println!(
-                "redirected_response status: {:?}",
-                first_redirected_response.canister_response.status()
-            );
-            if first_redirected_response.canister_response.status() == 307 {
-                if let Some(location_bis) = first_redirected_response
-                    .canister_response
-                    .headers()
-                    .get("location")
-                {
-                    let location_str = location_bis.to_str().unwrap();
-                    let canister_id = Principal::from_str(
-                        location_str
-                            .split('.')
-                            .next()
-                            .unwrap()
-                            .replace("https://", "")
-                            .as_str(),
-                    )
-                    .unwrap();
+    // File bytes are only served on the raw domain; a certified-domain request
+    // redirects there rather than serving.
+    let served = raw_get(&rt, &http_gateway, storage_canister_id, &location);
+    assert_eq!(
+        served.canister_response.status(),
+        200,
+        "the storage canister must serve the file on raw"
+    );
 
-                    let second_redirected_response = rt.block_on(async {
-                        http_gateway
-                            .request(HttpGatewayRequestArgs {
-                                canister_id: canister_id,
-                                canister_request: Request::builder()
-                                    .uri(location_str)
-                                    .body(Bytes::new())
-                                    .unwrap(),
-                            })
-                            .send()
-                            .await
-                    });
-
-                    let second_redirected_response_headers = second_redirected_response
-                        .canister_response
-                        .headers()
-                        .iter()
-                        .map(|(k, v)| (k.as_str(), v.to_str().unwrap()))
-                        .collect::<Vec<(&str, &str)>>();
-
-                    println!(
-                        "redirected_response_headers: {:?}",
-                        second_redirected_response_headers
-                    );
-                    println!(
-                        "redirected_response status: {:?}",
-                        second_redirected_response.canister_response.status()
-                    );
-
-                    rt.block_on(async {
-                        let body = second_redirected_response
-                            .canister_response
-                            .into_body()
-                            .collect()
-                            .await
-                            .unwrap()
-                            .to_bytes()
-                            .to_vec();
-
-                        assert_eq!(body, buffer);
-                    });
-                }
-            }
-        }
-    } else {
-        panic!("Expected 307 status code");
-    }
+    rt.block_on(async {
+        let body = served
+            .canister_response
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec();
+        assert_eq!(body, buffer);
+    });
 }
 
 #[test]
