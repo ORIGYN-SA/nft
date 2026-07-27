@@ -23,8 +23,16 @@ const MAX_FILE_SIZE: u128 = 2 * 1024 * 1024 * 1024; // 2 GiB
 pub const INITIAL_CYCLES_BALANCE: u128 = 5_000_000_000_000; // 5T cycles
 pub const RESERVED_CYCLES_BALANCE: u128 = 2_000_000_000_000; // 2T cycles
 
-pub const INITIAL_CYCLES_BALANCE_TEST_MODE: u128 = 1_000_000_000_000; // 1T cycles
-pub const RESERVED_CYCLES_BALANCE_TEST_MODE: u128 = 500_000_000_000; // 0.5T cycle
+// A test-mode storage canister burns ~1.3B cycles/day, so 0.5T is over a year of
+// runway. It is funded out of the parent collection's balance, and the manager's
+// top-up floor has to stay above this plus fees for a spawn to be possible at all.
+pub const INITIAL_CYCLES_BALANCE_TEST_MODE: u128 = 500_000_000_000; // 0.5T cycles
+// `reserved_cycles_limit` is a ceiling on what the sub-canister may reserve for
+// memory allocation, but the IC requires the parent to hold it liquid at spawn
+// time on top of the 0.5T creation fee and the initial balance. At 0.5T that made
+// a spawn cost ~1.55T, which is what the manager's top-up floor has to clear.
+// Staging canisters allocate little, so 0.1T is ample and drops a spawn to ~1.1T.
+pub const RESERVED_CYCLES_BALANCE_TEST_MODE: u128 = 100_000_000_000; // 0.1T cycles
 
 pub use bity_ic_storage_canister_api::lifecycle::Args as ArgsStorage;
 
@@ -38,13 +46,30 @@ pub struct StorageSubCanisterManager {
 /// Canfund options for storage sub-canisters. `SubCanisterManager.funding_config`
 /// is `#[serde(skip)]`, so this must be re-applied after every upgrade, not just
 /// at init.
-pub fn default_funding_config() -> FundManagerOptions {
+///
+/// Test mode gets its own thresholds, scaled to `INITIAL_CYCLES_BALANCE_TEST_MODE`.
+/// Under the production settings a test-mode storage canister was created below
+/// canfund's 1 TC floor and refilled to 3 TC the instant it existed, out of the
+/// parent collection's balance. That drop pushed the collection under the manager's
+/// top-up floor, which is how a staging collection ended up costing 7.5 TC. Keeping
+/// the floor and refill below the endowment leaves it at what it was given.
+///
+/// The interval is also relaxed in test mode: every tick is a `canister_status`
+/// call per storage child, paid for by the collection, and on staging that dominates
+/// the collection's cycle burn.
+pub fn default_funding_config(test_mode: bool) -> FundManagerOptions {
+    let (interval_secs, min_cycles, fund_cycles) = if test_mode {
+        (3600, 300_000_000_000, 500_000_000_000)
+    } else {
+        (60, 1_000_000_000_000, 2_000_000_000_000)
+    };
+
     FundManagerOptions::new()
-        .with_interval_secs(60)
+        .with_interval_secs(interval_secs)
         .with_strategy(FundStrategy::BelowThreshold(
             CyclesThreshold::new()
-                .with_min_cycles(1_000_000_000_000)
-                .with_fund_cycles(2_000_000_000_000),
+                .with_min_cycles(min_cycles)
+                .with_fund_cycles(fund_cycles),
         ))
 }
 
@@ -62,7 +87,7 @@ impl StorageSubCanisterManager {
         commit_hash: String,
         wasm: Vec<u8>,
     ) -> Self {
-        let funding_config = default_funding_config();
+        let funding_config = default_funding_config(test_mode);
 
         Self {
             sub_canister_manager: bity_ic_subcanister_manager::SubCanisterManager::new(

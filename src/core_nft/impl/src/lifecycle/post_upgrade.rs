@@ -55,7 +55,7 @@ fn post_upgrade(args: Args) {
                 .data
                 .sub_canister_manager
                 .sub_canister_manager
-                .funding_config = default_funding_config();
+                .funding_config = default_funding_config(state.env.is_test_mode());
 
             migrate_internal_filestorage_into_public_content(&mut state);
 
