@@ -87,7 +87,8 @@ We welcome contributions! Please read our contributing guidelines and submit pul
 
 ## License
 
-[License information]
+Licensed under the Apache License, Version 2.0. See [LICENSE](./LICENSE) for the full text,
+or obtain a copy at <http://www.apache.org/licenses/LICENSE-2.0>.
 
 ## Support
 

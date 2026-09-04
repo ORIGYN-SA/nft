@@ -10,6 +10,9 @@ members = [
 ]
 resolver = "2"
 
+[workspace.package]
+license = "Apache-2.0"
+
 [profile.release]
 lto = "thin"
 panic = "abort"
