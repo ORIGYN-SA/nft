@@ -79,7 +79,14 @@ type Args_12 = record {
   plaintext_hash : blob;
 };
 type Args_13 = record {
-  file_hash : text;
+  // Expected SHA-256 of the whole file, hex-encoded, verified at
+  // `finalize_upload`.
+  // 
+  // `None`: the canister does not verify a hash at finalize; the caller
+  // vouches for integrity by other means (the minting gateway uses
+  // per-chunk authenticated encryption, so it cannot know the ciphertext
+  // digest before streaming the file).
+  file_hash : opt text;
   file_path : text;
   file_size : nat64;
   chunk_size : opt nat64;

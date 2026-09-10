@@ -194,7 +194,7 @@ fn test_duplicate_upload() {
         collection_canister_id,
         &(init_upload::Args {
             file_path: upload_path.to_string(),
-            file_hash: "dummy_hash".to_string(),
+            file_hash: Some("dummy_hash".to_string()),
             file_size: 1024,
             chunk_size: None,
         }),
@@ -246,7 +246,7 @@ fn test_duplicate_chunk_upload() {
         collection_canister_id,
         &(init_upload::Args {
             file_path: "/test.png".to_string(),
-            file_hash: format!("{:x}", file_hash),
+            file_hash: Some(format!("{:x}", file_hash)),
             file_size,
             chunk_size: None,
         }),
@@ -347,7 +347,7 @@ fn test_finalize_upload_missing_chunk() {
         collection_canister_id,
         &(init_upload::Args {
             file_path: "/test.png".to_string(),
-            file_hash: format!("{:x}", file_hash),
+            file_hash: Some(format!("{:x}", file_hash)),
             file_size,
             chunk_size: None,
         }),
@@ -431,7 +431,7 @@ fn test_cancel_upload() {
         collection_canister_id,
         &(init_upload::Args {
             file_path: "/test_cancel.png".to_string(),
-            file_hash: format!("{:x}", file_hash),
+            file_hash: Some(format!("{:x}", file_hash)),
             file_size,
             chunk_size: None,
         }),
@@ -925,7 +925,7 @@ fn test_init_upload_unauthorized() {
         collection_canister_id,
         &(init_upload::Args {
             file_path: "/test.png".to_string(),
-            file_hash: "dummy_hash".to_string(),
+            file_hash: Some("dummy_hash".to_string()),
             file_size: 1024,
             chunk_size: None,
         }),
@@ -1359,7 +1359,7 @@ fn test_get_upload_status() {
         collection_canister_id,
         &(init_upload::Args {
             file_path: upload_path2.to_string(),
-            file_hash: "dummy_hash".to_string(),
+            file_hash: Some("dummy_hash".to_string()),
             file_size: 1024,
             chunk_size: None,
         }),
@@ -1809,7 +1809,7 @@ fn test_permissions_add_and_remove_one_by_one() {
         collection_canister_id,
         &(init_upload::Args {
             file_path: "/test_permissions.png".to_string(),
-            file_hash: "dummy_hash".to_string(),
+            file_hash: Some("dummy_hash".to_string()),
             file_size: 1024,
             chunk_size: None,
         }),
@@ -2366,7 +2366,7 @@ fn test_storage_limits_and_freeing_space() {
         collection_canister_id,
         &core_nft_common::types::management::init_upload::Args {
             file_path: upload_path_55mb.to_string(),
-            file_hash: "dummy_hash".to_string(),
+            file_hash: Some("dummy_hash".to_string()),
             file_size: 55_000_000,
             chunk_size: None,
         },
@@ -2560,7 +2560,7 @@ fn test_storage_edge_cases() {
         collection_canister_id,
         &core_nft_common::types::management::init_upload::Args {
             file_path: "/temp_limit_1b.bin".to_string(),
-            file_hash: "dummy_hash".to_string(),
+            file_hash: Some("dummy_hash".to_string()),
             file_size: limit_bytes + 1,
             chunk_size: None,
         },
@@ -2620,4 +2620,60 @@ fn test_storage_edge_cases() {
     // Cleanup temporary files
     let _ = std::fs::remove_file(temp_limit_path);
     let _ = std::fs::remove_file(temp_3mb_path);
+}
+
+#[test]
+fn upload_without_declared_hash_passes_through_to_storage() {
+    let mut test_env: TestEnv = default_test_setup();
+
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        ..
+    } = test_env;
+
+    let upload_path = "/no_declared_hash.bin".to_string();
+    let data = vec![7u8; 5000];
+
+    init_upload(
+        pic,
+        controller,
+        collection_canister_id,
+        &(init_upload::Args {
+            file_path: upload_path.clone(),
+            file_hash: None,
+            file_size: data.len() as u64,
+            chunk_size: None,
+        }),
+    )
+    .expect("init_upload without a declared hash should succeed");
+
+    store_chunk(
+        pic,
+        controller,
+        collection_canister_id,
+        &(store_chunk::Args {
+            file_path: upload_path.clone(),
+            chunk_id: Nat::from(0u64),
+            chunk_data: data.clone(),
+        }),
+    )
+    .expect("store_chunk should succeed");
+
+    let finalize_resp = finalize_upload(
+        pic,
+        controller,
+        collection_canister_id,
+        &(finalize_upload::Args {
+            file_path: upload_path.clone(),
+        }),
+    )
+    .expect("finalize_upload should succeed when no hash was declared");
+
+    assert!(
+        finalize_resp.url.contains(&upload_path),
+        "unexpected url: {}",
+        finalize_resp.url
+    );
 }

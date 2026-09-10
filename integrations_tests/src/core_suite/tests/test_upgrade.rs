@@ -1,6 +1,6 @@
 use crate::client::core_nft::{
     finalize_upload, get_upload_status, icrc7_owner_of, icrc7_total_supply, init_upload,
-    store_chunk,
+    legacy_init_upload, store_chunk,
 };
 use crate::client::pocket::execute_query;
 use crate::core_suite::setup::old_test_setup;
@@ -39,6 +39,38 @@ fn upload_file_as(
         collection_canister_id,
         &(init_upload::Args {
             file_path: file_path.to_string(),
+            file_hash: Some(format!("{:x}", file_hash)),
+            file_size: buffer.len() as u64,
+            chunk_size: None,
+        }),
+    );
+    assert!(
+        init_upload_resp.is_ok(),
+        "init_upload failed: {init_upload_resp:?}"
+    );
+
+    store_and_finalize(pic, sender, collection_canister_id, file_path, buffer);
+}
+
+/// The same upload against a collection installed from a previous-generation
+/// wasm, whose candid still declares `file_hash : text`.
+fn legacy_upload_file_as(
+    pic: &mut PocketIc,
+    sender: Principal,
+    collection_canister_id: Principal,
+    file_path: &str,
+    buffer: &[u8],
+) {
+    let mut hasher = Sha256::new();
+    hasher.update(buffer);
+    let file_hash = hasher.finalize();
+
+    let init_upload_resp = legacy_init_upload(
+        pic,
+        sender,
+        collection_canister_id,
+        &(legacy_init_upload::Args {
+            file_path: file_path.to_string(),
             file_hash: format!("{:x}", file_hash),
             file_size: buffer.len() as u64,
             chunk_size: None,
@@ -49,6 +81,16 @@ fn upload_file_as(
         "init_upload failed: {init_upload_resp:?}"
     );
 
+    store_and_finalize(pic, sender, collection_canister_id, file_path, buffer);
+}
+
+fn store_and_finalize(
+    pic: &mut PocketIc,
+    sender: Principal,
+    collection_canister_id: Principal,
+    file_path: &str,
+    buffer: &[u8],
+) {
     let chunk_size = 1024 * 1024;
     for (chunk_index, chunk) in buffer.chunks(chunk_size).enumerate() {
         let store_chunk_resp = store_chunk(
@@ -140,7 +182,7 @@ fn test_upgrade_storage_canister() {
     let mut buffer = Vec::new();
     file.read_to_end(&mut buffer).expect("Failed to read file");
 
-    upload_file_as(pic, controller, collection_canister_id, "/test.png", &buffer);
+    legacy_upload_file_as(pic, controller, collection_canister_id, "/test.png", &buffer);
 
     let supply_before = icrc7_total_supply(pic, controller, collection_canister_id, &());
     let owner_before = icrc7_owner_of(

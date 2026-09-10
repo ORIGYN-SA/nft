@@ -282,7 +282,7 @@ impl From<init_private_content_upload::Args> for init_upload::Args {
     fn from(args: init_private_content_upload::Args) -> Self {
         init_upload::Args {
             file_path: args.storage_path,
-            file_hash: hex::encode(args.file_hash),
+            file_hash: Some(hex::encode(args.file_hash)),
             file_size: args.file_size,
             chunk_size: args.chunk_size,
         }
