@@ -16,8 +16,24 @@ lazy_static! {
     // Wasms in particular canister folder
     pub static ref CORE_WASM_OLD: CanisterWasm = get_core_wasm_old();
 
-    pub static ref CORE_WASM: CanisterWasm = get_canister_wasm_from_bin("core_nft");
+    // The tests call the endpoints gated behind the `inttest` cargo feature, so
+    // they load the inttest build of core_nft, not the release artifact. The
+    // released wasm must never expose those endpoints.
+    // Build it with: ./scripts/build.sh --inttest
+    pub static ref CORE_WASM: CanisterWasm = get_core_wasm_inttest();
     pub static ref INDEX_WASM: CanisterWasm = get_canister_wasm_from_bin("index_icrc7");
+}
+
+fn get_core_wasm_inttest() -> CanisterWasm {
+    match read_file_from_relative_bin("../src/core_nft/wasm/core_nft_canister_inttest.wasm.gz") {
+        Ok(wasm) => wasm,
+        Err(err) => {
+            println!(
+                "Failed to read core_nft inttest wasm: {err}. \n\x1b[31mRun \"./scripts/build.sh --inttest\"\x1b[0m"
+            );
+            panic!()
+        }
+    }
 }
 
 // Or change to old
