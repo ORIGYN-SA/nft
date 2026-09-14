@@ -51,7 +51,6 @@ build:
     paths:
       - src/core_nft/wasm/
       - src/index_icrc7/wasm/
-      - integrations_tests/wasm/
       - integrations_tests/pocket-ic
     expire_in: 1 day
 

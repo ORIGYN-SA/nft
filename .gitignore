@@ -23,3 +23,8 @@ dist/
 
 # environment variables
 .env
+
+# integration-test builds of the canisters (inttest feature) - never released
+src/*/wasm/*_inttest.wasm
+src/*/wasm/*_inttest.wasm.gz
+src/*/wasm/can_inttest.did

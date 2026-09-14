@@ -1,6 +1,6 @@
 use crate::client::core_nft::{
-    finalize_private_content_upload, finalize_upload, init_private_content_upload, init_upload,
-    store_chunk, store_private_content_chunk,
+    finalize_private_content_upload, finalize_upload, init_private_content_upload,
+    legacy_init_upload, store_chunk, store_private_content_chunk,
 };
 use crate::core_suite::setup::setup::TestEnv;
 use crate::core_suite::setup::setup_core::upgrade_core_canister;
@@ -11,7 +11,7 @@ use bytes::Bytes;
 use candid::{Nat, Principal};
 use core_nft_api::lifecycle::Args;
 use core_nft_api::post_upgrade::UpgradeArgs;
-use core_nft_common::types::management::{finalize_upload, init_upload, store_chunk};
+use core_nft_common::types::management::{finalize_upload, store_chunk};
 use core_nft_common::EncryptionMode;
 use serde_bytes::ByteBuf;
 use std::collections::HashMap;
@@ -24,7 +24,9 @@ use std::io::Read;
 use std::path::Path;
 use std::time::Duration;
 
-fn upload_file_as(
+/// Uploads through the pre-0.7 candid, which is what a collection installed
+/// from a previous-generation wasm still exposes.
+fn legacy_upload_file_as(
     pic: &mut PocketIc,
     sender: Principal,
     collection_canister_id: Principal,
@@ -35,11 +37,11 @@ fn upload_file_as(
     hasher.update(buffer);
     let file_hash = hasher.finalize();
 
-    init_upload(
+    legacy_init_upload(
         pic,
         sender,
         collection_canister_id,
-        &(init_upload::Args {
+        &(legacy_init_upload::Args {
             file_path: file_path.to_string(),
             file_hash: format!("{:x}", file_hash),
             file_size: buffer.len() as u64,
@@ -135,7 +137,7 @@ fn test_legacy_upload_is_still_served_after_upgrade() {
     } = test_env;
 
     let buffer = test_asset();
-    upload_file_as(pic, controller, collection_canister_id, "/test.png", &buffer);
+    legacy_upload_file_as(pic, controller, collection_canister_id, "/test.png", &buffer);
 
     upgrade_core_canister(
         pic,

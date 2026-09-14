@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-./scripts/build.sh ./src storage_canister
 ./scripts/generate_did.sh storage_canister 
 
 dfx deploy --network local storage --argument "(variant { Init = record {

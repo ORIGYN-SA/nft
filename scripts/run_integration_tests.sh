@@ -2,9 +2,12 @@
 
 ulimit -n 65536
 
-./scripts/build.sh
+# Release build first: it produces the shipped artifacts (index_icrc7 included,
+# the tests use its release wasm) and keeps them free of the test-only endpoints.
+./scripts/build.sh || exit 1
 
-mkdir -p integrations_tests/wasm
-cp src/core_nft/wasm/core_nft_canister.wasm.gz integrations_tests/wasm/
+# Then the core_nft build the tests actually load: same sources plus the
+# `inttest` feature, written to src/core_nft/wasm/*_inttest.*.
+./scripts/build.sh --inttest || exit 1
 
 cargo test -p integration_tests -- --test-threads=1

@@ -70,7 +70,7 @@ pub async fn upload_file(
             file_path: destination_path.to_string(),
             file_size,
             chunk_size: Some(chunk_size),
-            file_hash,
+            file_hash: Some(file_hash),
         },
     )
     .await?;

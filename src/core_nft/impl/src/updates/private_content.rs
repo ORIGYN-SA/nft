@@ -123,7 +123,7 @@ pub async fn init_private_content_upload(
                 read_state(|state| state.data.sub_canister_manager.clone());
             let upload_args = management::init_upload::Args {
                 file_path: args.storage_path.clone(),
-                file_hash: hex::encode(args.file_hash),
+                file_hash: Some(hex::encode(args.file_hash)),
                 file_size: args.file_size,
                 chunk_size: args.chunk_size,
             };

@@ -99,3 +99,33 @@ generate_pocket_update_call!(derive_vetkey_by_entry);
 generate_pocket_query_call!(get_caller_nft_private_content_access);
 generate_pocket_query_call!(__get_public_entry_test);
 generate_pocket_update_call!(burn_nft);
+
+/// `init_upload` as the pre-0.7 candid declared it, with a mandatory
+/// `file_hash : text`.
+///
+/// A collection installed from a previous-generation wasm still expects the
+/// non-optional field, and `opt text` is not a subtype of `text`, so the
+/// upgrade tests cannot reach it through the current `init_upload::Args`.
+pub mod legacy_init_upload {
+    use candid::CandidType;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, CandidType, Clone, Debug)]
+    pub struct Args {
+        pub file_path: String,
+        pub file_hash: String,
+        pub file_size: u64,
+        pub chunk_size: Option<u64>,
+    }
+
+    pub type Response = super::init_upload::Response;
+}
+
+pub fn legacy_init_upload(
+    pic: &mut pocket_ic::PocketIc,
+    sender: candid::Principal,
+    canister_id: candid::Principal,
+    args: &legacy_init_upload::Args,
+) -> legacy_init_upload::Response {
+    crate::client::pocket::execute_update(pic, sender, canister_id, "init_upload", args)
+}
