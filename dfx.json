@@ -1,7 +1,6 @@
 {
   "canisters": {
     "storage": {
-      "build": ["./scripts/build.sh"],
       "candid": "src/storage_canister/wasm/can.did",
       "declarations": {
         "bindings": ["js", "did"],
