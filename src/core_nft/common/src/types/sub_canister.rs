@@ -131,6 +131,11 @@ impl StorageSubCanisterManager {
                                     canister.canister_id(),
                                 ));
                             }
+                            // Hazard: this reads every rejection as "that canister is
+                            // full". A sub-canister left on storage 0.6.1 rejects the 0.7
+                            // `opt text` file_hash, so an un-upgraded fleet silently grows
+                            // a new storage canister per upload instead of failing. See
+                            // the Upgrading section of README.md.
                             Err(_) => {
                                 continue;
                             }
