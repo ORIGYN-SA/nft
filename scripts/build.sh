@@ -49,10 +49,21 @@ else
     SUFFIX=""
 fi
 
-# Pinned, and `--fail` so an HTML error page is never written over the wasm.
+# Pinned, and failing loudly so an HTML error page is never written over the
+# wasm. The CI image ships wget but not curl, so either tool is accepted.
+fetch() {
+    if command -v curl >/dev/null 2>&1; then
+        curl -L --fail -o "$1" "$2"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q -O "$1" "$2"
+    else
+        echo "neither curl nor wget is available to download $2" >&2
+        return 1
+    fi
+}
 mkdir -p "./wasm"
-curl -L --fail -o "./wasm/storage_canister.wasm" "${STORAGE_RELEASE_URL}/storage_canister.wasm" || exit 1
-curl -L --fail -o "./wasm/storage_canister.wasm.gz" "${STORAGE_RELEASE_URL}/storage_canister.wasm.gz" || exit 1
+fetch "./wasm/storage_canister.wasm" "${STORAGE_RELEASE_URL}/storage_canister.wasm" || exit 1
+fetch "./wasm/storage_canister.wasm.gz" "${STORAGE_RELEASE_URL}/storage_canister.wasm.gz" || exit 1
 
 FAILED=()
 
