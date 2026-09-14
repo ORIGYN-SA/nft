@@ -2622,8 +2622,16 @@ fn test_storage_edge_cases() {
     let _ = std::fs::remove_file(temp_3mb_path);
 }
 
+/// An upload that declares no hash must still land in a storage canister and
+/// come back byte for byte.
+///
+/// The pass-through is the point: 0.7 made `file_hash` an `opt text`, and the
+/// collection forwards `None` to the storage canister rather than computing a
+/// hash of its own. Asserting only on the finalize response would not notice a
+/// file that was accepted and then stored empty or truncated, so the bytes are
+/// read back over the HTTP gateway.
 #[test]
-fn upload_without_declared_hash_passes_through_to_storage() {
+fn test_upload_without_declared_hash_passes_through_to_storage() {
     let mut test_env: TestEnv = default_test_setup();
 
     let TestEnv {
@@ -2676,4 +2684,75 @@ fn upload_without_declared_hash_passes_through_to_storage() {
         "unexpected url: {}",
         finalize_resp.url
     );
+
+    // Read it back the way a browser does: the collection answers 307 with the
+    // storage canister it delegated to, and that canister serves the bytes.
+    let (rt, http_gateway) = setup_http_client(pic);
+
+    let redirect = rt.block_on(async {
+        http_gateway
+            .request(HttpGatewayRequestArgs {
+                canister_id: collection_canister_id,
+                canister_request: Request::builder()
+                    .uri(upload_path.as_str())
+                    .body(Bytes::new())
+                    .unwrap(),
+            })
+            .send()
+            .await
+    });
+
+    assert_eq!(
+        redirect.canister_response.status(),
+        307,
+        "the collection must redirect the upload path to its storage canister"
+    );
+
+    let location = redirect
+        .canister_response
+        .headers()
+        .get("location")
+        .expect("redirect must carry a location")
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let storage_canister_id = Principal::from_str(
+        location
+            .split('.')
+            .next()
+            .unwrap()
+            .replace("http://", "")
+            .replace("https://", "")
+            .as_str(),
+    )
+    .unwrap();
+    assert_ne!(
+        storage_canister_id, collection_canister_id,
+        "the file must be stored in a storage sub-canister, not in the collection"
+    );
+
+    // File bytes are only served on the raw domain; a certified-domain request
+    // redirects there rather than serving.
+    let served = raw_get(&rt, &http_gateway, storage_canister_id, &location);
+    assert_eq!(
+        served.canister_response.status(),
+        200,
+        "the storage canister must serve a file uploaded without a declared hash"
+    );
+
+    rt.block_on(async {
+        let body = served
+            .canister_response
+            .into_body()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .to_vec();
+        assert_eq!(
+            body, data,
+            "the bytes served back must be the bytes uploaded"
+        );
+    });
 }

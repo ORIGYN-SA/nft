@@ -2,7 +2,6 @@ use bity_ic_types::CanisterWasm;
 use lazy_static::lazy_static;
 use std::fs::File;
 use std::io::Read;
-use std::path::PathBuf;
 
 lazy_static! {
     // Wasms in wasms folder
@@ -36,7 +35,15 @@ fn get_core_wasm_inttest() -> CanisterWasm {
     }
 }
 
-// Or change to old
+/// The previous-generation core_nft wasm, checked in at `wasm/`. `test_upgrade`
+/// and `test_media_serving` install it and then upload through the pre-0.7
+/// candid, where `file_hash` is a bare `text`.
+///
+/// Whoever refreshes these bytes to a post-0.7 build MUST delete
+/// `legacy_init_upload` in `client/core_nft.rs` in the same commit, and move
+/// its callers onto `init_upload`. Candid decodes a `text` argument into an
+/// `opt text` parameter, so those tests would keep passing against a 0.7 wasm
+/// while proving nothing about the legacy shape they exist to cover.
 fn get_core_wasm_old() -> CanisterWasm {
     match read_file_from_relative_bin(&format!("../wasm/core_nft_canister.wasm.gz")) {
         Ok(wasm) => wasm,
@@ -59,34 +66,6 @@ fn get_canister_wasm_from_bin(canister_name: &str) -> CanisterWasm {
             panic!()
         }
     }
-}
-
-fn get_canister_wasm(canister_name: &str) -> CanisterWasm {
-    read_file_from_local_bin(&format!("{canister_name}_canister.wasm"))
-}
-
-fn get_canister_wasm_gz(canister_name: &str) -> CanisterWasm {
-    read_file_from_local_bin(&format!("{canister_name}_canister.wasm.gz"))
-}
-
-fn read_file_from_local_bin(file_name: &str) -> Vec<u8> {
-    let mut file_path = local_bin();
-    file_path.push(file_name);
-
-    let mut file = File::open(&file_path)
-        .unwrap_or_else(|_| panic!("Failed to open file: {}", file_path.to_str().unwrap()));
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes).expect("Failed to read file");
-    bytes
-}
-
-pub fn local_bin() -> PathBuf {
-    let mut file_path = PathBuf::from(
-        std::env::var("CARGO_MANIFEST_DIR")
-            .expect("Failed to read CARGO_MANIFEST_DIR env variable"),
-    );
-    file_path.push("wasm");
-    file_path
 }
 
 fn read_file_from_relative_bin(file_path: &str) -> Result<Vec<u8>, std::io::Error> {

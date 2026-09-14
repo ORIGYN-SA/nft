@@ -121,7 +121,6 @@ pub mod legacy_init_upload {
     pub type Response = super::init_upload::Response;
 }
 
-#[allow(dead_code)]
 pub fn legacy_init_upload(
     pic: &mut pocket_ic::PocketIc,
     sender: candid::Principal,
