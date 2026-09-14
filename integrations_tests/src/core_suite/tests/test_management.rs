@@ -21,10 +21,12 @@ use sha2::{Digest, Sha256};
 use crate::core_suite::setup::default_test_setup;
 use crate::core_suite::setup::setup::TestEnv;
 use crate::utils::{
-    extract_metadata_file_path, fetch_metadata_json, raw_get, setup_http_client, upload_file,
-    upload_metadata,
+    extract_metadata_file_path, fetch_metadata_json, free_storage_bytes, raw_get,
+    setup_http_client, storage_canister_for_path, upload_bytes, upload_file, upload_metadata,
 };
 use bytes::Bytes;
+use core_nft_common::types::sub_canister::INITIAL_CYCLES_BALANCE_TEST_MODE;
+use core_nft_common::types::MAX_CONTENT_SIZE;
 use http::Request;
 use http_body_util::BodyExt;
 use ic_agent::Agent;
@@ -532,7 +534,7 @@ fn test_management_file_distribution() {
         .unwrap();
 
     // Verify distribution of files across canisters
-    for (upload_path, original_buffer) in uploaded_files {
+    for (upload_path, _original_buffer) in &uploaded_files {
         let response = rt.block_on(async {
             http_gateway
                 .request(HttpGatewayRequestArgs {
@@ -546,42 +548,66 @@ fn test_management_file_distribution() {
                 .await
         });
 
-        if let Some(location) = response.canister_response.headers().get("location") {
-            let location_str = location.to_str().unwrap();
-            let canister_id = Principal::from_str(
-                location_str
-                    .split('.')
-                    .next()
-                    .unwrap()
-                    .replace("http://", "")
-                    .as_str(),
-            )
-            .unwrap();
+        let location = response
+            .canister_response
+            .headers()
+            .get("location")
+            .unwrap_or_else(|| {
+                panic!(
+                    "{} must redirect to the storage canister holding it",
+                    upload_path
+                )
+            });
+        let location_str = location.to_str().unwrap();
+        let canister_id = Principal::from_str(
+            location_str
+                .split('.')
+                .next()
+                .unwrap()
+                .replace("http://", "")
+                .replace("https://", "")
+                .as_str(),
+        )
+        .unwrap();
 
-            canister_distribution
-                .entry(canister_id.to_string())
-                .or_insert_with(Vec::new)
-                .push(upload_path.clone());
-        }
-    }
-
-    // Verify that files are distributed evenly (2 files per canister)
-    for (canister_id, files) in &canister_distribution {
-        assert_eq!(
-            files.len(),
-            7,
-            "Canister {} should contain exactly 2 files, but has {}",
-            canister_id,
-            files.len()
+        assert_ne!(
+            canister_id, collection_canister_id,
+            "{} must live in a storage sub-canister, not in the collection",
+            upload_path
         );
+
+        canister_distribution
+            .entry(canister_id.to_string())
+            .or_insert_with(Vec::new)
+            .push(upload_path.clone());
     }
 
-    // Verify we have exactly 2 canisters
+    // Every upload has to be accounted for: a file that resolved nowhere would
+    // otherwise vanish from the distribution silently.
+    let placed: usize = canister_distribution.values().map(|f| f.len()).sum();
+    assert_eq!(
+        placed,
+        uploaded_files.len(),
+        "every uploaded file must resolve to a storage canister"
+    );
+
+    // All 14 files share one canister. 14 * 6.2 MB is about 87 MB, comfortably
+    // inside a test-mode storage canister's 500 MiB ceiling, so the collection
+    // has no reason to spawn a second one.
+    //
+    // This is the assertion that catches the `Err(_) => continue` hazard in
+    // `StorageSubCanisterManager::init_upload`: that arm reads every rejection
+    // from a sub-canister as "this one is full", so a fleet that rejects uploads
+    // for any other reason grows one canister per upload instead of failing.
+    // Splitting on a genuinely full canister is covered by
+    // `test_storage_threshold_splitting`, which is the one test that pays the
+    // cost of actually filling one.
     assert_eq!(
         canister_distribution.len(),
-        2,
-        "Should have exactly 2 canisters, but found {}",
-        canister_distribution.len()
+        1,
+        "14 small files must all fit one storage canister, but they landed on {}: {:?}",
+        canister_distribution.len(),
+        canister_distribution
     );
 }
 
@@ -851,13 +877,31 @@ fn test_management_cycles() {
         "Collection canister should have spent cycles"
     );
 
-    // Verify each storage canister has sufficient cycles
+    // Verify each storage canister is left holding its test-mode endowment.
+    //
+    // The endowment is `INITIAL_CYCLES_BALANCE_TEST_MODE` (0.5 T). canfund's
+    // test-mode floor is 0.3 T with a 0.5 T refill, both inline in
+    // `default_funding_config` in core_nft_common, and the point of those numbers
+    // is that a healthy storage canister sits above the floor and is therefore
+    // never topped up out of the collection's balance. So the assertion is that
+    // the canister is still comfortably above the floor, not that it holds some
+    // absolute amount: a balance below it would mean canfund is about to bill the
+    // collection, and a balance above the endowment would mean it already has.
+    const CANFUND_TEST_MODE_FLOOR: u128 = 300_000_000_000;
     for (canister_id, cycles) in &canister_cycles {
         assert!(
-            *cycles >= 1_000_000_000_000, // 1T cycles minimum threshold
-            "Storage canister {} has insufficient cycles: {}",
+            *cycles > CANFUND_TEST_MODE_FLOOR,
+            "Storage canister {} fell under the canfund top-up floor: {} <= {}",
             canister_id,
-            cycles
+            cycles,
+            CANFUND_TEST_MODE_FLOOR
+        );
+        assert!(
+            *cycles <= INITIAL_CYCLES_BALANCE_TEST_MODE,
+            "Storage canister {} was topped up past its endowment: {} > {}",
+            canister_id,
+            cycles,
+            INITIAL_CYCLES_BALANCE_TEST_MODE
         );
     }
 
@@ -2270,7 +2314,8 @@ fn test_storage_size_checks() {
 
 #[test]
 fn test_storage_limits_and_freeing_space() {
-    // 1. Initialize collection canister (using default setup, where storage canister test limit is 50 MB)
+    // 1. Initialize collection canister. A storage sub-canister created in test
+    //    mode is capped at `TEST_MODE_STORAGE_CEILING_BYTES` (500 MiB).
     let mut test_env: TestEnv = default_test_setup();
     let TestEnv {
         ref mut pic,
@@ -2279,27 +2324,19 @@ fn test_storage_limits_and_freeing_space() {
         ..
     } = test_env;
 
-    let temp_20mb_path = "./temp_20mb.bin";
-    let temp_55mb_path = "./temp_55mb.bin";
-    let temp_15mb_path = "./temp_15mb.bin";
-
-    // Create 20 MB file (filled with zeros)
-    std::fs::write(temp_20mb_path, vec![0u8; 20_000_000]).unwrap();
-    // Create 55 MB file (exceeds the 50 MB canister limit)
-    std::fs::write(temp_55mb_path, vec![0u8; 55_000_000]).unwrap();
-    // Create 15 MB file (will fit in pre-allocated space after delete)
-    std::fs::write(temp_15mb_path, vec![0u8; 15_000_000]).unwrap();
-
     let upload_path_20mb = "/temp_20mb.bin";
-    let upload_path_55mb = "/temp_55mb.bin";
     let upload_path_15mb = "/temp_15mb.bin";
 
-    // 2. Upload the 20 MB file (should succeed, expected size ~20MB <= 50MB)
-    let buffer_20mb = upload_file(
+    // 20 MB of zeros, and 15 MB that will fit in the pages it frees up.
+    let data_20mb = vec![0u8; 20_000_000];
+    let data_15mb = vec![0u8; 15_000_000];
+
+    // 2. Upload the 20 MB file (well inside the ceiling, so it must succeed)
+    let buffer_20mb = upload_bytes(
         pic,
         controller,
         collection_canister_id,
-        temp_20mb_path,
+        &data_20mb,
         upload_path_20mb,
     );
     assert!(buffer_20mb.is_ok(), "20 MB file upload should succeed");
@@ -2359,22 +2396,12 @@ fn test_storage_limits_and_freeing_space() {
     println!("Initial stored files size: {}", initial_stored_files_size);
     assert_eq!(initial_stored_files_size, 20_000_000);
 
-    // 5. Try to initialize upload of the 55 MB file (should FAIL/REJECT because 55MB > 50MB canister limit)
-    let init_result = crate::client::core_nft::init_upload(
-        pic,
-        controller,
-        collection_canister_id,
-        &core_nft_common::types::management::init_upload::Args {
-            file_path: upload_path_55mb.to_string(),
-            file_hash: Some("dummy_hash".to_string()),
-            file_size: 55_000_000,
-            chunk_size: None,
-        },
-    );
-    println!("DEBUG: init_result = {:?}", init_result);
+    // The ceiling is what the canister will accept, minus what it has already
+    // allocated. Read it back rather than hardcoding it.
+    let free_after_20mb = free_storage_bytes(pic, controller, storage_canister_id);
     assert!(
-        init_result.is_err(),
-        "55 MB file upload should fail due to storage limit"
+        free_after_20mb > 0,
+        "a canister holding 20 MB must still have room under the 500 MiB ceiling"
     );
 
     // 6. Delete the 20 MB file directly from the storage canister
@@ -2402,11 +2429,11 @@ fn test_storage_limits_and_freeing_space() {
     assert_eq!(after_remove_stored_files_size, 0);
 
     // 7. Upload the 15 MB file (should SUCCEED now and fit inside the pre-allocated pages)
-    let buffer_15mb_success = upload_file(
+    let buffer_15mb_success = upload_bytes(
         pic,
         controller,
         collection_canister_id,
-        temp_15mb_path,
+        &data_15mb,
         upload_path_15mb,
     );
     assert!(
@@ -2439,20 +2466,57 @@ fn test_storage_limits_and_freeing_space() {
         "The reused file must be stored in the same canister"
     );
 
-    // 8. Clean up temporary files from disk
-    let _ = std::fs::remove_file(temp_20mb_path);
-    let _ = std::fs::remove_file(temp_55mb_path);
-    let _ = std::fs::remove_file(temp_15mb_path);
+    // 8. An upload too large to store is still refused.
+    //
+    // The size that does it is `MAX_CONTENT_SIZE + 1`, not something over the
+    // storage canister's capacity ceiling. The collection caps a single upload at
+    // 100 MiB before it consults any sub-canister, and that is below the 500 MiB
+    // test-mode ceiling, so a size the collection would accept always fits a fresh
+    // sub-canister. This test used to use 55 MB against a 50 MiB ceiling, where
+    // the sub-canister was the binding limit.
+    //
+    // It is kept last on purpose. The `MAX_CONTENT_SIZE` check refuses inside
+    // `read_state`, so this particular rejection spawns nothing. A rejection on
+    // capacity grounds does not: it runs through `create_canister` before giving
+    // up, and leaves a second empty canister behind. The assertions above are
+    // about which of the collection's canisters a file lands on, so keeping any
+    // rejection after them removes that coupling whichever limit is doing the
+    // refusing.
+    let upload_path_oversize = "/temp_oversize.bin";
+    let init_result = crate::client::core_nft::init_upload(
+        pic,
+        controller,
+        collection_canister_id,
+        &core_nft_common::types::management::init_upload::Args {
+            file_path: upload_path_oversize.to_string(),
+            file_hash: Some("dummy_hash".to_string()),
+            file_size: MAX_CONTENT_SIZE + 1,
+            chunk_size: None,
+        },
+    );
+    println!("DEBUG: init_result = {:?}", init_result);
+    assert!(
+        init_result.is_err(),
+        "an upload over the maximum content size must be rejected"
+    );
 }
 
+/// A file that no longer fits the current storage canister is placed in a new one.
+///
+/// Splitting is driven entirely by the storage canister rejecting `init_upload`
+/// once the declared size exceeds `ceiling - stable_size()`. The collection reads
+/// any rejection as "that one is full", moves to the next sub-canister and spawns
+/// one when it runs out. Nothing scales that ceiling down for a test:
+/// `max_storage_size_for` is compiled into the storage wasm, and the collection's
+/// `max_canister_storage_threshold` init arg is stored in state but never read on
+/// the upload path. So proving the split means genuinely filling a canister to its
+/// 500 MiB test-mode ceiling, and this is the only test that pays for it.
+///
+/// The fill uses 32 MiB files rather than one large one. Chunks accumulate in the
+/// canister's heap until finalize assembles them into a single buffer, so one
+/// 500 MiB upload would peak above a gigabyte of heap.
 #[test]
 fn test_storage_threshold_splitting() {
-    let temp_30mb_path = "./temp_30mb.bin";
-    std::fs::write(temp_30mb_path, vec![0u8; 30_000_000]).unwrap();
-
-    let upload_path_file1 = "/temp_file1.bin";
-    let upload_path_file2 = "/temp_file2.bin";
-
     let mut test_env = default_test_setup();
     let TestEnv {
         ref mut pic,
@@ -2461,38 +2525,70 @@ fn test_storage_threshold_splitting() {
         ..
     } = test_env;
 
-    // Upload first 30 MB file
-    let _ = upload_file(
-        pic,
-        controller,
-        collection_canister_id,
-        temp_30mb_path,
-        upload_path_file1,
-    )
-    .unwrap();
+    const FILLER_BYTES: usize = 32 * 1024 * 1024;
+    let filler = vec![0u8; FILLER_BYTES];
 
-    // Upload second 30 MB file (since 30MB + 30MB = 60MB > 50MB limit, it should spawn canister 2)
-    let _ = upload_file(
-        pic,
-        controller,
-        collection_canister_id,
-        temp_30mb_path,
-        upload_path_file2,
-    )
-    .unwrap();
+    // The first upload spawns the canister this test fills.
+    let first_path = "/split_filler_0.bin";
+    upload_bytes(pic, controller, collection_canister_id, &filler, first_path)
+        .expect("the first upload should succeed");
 
-    // Resolve storage canister IDs
-    let url = pic.auto_progress();
-    let id1 = resolve_storage_canister_id(url.as_str(), collection_canister_id, upload_path_file1);
-    let id2 = resolve_storage_canister_id(url.as_str(), collection_canister_id, upload_path_file2);
+    let first_canister =
+        storage_canister_for_path(pic, controller, collection_canister_id, first_path);
 
-    // Asserts they split into different canisters because the 50 MB threshold was exceeded
-    assert_ne!(
-        id1, id2,
-        "The second 30 MB file should trigger splitting to canister 2"
+    // Keep loading it while there is room for another whole file. Every file that
+    // still fits has to stay put: a split before the canister is full would mean
+    // the collection is reading some other rejection as "full".
+    let mut index = 1;
+    loop {
+        let free = free_storage_bytes(pic, controller, first_canister);
+        println!("free bytes on {first_canister} before upload {index}: {free}");
+
+        if free < FILLER_BYTES as u128 {
+            break;
+        }
+
+        assert!(
+            index < 32,
+            "the canister is not filling up: after {index} files of {FILLER_BYTES} bytes it still reports {free} bytes free"
+        );
+
+        let path = format!("/split_filler_{index}.bin");
+        upload_bytes(pic, controller, collection_canister_id, &filler, &path)
+            .unwrap_or_else(|e| panic!("filler upload {index} should succeed: {e}"));
+
+        assert_eq!(
+            storage_canister_for_path(pic, controller, collection_canister_id, &path),
+            first_canister,
+            "a file that still fits must stay in the canister it was offered to"
+        );
+
+        index += 1;
+    }
+
+    assert!(
+        index > 1,
+        "the ceiling must leave room for more than one file, otherwise this proves nothing"
     );
 
-    let _ = std::fs::remove_file(temp_30mb_path);
+    // The next file does not fit, so the collection has to place it elsewhere.
+    let overflow_path = "/split_overflow.bin";
+    upload_bytes(
+        pic,
+        controller,
+        collection_canister_id,
+        &filler,
+        overflow_path,
+    )
+    .expect("an upload that overflows a canister must still succeed, in a new one");
+
+    let overflow_canister =
+        storage_canister_for_path(pic, controller, collection_canister_id, overflow_path);
+
+    assert_ne!(
+        overflow_canister, first_canister,
+        "a file that no longer fits must be split into a new storage canister"
+    );
 }
 
 fn resolve_storage_canister_id(
@@ -2540,6 +2636,23 @@ fn resolve_storage_canister_id(
     .unwrap()
 }
 
+/// The size limit on a single upload is decided at `init_upload`, from the
+/// declared size alone, and it is inclusive.
+///
+/// The binding limit is the collection's own `MAX_CONTENT_SIZE` (100 MiB), which
+/// `init_upload` checks before it consults any storage sub-canister. It sits well
+/// under a test-mode storage canister's 500 MiB capacity ceiling
+/// (`TEST_MODE_STORAGE_CEILING_BYTES`), so no upload the collection will accept
+/// can be too large for a fresh sub-canister to hold. That is the difference from
+/// when this test was written against a 50 MiB ceiling, where the sub-canister was
+/// the binding limit and a 55 MB file was refused by the whole fleet.
+///
+/// The ceiling still decides where a file goes once a canister has filled up, and
+/// that is covered by `test_storage_threshold_splitting`, which is the one test
+/// that pays for filling one.
+///
+/// Nothing here moves any bytes: `init_upload` rules on the declared size, so the
+/// declaration is the whole behaviour under test.
 #[test]
 fn test_storage_edge_cases() {
     let mut test_env: TestEnv = default_test_setup();
@@ -2550,76 +2663,65 @@ fn test_storage_edge_cases() {
         ..
     } = test_env;
 
-    // Use exact free storage limit of an empty canister (43,974,656 bytes)
-    let limit_bytes = 43_974_656u64;
+    // --- A file of exactly the maximum content size is accepted ---
+    let exact_path = "/edge_exact_limit.bin";
+    crate::client::core_nft::init_upload(
+        pic,
+        controller,
+        collection_canister_id,
+        &core_nft_common::types::management::init_upload::Args {
+            file_path: exact_path.to_string(),
+            file_hash: Some("dummy_hash".to_string()),
+            file_size: MAX_CONTENT_SIZE,
+            chunk_size: None,
+        },
+    )
+    .expect("a file of exactly the maximum content size must be accepted");
 
-    // --- Case 1: Exactly limit + 1 byte upload (fails/rejected) ---
+    // Acceptance means a storage sub-canister took the reservation, so the upload
+    // is now in progress rather than unknown. (The path cannot be resolved to its
+    // canister over HTTP yet: the collection only serves a redirect once an upload
+    // is finalized.)
+    let status = get_upload_status(
+        pic,
+        controller,
+        collection_canister_id,
+        &exact_path.to_string(),
+    );
+    assert!(
+        matches!(status, Ok(UploadState::Init) | Ok(UploadState::InProgress)),
+        "the accepted upload must be registered as in progress, got {status:?}"
+    );
+
+    cancel_upload(
+        pic,
+        controller,
+        collection_canister_id,
+        &core_nft_common::types::management::cancel_upload::Args {
+            file_path: exact_path.to_string(),
+        },
+    )
+    .expect("the reserved upload should cancel cleanly");
+
+    // --- One byte over is rejected, and rejected by the collection itself ---
     let init_result = crate::client::core_nft::init_upload(
         pic,
         controller,
         collection_canister_id,
         &core_nft_common::types::management::init_upload::Args {
-            file_path: "/temp_limit_1b.bin".to_string(),
+            file_path: "/edge_over_limit.bin".to_string(),
             file_hash: Some("dummy_hash".to_string()),
-            file_size: limit_bytes + 1,
+            file_size: MAX_CONTENT_SIZE + 1,
             chunk_size: None,
         },
     );
     assert!(
-        init_result.is_err(),
-        "Exactly limit + 1 byte file upload must fail"
+        matches!(
+            init_result,
+            Err(core_nft_common::types::management::init_upload::InitUploadError::ContentTooLarge)
+        ),
+        "one byte over the maximum content size must be refused by the collection, got {init_result:?}"
     );
-
-    // --- Case 2: Exactly limit upload (succeeds) ---
-    let temp_limit_path = "./temp_limit.bin";
-    std::fs::write(temp_limit_path, vec![0u8; limit_bytes as usize]).unwrap();
-    let upload_path_limit = "/temp_limit.bin";
-
-    let upload_result = upload_file(
-        pic,
-        controller,
-        collection_canister_id,
-        temp_limit_path,
-        upload_path_limit,
-    );
-    assert!(upload_result.is_ok(), "Exactly limit upload must succeed");
-
-    // Resolve the canister ID for the limit file
-    let url = pic.auto_progress();
-    let url_str = url.to_string();
-    let storage_canister_id =
-        resolve_storage_canister_id(url_str.as_str(), collection_canister_id, upload_path_limit);
-
-    // --- Case 3: Splitting when filling close to the limit ---
-    // The canister has ~2.03 MB of remaining space after the 43,974,656 bytes upload.
-    // Uploading a 3 MB (3,000,000 bytes) file will exceed this remaining space, triggering splitting to a new canister!
-    let temp_3mb_path = "./temp_3mb.bin";
-    std::fs::write(temp_3mb_path, vec![0u8; 3_000_000]).unwrap();
-    let upload_path_3mb = "/temp_3mb.bin";
-
-    let upload_3mb_result = upload_file(
-        pic,
-        controller,
-        collection_canister_id,
-        temp_3mb_path,
-        upload_path_3mb,
-    );
-    assert!(
-        upload_3mb_result.is_ok(),
-        "3 MB file upload after near-full canister should succeed via splitting"
-    );
-
-    // Assert that the 3 MB file was stored in a new canister
-    let new_canister_id =
-        resolve_storage_canister_id(url_str.as_str(), collection_canister_id, upload_path_3mb);
-    assert_ne!(
-        new_canister_id, storage_canister_id,
-        "3 MB file must be split to a new storage canister"
-    );
-
-    // Cleanup temporary files
-    let _ = std::fs::remove_file(temp_limit_path);
-    let _ = std::fs::remove_file(temp_3mb_path);
 }
 
 /// An upload that declares no hash must still land in a storage canister and
