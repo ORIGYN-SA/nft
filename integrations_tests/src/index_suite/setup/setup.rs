@@ -1,6 +1,6 @@
 use crate::index_suite::setup::setup_core::setup_core_canister;
 use crate::index_suite::setup::setup_index::setup_index_canister;
-use crate::utils::random_principal;
+use crate::utils::{pin_clock_to_wall_time, random_principal};
 use bity_ic_types::{CanisterId, Milliseconds};
 use candid::{CandidType, Deserialize, Principal};
 use core_nft_api::init::InitArgs;
@@ -86,6 +86,8 @@ impl TestEnvBuilder {
             .with_nns_subnet()
             .with_system_subnet()
             .build();
+
+        pin_clock_to_wall_time(&pic);
 
         self.collection_id = pic.create_canister_with_settings(Some(self.controller.clone()), None);
         self.index_id = pic.create_canister_with_settings(Some(self.controller.clone()), None);

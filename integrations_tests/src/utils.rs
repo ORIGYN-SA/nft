@@ -76,6 +76,25 @@ pub fn upload_file(
     file.read_to_end(&mut buffer)
         .map_err(|e| format!("Failed to read file: {:?}", e))?;
 
+    upload_bytes(pic, controller, storage_canister_id, &buffer, upload_path)?;
+
+    Ok(buffer)
+}
+
+/// Uploads bytes already held in memory through the same init / chunk / finalize
+/// sequence as [`upload_file`], without staging a file on disk first.
+///
+/// The tests that have to fill a storage canister up to its capacity ceiling move
+/// hundreds of megabytes. Writing that into the working tree and reading it back
+/// leaves large artifacts behind whenever a test fails part way through, which is
+/// how `temp_20mb.bin` and friends kept turning up as untracked files.
+pub fn upload_bytes(
+    pic: &mut PocketIc,
+    controller: Principal,
+    storage_canister_id: Principal,
+    buffer: &[u8],
+    upload_path: &str,
+) -> Result<(), String> {
     let file_size = buffer.len() as u64;
 
     // Calculate SHA-256 hash
@@ -104,7 +123,9 @@ pub fn upload_file(
 
     while offset < buffer.len() {
         let chunk = &buffer[offset..(offset + (chunk_size as usize)).min(buffer.len())];
-        let store_chunk_resp = store_chunk(
+        // Deliberately not logged: a fill-to-capacity upload is hundreds of
+        // chunks, and one line each buries everything else in the test output.
+        store_chunk(
             pic,
             controller,
             storage_canister_id,
@@ -115,8 +136,6 @@ pub fn upload_file(
             }),
         )
         .map_err(|e| format!("store_chunk error: {:?}", e))?;
-
-        println!("store_chunk_resp: {:?}", store_chunk_resp);
 
         offset += chunk_size as usize;
         chunk_index += 1;
@@ -134,7 +153,7 @@ pub fn upload_file(
 
     println!("finalize_upload_resp: {:?}", finalize_upload_resp);
 
-    Ok(buffer)
+    Ok(())
 }
 
 pub fn upload_metadata(
@@ -175,6 +194,98 @@ pub fn upload_metadata(
 }
 
 pub const T: Cycles = 1_000_000_000_000;
+
+/// Capacity ceiling of a storage sub-canister created in test mode.
+///
+/// Mirrors `max_storage_size_for(true)` in the storage canister
+/// (`canister/src/lifecycle/mod.rs`), which is compiled into the wasm the tests
+/// install and is not settable through the init args. The collection's own
+/// `max_canister_storage_threshold` init arg is stored in state but never read
+/// by `StorageSubCanisterManager::init_upload`, so it cannot be used to lower
+/// this for a test.
+pub const TEST_MODE_STORAGE_CEILING_BYTES: u128 = 500 * 1024 * 1024;
+
+/// Bytes a storage sub-canister will still accept.
+///
+/// The canister rejects an `init_upload` whose declared size exceeds
+/// `ceiling - stable_size()`, and stable memory only ever grows, so this is what
+/// the splitting decision actually turns on. Reading it back rather than
+/// hardcoding it keeps the tests honest about a canister that has already been
+/// written to, and about any change to the wasm's pre-allocated pages.
+pub fn free_storage_bytes(
+    pic: &PocketIc,
+    controller: Principal,
+    storage_canister_id: Principal,
+) -> u128 {
+    let used = crate::client::storage::get_storage_size(pic, controller, storage_canister_id, &());
+    TEST_MODE_STORAGE_CEILING_BYTES.saturating_sub(used)
+}
+
+/// Resolves the storage sub-canister holding `upload_path` by asking the
+/// collection directly.
+///
+/// The collection holds no file bytes and answers a media path with a 307 to the
+/// sub-canister that does. Reading that through a plain query call rather than
+/// `auto_progress()` plus an HTTP gateway keeps the instance on its deterministic
+/// tick loop, which matters for a test that has to make hundreds of update calls
+/// in a loop and check where each one landed.
+pub fn storage_canister_for_path(
+    pic: &PocketIc,
+    controller: Principal,
+    collection_canister_id: Principal,
+    upload_path: &str,
+) -> Principal {
+    let request = bity_ic_storage_canister_api::queries::http_request::Args::get(upload_path)
+        .with_certificate_version(2)
+        .build();
+
+    let response =
+        crate::client::storage::http_request(pic, controller, collection_canister_id, &request);
+
+    assert_eq!(
+        response.status_code, 307,
+        "{} must redirect to the storage canister holding it, got {}",
+        upload_path, response.status_code
+    );
+
+    let location = response
+        .headers
+        .iter()
+        .find(|(name, _)| name.eq_ignore_ascii_case("location"))
+        .map(|(_, value)| value.clone())
+        .unwrap_or_else(|| panic!("redirect for {} carried no location header", upload_path));
+
+    Principal::from_str(
+        location
+            .split('.')
+            .next()
+            .unwrap()
+            .replace("http://", "")
+            .replace("https://", "")
+            .as_str(),
+    )
+    .unwrap_or_else(|e| panic!("location {location} is not a canister url: {e}"))
+}
+
+/// Moves a fresh PocketIC instance from its 2021 genesis clock up to (roughly)
+/// wall time, before any canister exists.
+///
+/// `auto_progress()` hands the instance to a real-time ticker, which snaps the
+/// clock to the host date. A canister created while the instance still sat in
+/// 2021 is then charged for every year in between in a single round, and a
+/// test-mode storage canister holds 0.5 T (`INITIAL_CYCLES_BALANCE_TEST_MODE`),
+/// which does not survive that. It drains to zero, the IC uninstalls it, and the
+/// next call against it comes back rejected rather than answered.
+///
+/// The instance is left a day behind wall time rather than exactly on it: setup
+/// goes on to call `advance_time` twice (10 min, then 30 min) and `auto_progress`
+/// only moves the clock forward, so the instance has to stay behind the host for
+/// the snap to be monotonic. A day of retroactive storage cost is about 1.3 B
+/// cycles, roughly 0.26% of the endowment.
+pub fn pin_clock_to_wall_time(pic: &PocketIc) {
+    let one_day_ago = std::time::SystemTime::now() - Duration::from_secs(24 * 60 * 60);
+    pic.set_time(pocket_ic::Time::from(one_day_ago));
+}
 
 // Helper function to setup HTTP client
 pub fn setup_http_client(pic: &mut PocketIc) -> (tokio::runtime::Runtime, HttpGatewayClient) {
@@ -294,8 +405,7 @@ pub fn fetch_metadata_json(
 
         println!("Canister_id: {}", canister_id);
 
-        let redirected_response =
-            raw_get(rt, http_gateway, canister_id, location_str);
+        let redirected_response = raw_get(rt, http_gateway, canister_id, location_str);
 
         println!(
             "Status of the first redirection: {}",
