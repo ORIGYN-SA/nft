@@ -148,6 +148,7 @@ fn test_legacy_upload_is_still_served_after_upgrade() {
             vetkd_key_name: None,
             vetkd_context: None,
             base_url: Some("https://{canister_id}.raw.icp0.io".to_string()),
+            storage_cycles: None,
         }),
         controller,
     );
@@ -325,6 +326,7 @@ fn test_private_content_is_served_and_survives_upgrade() {
             vetkd_key_name: None,
             vetkd_context: None,
             base_url: None,
+            storage_cycles: None,
         }),
         controller,
     );

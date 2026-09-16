@@ -60,6 +60,7 @@ fn init(args: Args) {
                 init_args.base_url.clone(),
                 init_args.vetkd_key_name.clone(),
                 init_args.vetkd_context.clone(),
+                init_args.storage_cycles.clone(),
             );
 
             if env.is_test_mode() {

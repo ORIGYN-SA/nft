@@ -20,7 +20,10 @@ use std::collections::HashMap;
 const MAX_STORAGE_SIZE: u128 = 500 * 1024 * 1024 * 1024; // 500 GiB TODO maybe we should put a be less here ?
 const MAX_FILE_SIZE: u128 = 2 * 1024 * 1024 * 1024; // 2 GiB
 
-pub const INITIAL_CYCLES_BALANCE: u128 = 5_000_000_000_000; // 5T cycles
+// Paid out of the parent collection's balance on top of the 0.5T creation fee.
+// At 5T a freshly created collection fell under claimlink's 5T top-up floor and
+// was topped up within the hour. 2T stays above canfund's 1T refill threshold.
+pub const INITIAL_CYCLES_BALANCE: u128 = 2_000_000_000_000; // 2T cycles
 pub const RESERVED_CYCLES_BALANCE: u128 = 2_000_000_000_000; // 2T cycles
 
 // A test-mode storage canister burns ~1.3B cycles/day, so 0.5T is over a year of
@@ -36,41 +39,81 @@ pub const RESERVED_CYCLES_BALANCE_TEST_MODE: u128 = 100_000_000_000; // 0.1T cyc
 
 pub use bity_ic_storage_canister_api::lifecycle::Args as ArgsStorage;
 
+// Every tick is a `canister_status` call per storage child, paid for by the
+// collection, so it runs hourly rather than every minute.
+const FUNDING_INTERVAL_SECS: u64 = 3600;
+
+/// Cycle settings for storage sub-canisters, passed in the collection's init and
+/// upgrade args. A `None` field falls back to the default for the mode.
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug, Default)]
+pub struct StorageCyclesConfig {
+    /// Cycles a new storage canister is created with, paid by the collection.
+    pub initial_cycles: Option<u128>,
+    /// `reserved_cycles_limit` of a new storage canister.
+    pub reserved_cycles_limit: Option<u128>,
+    /// How often the collection checks its storage canisters' balances.
+    pub funding_interval_secs: Option<u64>,
+    /// Balance under which a storage canister is refilled.
+    pub funding_min_cycles: Option<u128>,
+    /// Cycles sent per refill.
+    pub funding_fund_cycles: Option<u128>,
+}
+
+impl StorageCyclesConfig {
+    /// `(initial_cycles, reserved_cycles_limit)` for a spawn, defaults filled in.
+    pub fn spawn_cycles(&self, test_mode: bool) -> (u128, u128) {
+        let (initial_cycles, reserved_cycles) = if test_mode {
+            (
+                INITIAL_CYCLES_BALANCE_TEST_MODE,
+                RESERVED_CYCLES_BALANCE_TEST_MODE,
+            )
+        } else {
+            (INITIAL_CYCLES_BALANCE, RESERVED_CYCLES_BALANCE)
+        };
+
+        (
+            self.initial_cycles.unwrap_or(initial_cycles),
+            self.reserved_cycles_limit.unwrap_or(reserved_cycles),
+        )
+    }
+
+    /// Canfund options for storage sub-canisters. `SubCanisterManager.funding_config`
+    /// is `#[serde(skip)]`, so this must be re-applied after every upgrade, not just
+    /// at init.
+    ///
+    /// Test mode gets its own thresholds, scaled to `INITIAL_CYCLES_BALANCE_TEST_MODE`.
+    /// Under the production settings a test-mode storage canister was created below
+    /// canfund's 1 TC floor and refilled to 3 TC the instant it existed, out of the
+    /// parent collection's balance. That drop pushed the collection under the manager's
+    /// top-up floor, which is how a staging collection ended up costing 7.5 TC. Keeping
+    /// the floor and refill below the endowment leaves it at what it was given.
+    pub fn funding_config(&self, test_mode: bool) -> FundManagerOptions {
+        let (min_cycles, fund_cycles) = if test_mode {
+            (300_000_000_000, 500_000_000_000)
+        } else {
+            (1_000_000_000_000, 2_000_000_000_000)
+        };
+
+        FundManagerOptions::new()
+            .with_interval_secs(self.funding_interval_secs.unwrap_or(FUNDING_INTERVAL_SECS))
+            .with_strategy(FundStrategy::BelowThreshold(
+                CyclesThreshold::new()
+                    .with_min_cycles(self.funding_min_cycles.unwrap_or(min_cycles))
+                    .with_fund_cycles(self.funding_fund_cycles.unwrap_or(fund_cycles)),
+            ))
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct StorageSubCanisterManager {
     pub sub_canister_manager: bity_ic_subcanister_manager::SubCanisterManager<StorageCanister>,
     init_args: ArgsStorage,
     upgrade_args: ArgsStorage,
-}
-
-/// Canfund options for storage sub-canisters. `SubCanisterManager.funding_config`
-/// is `#[serde(skip)]`, so this must be re-applied after every upgrade, not just
-/// at init.
-///
-/// Test mode gets its own thresholds, scaled to `INITIAL_CYCLES_BALANCE_TEST_MODE`.
-/// Under the production settings a test-mode storage canister was created below
-/// canfund's 1 TC floor and refilled to 3 TC the instant it existed, out of the
-/// parent collection's balance. That drop pushed the collection under the manager's
-/// top-up floor, which is how a staging collection ended up costing 7.5 TC. Keeping
-/// the floor and refill below the endowment leaves it at what it was given.
-///
-/// The interval is also relaxed in test mode: every tick is a `canister_status`
-/// call per storage child, paid for by the collection, and on staging that dominates
-/// the collection's cycle burn.
-pub fn default_funding_config(test_mode: bool) -> FundManagerOptions {
-    let (interval_secs, min_cycles, fund_cycles) = if test_mode {
-        (3600, 300_000_000_000, 500_000_000_000)
-    } else {
-        (60, 1_000_000_000_000, 2_000_000_000_000)
-    };
-
-    FundManagerOptions::new()
-        .with_interval_secs(interval_secs)
-        .with_strategy(FundStrategy::BelowThreshold(
-            CyclesThreshold::new()
-                .with_min_cycles(min_cycles)
-                .with_fund_cycles(fund_cycles),
-        ))
+    // The last cycle settings passed in init or upgrade args. `None` on a
+    // collection that never received any: its spawn numbers are whatever it was
+    // created with, and upgrades leave them alone.
+    #[serde(default)]
+    cycles_config: Option<StorageCyclesConfig>,
 }
 
 impl StorageSubCanisterManager {
@@ -81,13 +124,14 @@ impl StorageSubCanisterManager {
         sub_canisters: HashMap<Principal, Box<StorageCanister>>,
         controllers: Vec<Principal>,
         authorized_principal: Vec<Principal>,
-        initial_cycles: u128,
-        reserved_cycles: u128,
+        cycles_config: Option<StorageCyclesConfig>,
         test_mode: bool,
         commit_hash: String,
         wasm: Vec<u8>,
     ) -> Self {
-        let funding_config = default_funding_config(test_mode);
+        let resolved = cycles_config.clone().unwrap_or_default();
+        let (initial_cycles, reserved_cycles) = resolved.spawn_cycles(test_mode);
+        let funding_config = resolved.funding_config(test_mode);
 
         Self {
             sub_canister_manager: bity_ic_subcanister_manager::SubCanisterManager::new(
@@ -104,6 +148,38 @@ impl StorageSubCanisterManager {
             ),
             init_args,
             upgrade_args,
+            cycles_config,
+        }
+    }
+
+    pub fn cycles_config(&self) -> Option<&StorageCyclesConfig> {
+        self.cycles_config.as_ref()
+    }
+
+    /// Re-applies the cycle settings after an upgrade. A given `cycles_config`
+    /// replaces the stored one. With neither, the spawn numbers the collection
+    /// already has are left alone. `funding_config` is `#[serde(skip)]`, so it is
+    /// rebuilt in every case.
+    pub fn apply_cycles_config(
+        &mut self,
+        cycles_config: Option<StorageCyclesConfig>,
+        test_mode: bool,
+    ) {
+        if cycles_config.is_some() {
+            self.cycles_config = cycles_config;
+        }
+
+        let manager = &mut self.sub_canister_manager;
+        match &self.cycles_config {
+            Some(config) => {
+                let (initial_cycles, reserved_cycles) = config.spawn_cycles(test_mode);
+                manager.initial_cycles = initial_cycles;
+                manager.reserved_cycles = reserved_cycles;
+                manager.funding_config = config.funding_config(test_mode);
+            }
+            None => {
+                manager.funding_config = StorageCyclesConfig::default().funding_config(test_mode);
+            }
         }
     }
 

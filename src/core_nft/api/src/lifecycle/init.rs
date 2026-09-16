@@ -1,6 +1,7 @@
 use bity_ic_types::BuildVersion;
 use candid::{CandidType, Nat};
 use core_nft_common::types::permissions::PermissionManager;
+use core_nft_common::types::sub_canister::StorageCyclesConfig;
 use core_nft_common::types::value_custom::CustomValue as Value;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -36,4 +37,6 @@ pub struct InitArgs {
     pub base_url: Option<String>,
     pub vetkd_key_name: String,
     pub vetkd_context: String,
+    /// Cycle settings for storage sub-canisters. `None` uses the defaults.
+    pub storage_cycles: Option<StorageCyclesConfig>,
 }
