@@ -2674,6 +2674,7 @@ fn test_icrc37_approvals_persistence_after_upgrade() {
                 vetkd_key_name: None,
                 vetkd_context: None,
                 base_url: None,
+                storage_cycles: None,
             });
 
             upgrade_core_canister(

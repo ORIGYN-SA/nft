@@ -881,7 +881,7 @@ fn test_management_cycles() {
     //
     // The endowment is `INITIAL_CYCLES_BALANCE_TEST_MODE` (0.5 T). canfund's
     // test-mode floor is 0.3 T with a 0.5 T refill, both inline in
-    // `default_funding_config` in core_nft_common, and the point of those numbers
+    // `StorageCyclesConfig::funding_config` in core_nft_common, and the point of those numbers
     // is that a healthy storage canister sits above the floor and is therefore
     // never topped up out of the collection's balance. So the assertion is that
     // the canister is still comfortably above the floor, not that it holds some

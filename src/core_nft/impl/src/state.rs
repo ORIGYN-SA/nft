@@ -9,12 +9,8 @@ use bity_ic_utils::env::{CanisterEnv, Environment};
 use bity_ic_utils::memory::MemorySize;
 use core_nft_api::init::InitApprovalsArg;
 use core_nft_common::types::permissions::{Permission, PermissionManager};
-use core_nft_common::types::sub_canister::{
-    StorageSubCanisterManager, INITIAL_CYCLES_BALANCE, RESERVED_CYCLES_BALANCE,
-};
-use core_nft_common::types::{
-    sub_canister, INITIAL_CYCLES_BALANCE_TEST_MODE, RESERVED_CYCLES_BALANCE_TEST_MODE,
-};
+use core_nft_common::types::sub_canister;
+use core_nft_common::types::sub_canister::{StorageCyclesConfig, StorageSubCanisterManager};
 use core_nft_common::PrivateContentConfig;
 use core_nft_common::PrivateContentSystem;
 use core_nft_common::PublicContentSystem;
@@ -126,6 +122,7 @@ impl Data {
         base_url: Option<String>,
         vetkd_key_name: String,
         vetkd_context: String,
+        storage_cycles: Option<StorageCyclesConfig>,
     ) -> Self {
         let mut authorized_principals = vec![];
 
@@ -141,15 +138,6 @@ impl Data {
                 None => {}
             }
         }
-
-        let (init_cycles, reserve_cycles) = if test_mode {
-            (
-                INITIAL_CYCLES_BALANCE_TEST_MODE,
-                RESERVED_CYCLES_BALANCE_TEST_MODE,
-            )
-        } else {
-            (INITIAL_CYCLES_BALANCE, RESERVED_CYCLES_BALANCE)
-        };
 
         let sub_canister_manager = StorageSubCanisterManager::new(
             sub_canister::ArgsStorage::Init(InitArgs {
@@ -170,8 +158,7 @@ impl Data {
             HashMap::new(),
             vec![],
             authorized_principals.clone(),
-            init_cycles,
-            reserve_cycles,
+            storage_cycles,
             test_mode.clone(),
             commit_hash.clone(),
             STORAGE_WASM.to_vec(),

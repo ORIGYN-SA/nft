@@ -333,6 +333,8 @@ type InitArgs = record {
   supply_cap : opt nat;
   tx_window : opt nat;
   test_mode : bool;
+  // Cycle settings for storage sub-canisters. `None` uses the defaults.
+  storage_cycles : opt StorageCyclesConfig;
   default_take_value : opt nat;
   max_canister_storage_threshold : opt nat;
   logo : opt text;
@@ -492,6 +494,20 @@ type RevokeTokenApprovalResponse = variant {
   Ok : nat;
   Err : RevokeTokenApprovalError;
 };
+// Cycle settings for storage sub-canisters, passed in the collection's init and
+// upgrade args. A `None` field falls back to the default for the mode.
+type StorageCyclesConfig = record {
+  // Cycles a new storage canister is created with, paid by the collection.
+  initial_cycles : opt nat;
+  // `reserved_cycles_limit` of a new storage canister.
+  reserved_cycles_limit : opt nat;
+  // How often the collection checks its storage canisters' balances.
+  funding_interval_secs : opt nat64;
+  // Cycles sent per refill.
+  funding_fund_cycles : opt nat;
+  // Balance under which a storage canister is refilled.
+  funding_min_cycles : opt nat;
+};
 type StoreChunkError = variant {
   InvalidFilePath;
   StorageCanisterError : text;
@@ -562,6 +578,9 @@ type UpdateNftMetadataError = variant {
 };
 type UpgradeArgs = record {
   base_url : opt text;
+  // Replaces the stored cycle settings for storage sub-canisters. `None`
+  // keeps whatever the collection already has.
+  storage_cycles : opt StorageCyclesConfig;
   version : BuildVersion;
   vetkd_context : opt text;
   commit_hash : text;

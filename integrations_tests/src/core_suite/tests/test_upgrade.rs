@@ -204,6 +204,7 @@ fn test_upgrade_storage_canister() {
         vetkd_key_name: None,
         vetkd_context: None,
         base_url: Some("test".to_string()),
+        storage_cycles: None,
     });
 
     upgrade_core_canister(
@@ -276,6 +277,7 @@ fn test_upgrade_storage_canister() {
         vetkd_key_name: None,
         vetkd_context: None,
         base_url: None,
+        storage_cycles: None,
     });
     upgrade_core_canister(pic, collection_canister_id, repeat_upgrade_args, controller);
     pic.advance_time(Duration::from_secs(1));

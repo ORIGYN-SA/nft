@@ -3,12 +3,17 @@ use bity_ic_types::{BuildVersion, CanisterId, Milliseconds};
 use candid::Nat;
 use core_nft_api::lifecycle::init::{InitApprovalsArg, InitArgs};
 use core_nft_common::types::permissions::{Permission, PermissionManager};
+use core_nft_common::types::sub_canister::StorageCyclesConfig;
 use std::collections::HashMap;
 
 pub mod setup;
 pub mod setup_core;
 
 pub fn default_test_setup() -> TestEnv {
+    test_setup_with_storage_cycles(None)
+}
+
+pub fn test_setup_with_storage_cycles(storage_cycles: Option<StorageCyclesConfig>) -> TestEnv {
     let mut test_env = TestEnvBuilder::new();
 
     let mut user_permissions = HashMap::new();
@@ -51,6 +56,7 @@ pub fn default_test_setup() -> TestEnv {
         base_url: None,
         vetkd_key_name: "dfx_test_key".to_string(),
         vetkd_context: "vetkd_context".to_string(),
+        storage_cycles,
     };
 
     test_env.build(init_args)
@@ -99,6 +105,7 @@ pub fn old_test_setup() -> TestEnv {
         base_url: None,
         vetkd_key_name: "dfx_test_key".to_string(),
         vetkd_context: "vetkd_context".to_string(),
+        storage_cycles: None,
     };
 
     test_env.build_old(init_args)
@@ -147,6 +154,7 @@ pub fn test_setup_atomic_batch_transfers() -> TestEnv {
         base_url: None,
         vetkd_key_name: "dfx_test_key".to_string(),
         vetkd_context: "vetkd_context".to_string(),
+        storage_cycles: None,
     };
 
     test_env.build(init_args)
@@ -195,6 +203,7 @@ pub fn test_setup_no_limit() -> TestEnv {
         base_url: None,
         vetkd_key_name: "dfx_test_key".to_string(),
         vetkd_context: "vetkd_context".to_string(),
+        storage_cycles: None,
     };
 
     test_env.build(init_args)

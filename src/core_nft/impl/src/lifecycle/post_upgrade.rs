@@ -11,7 +11,6 @@ use bity_ic_stable_memory::get_reader;
 use bity_ic_types::BuildVersion;
 use core_nft_api::lifecycle::Args;
 use core_nft_common::types::http::{add_redirection, certify_all_assets};
-use core_nft_common::types::sub_canister::default_funding_config;
 use ic_cdk_macros::post_upgrade;
 use std::time::Duration;
 use tracing::{error, info};
@@ -49,13 +48,14 @@ fn post_upgrade(args: Args) {
             }
 
             state.data.sub_canister_manager.sub_canister_manager.wasm = STORAGE_WASM.to_vec();
-            // funding_config is #[serde(skip)]: without this, canfund falls back to
-            // its defaults (daily / 250B threshold) after the upgrade.
+            // Without this, canfund falls back to its defaults (daily / 250B
+            // threshold) after the upgrade, and a new storage_cycles arg would not
+            // reach the spawn numbers.
+            let test_mode = state.env.is_test_mode();
             state
                 .data
                 .sub_canister_manager
-                .sub_canister_manager
-                .funding_config = default_funding_config(state.env.is_test_mode());
+                .apply_cycles_config(upgrade_args.storage_cycles.clone(), test_mode);
 
             migrate_internal_filestorage_into_public_content(&mut state);
 
