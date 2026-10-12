@@ -22,7 +22,11 @@ use std::collections::{BTreeSet, HashMap};
 
 pub use bity_ic_storage_canister_api::lifecycle::{init::InitArgs, post_upgrade::UpgradeArgs};
 
-const STORAGE_WASM: &[u8] = include_bytes!("../../../../wasm/storage_canister.wasm.gz");
+/// The storage canister wasm every collection deploys and upgrades its storage
+/// canisters to. Both `init` and `post_upgrade` read it from here: this single
+/// `static` keeps one copy of the bytes in the core_nft wasm, where two
+/// `include_bytes!` of the same file would embed it twice.
+pub static STORAGE_WASM: &[u8] = include_bytes!("../../../../wasm/storage_canister.wasm.gz");
 
 icrc3_state!();
 canister_state!(RuntimeState);
