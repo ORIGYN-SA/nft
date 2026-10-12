@@ -31,7 +31,7 @@ use core_nft_common::types::icrc7::{
 use core_nft_common::types::management::{
     append_file, cancel_upload, finalize_upload, get_all_uploads, get_upload_status,
     get_user_permissions, grant_permission, has_permission, init_upload, mint, revoke_permission,
-    store_chunk, update_collection_metadata, update_nft_metadata,
+    store_chunk, update_collection_metadata, update_nft_metadata, update_nft_metadata_batch,
 };
 
 generate_pocket_query_call!(icrc7_collection_metadata);
@@ -67,6 +67,7 @@ generate_pocket_update_call!(icrc7_transfer);
 generate_pocket_update_call!(mint);
 generate_pocket_update_call!(append_file);
 generate_pocket_update_call!(update_nft_metadata);
+generate_pocket_update_call!(update_nft_metadata_batch);
 generate_pocket_update_call!(init_upload);
 generate_pocket_update_call!(store_chunk);
 generate_pocket_update_call!(finalize_upload);

@@ -6,13 +6,14 @@ use crate::guards::{
 use crate::state::{icrc3_add_transaction, mutate_state, read_state, InternalFilestorageData};
 use crate::types::metadata::__METADATA;
 use crate::types::nft::Icrc7Token;
-use crate::utils::check_memo;
+use crate::utils::{check_memo, check_metadata_batch, update_token_meta};
 use core_nft_common::CHUNK_SIZE;
 
 #[cfg(feature = "inttest")]
 pub use core_nft_api::__get_public_entry_test;
 use core_nft_common::resolve_readers;
 use core_nft_common::types::http::add_redirection;
+use core_nft_common::types::management::update_nft_metadata_batch::LogMode;
 use core_nft_common::types::sub_canister::StorageCanister;
 use core_nft_common::types::{icrc7, management};
 use core_nft_common::utils::trace;
@@ -31,7 +32,6 @@ pub use ic_cdk::call::RejectCode;
 use ic_cdk_macros::{query, update};
 use icrc_ledger_types::icrc::generic_value::ICRC3Value as Icrc3Value;
 use icrc_ledger_types::icrc1::account::Account;
-use std::collections::BTreeMap;
 use std::collections::HashMap;
 
 #[update(guard = "caller_has_update_collection_metadata_permission")]
@@ -566,7 +566,8 @@ pub fn update_nft_metadata(
     let token = read_state(|state| state.data.tokens_list.get(&req.token_id).cloned())
         .ok_or(management::update_nft_metadata::UpdateNftMetadataError::TokenDoesNotExist)?;
 
-    let block_index = replace_metadata_and_log(caller, token, req.metadata, req.memo);
+    let block_index =
+        replace_metadata_and_log(caller, token, req.metadata, req.memo, LogMode::Full);
 
     trace(&format!(
         "Updated NFT metadata for token: {:?}",
@@ -575,8 +576,58 @@ pub fn update_nft_metadata(
     Ok(block_index)
 }
 
+/// Replaces the metadata of several tokens in one message: one `7update_token`
+/// block per item, in item order, every block carrying `memo`. `Ok` is each
+/// item's block index.
+///
+/// All or nothing. An empty batch, one over `MAX_METADATA_BATCH_ITEMS`, one
+/// naming a token twice, or one with a missing token is refused before the
+/// first write, so each token gets at most one block per message. A block the
+/// log refuses traps, which rolls back every item; blocks still in the log's
+/// window from earlier messages can make even a batch within the limit trap.
+#[update(guard = "caller_has_update_metadata_permission")]
+pub fn update_nft_metadata_batch(
+    req: management::update_nft_metadata_batch::Args,
+) -> management::update_nft_metadata_batch::Response {
+    trace("Updating NFT metadata batch");
+    let caller = ic_cdk::api::msg_caller();
+    let _guard_principal = GuardManagement::new(caller).map_err(|_| {
+        management::update_nft_metadata::UpdateNftMetadataError::ConcurrentManagementCall
+    })?;
+
+    let management::update_nft_metadata_batch::Args { items, memo, log } = req;
+
+    check_metadata_batch(&items)
+        .map_err(management::update_nft_metadata::UpdateNftMetadataError::StorageCanisterError)?;
+
+    check_memo(&memo)
+        .map_err(management::update_nft_metadata::UpdateNftMetadataError::InvalidMemo)?;
+
+    let tokens = read_state(|state| {
+        items
+            .iter()
+            .map(|item| state.data.tokens_list.get(&item.token_id).cloned())
+            .collect::<Option<Vec<Icrc7Token>>>()
+    })
+    .ok_or(management::update_nft_metadata::UpdateNftMetadataError::TokenDoesNotExist)?;
+
+    let block_indexes: Vec<Nat> = tokens
+        .into_iter()
+        .zip(items)
+        .map(|(token, item)| {
+            replace_metadata_and_log(caller, token, item.metadata, memo.clone(), log)
+        })
+        .collect();
+
+    trace(&format!(
+        "Updated NFT metadata for {} tokens",
+        block_indexes.len()
+    ));
+    Ok(block_indexes)
+}
+
 /// Replaces a token's metadata and records the change as one `7update_token`
-/// block whose meta holds the previous and the new metadata maps.
+/// block, with the meta `log` selects.
 ///
 /// The write and the block stand or fall together: a block the log refuses
 /// traps, and the trap rolls the metadata write back. Returns the index of the
@@ -586,15 +637,12 @@ fn replace_metadata_and_log(
     mut token: Icrc7Token,
     metadata: Vec<(String, Icrc3Value)>,
     memo: Option<serde_bytes::ByteBuf>,
+    log: LogMode,
 ) -> Nat {
     let token_id = token.token_id.clone();
     let previous_metadata = token_metadata_map(&token_id);
     __METADATA.with_borrow_mut(|m| token.replace_metadata(m, metadata));
     let new_metadata = token_metadata_map(&token_id);
-
-    let mut meta = BTreeMap::new();
-    meta.insert("icrc7:previous_metadata".to_string(), previous_metadata);
-    meta.insert("icrc7:new_metadata".to_string(), new_metadata);
 
     let now = ic_cdk::api::time();
     let transaction = ICRC7Transaction::new(
@@ -608,7 +656,7 @@ fn replace_metadata_and_log(
                 subaccount: None,
             }),
             to: None,
-            meta: Some(Icrc3Value::Map(meta)),
+            meta: Some(update_token_meta(previous_metadata, new_metadata, log)),
             memo,
             created_at_time: Some(Nat::from(now)),
         },

@@ -123,6 +123,43 @@ pub mod update_nft_metadata {
     /// `Ok` is the index of the `7update_token` block the call wrote.
     pub type Response = Result<Nat, UpdateNftMetadataError>;
 }
+
+pub mod update_nft_metadata_batch {
+    use super::*;
+
+    /// Most items one call takes. Every collection's ICRC-3 log takes at most
+    /// 50 blocks in one message (half its fixed 100 transactions per window),
+    /// so a larger batch could only trap after writing. 50 is an upper bound,
+    /// not a promise: blocks still in the log's window from earlier messages
+    /// lower what one message can add.
+    pub const MAX_METADATA_BATCH_ITEMS: usize = 50;
+
+    #[derive(CandidType, Serialize, Deserialize, Clone)]
+    pub struct Item {
+        pub token_id: Nat,
+        pub metadata: Vec<(String, ICRC3Value)>,
+    }
+
+    /// How each `7update_token` block records its change. `Full` logs the
+    /// previous and the new metadata maps. `HashOnly` logs only their ICRC-3
+    /// representation-independent hashes, so the previous values never enter
+    /// the permanent log.
+    #[derive(CandidType, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum LogMode {
+        Full,
+        HashOnly,
+    }
+
+    #[derive(CandidType, Serialize, Deserialize, Clone)]
+    pub struct Args {
+        pub items: Vec<Item>,
+        pub memo: Option<serde_bytes::ByteBuf>,
+        pub log: LogMode,
+    }
+
+    /// `Ok` is the index of each item's `7update_token` block, in item order.
+    pub type Response = Result<Vec<Nat>, super::update_nft_metadata::UpdateNftMetadataError>;
+}
 pub mod get_upload_status {
     use super::*;
 
