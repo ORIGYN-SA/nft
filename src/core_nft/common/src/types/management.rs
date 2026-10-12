@@ -111,13 +111,16 @@ pub mod update_nft_metadata {
     pub struct Args {
         pub token_id: Nat,
         pub metadata: Vec<(String, ICRC3Value)>,
+        pub memo: Option<serde_bytes::ByteBuf>,
     }
     #[derive(Serialize, Deserialize, CandidType, Debug)]
     pub enum UpdateNftMetadataError {
         ConcurrentManagementCall,
         TokenDoesNotExist,
         StorageCanisterError(String),
+        InvalidMemo(String),
     }
+    /// `Ok` is the index of the `7update_token` block the call wrote.
     pub type Response = Result<Nat, UpdateNftMetadataError>;
 }
 pub mod get_upload_status {

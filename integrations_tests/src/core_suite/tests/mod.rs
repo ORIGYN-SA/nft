@@ -5,4 +5,5 @@ pub mod test_management;
 pub mod test_media_serving;
 pub mod test_private_content;
 pub mod test_storage_cycles;
+pub mod test_update_metadata;
 pub mod test_upgrade;

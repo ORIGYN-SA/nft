@@ -206,6 +206,7 @@ fn test_icrc7_token_metadata_simple() {
                     "icrc97:metadata".to_string(),
                     Value::Array(vec![Value::Text(metadata_url.to_string())]),
                 )],
+                memo: None,
             };
 
             let _ = update_nft_metadata(
@@ -366,6 +367,7 @@ fn test_icrc7_token_metadata_multiple_insert() {
             let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),
                 metadata: create_default_icrc97_metadata(metadata_url_1.clone()),
+                memo: None,
             };
 
             let ret = update_nft_metadata(
@@ -420,6 +422,7 @@ fn test_icrc7_token_metadata_multiple_insert() {
             let update_nft_metadata_args_2 = update_nft_metadata::Args {
                 token_id: token_id.clone(),
                 metadata: create_default_icrc97_metadata(metadata_url_2.clone()),
+                memo: None,
             };
 
             println!("update_nft_metadata_args_2");
@@ -584,6 +587,7 @@ fn test_icrc7_token_metadata_multiple_insert_dup_name() {
             let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),
                 metadata: create_default_icrc97_metadata(metadata_url_1.clone()),
+                memo: None,
             };
 
             let _ = update_nft_metadata(
@@ -633,6 +637,7 @@ fn test_icrc7_token_metadata_multiple_insert_dup_name() {
             let update_nft_metadata_args_2 = update_nft_metadata::Args {
                 token_id: token_id.clone(),
                 metadata: create_default_icrc97_metadata(metadata_url_2.clone()),
+                memo: None,
             };
 
             let _ = update_nft_metadata(
@@ -846,6 +851,7 @@ fn test_icrc7_transfer_with_metadata_updates() {
             let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),
                 metadata: create_default_icrc97_metadata(metadata_url_1),
+                memo: None,
             };
 
             let _ = update_nft_metadata(
@@ -895,6 +901,7 @@ fn test_icrc7_transfer_with_metadata_updates() {
             let update_nft_metadata_args_2 = update_nft_metadata::Args {
                 token_id: token_id.clone(),
                 metadata: create_default_icrc97_metadata(metadata_url_2.clone()),
+                memo: None,
             };
 
             let _ = update_nft_metadata(
@@ -1262,6 +1269,7 @@ fn test_icrc3_logs_metadata_updates() {
             let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),
                 metadata: create_default_icrc97_metadata(metadata_url.clone()),
+                memo: None,
             };
 
             let update_result = update_nft_metadata(
@@ -2956,6 +2964,7 @@ fn test_icrc7_mint_with_hashmap_and_update_metadata() {
             let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),
                 metadata: updated_metadata.clone(),
+                memo: None,
             };
 
             let update_result = update_nft_metadata(
@@ -3090,6 +3099,7 @@ fn test_icrc7_mint_with_hashmap_and_icrc3_logs() {
             let update_nft_metadata_args = update_nft_metadata::Args {
                 token_id: token_id.clone(),
                 metadata: updated_metadata.clone(),
+                memo: None,
             };
 
             let update_result = update_nft_metadata(

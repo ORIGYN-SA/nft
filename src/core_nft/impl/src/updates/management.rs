@@ -548,6 +548,8 @@ pub fn append_file(req: management::append_file::Args) -> management::append_fil
     Ok(())
 }
 
+/// Replaces a token's metadata. `Ok` is the index of the `7update_token` block
+/// that records the change, with `memo` in it.
 #[update(guard = "caller_has_update_metadata_permission")]
 pub fn update_nft_metadata(
     req: management::update_nft_metadata::Args,
@@ -558,91 +560,80 @@ pub fn update_nft_metadata(
         management::update_nft_metadata::UpdateNftMetadataError::ConcurrentManagementCall
     })?;
 
-    let token_name_hash = req.token_id;
+    check_memo(&req.memo)
+        .map_err(management::update_nft_metadata::UpdateNftMetadataError::InvalidMemo)?;
 
-    let token_list = read_state(|state| state.data.tokens_list.clone());
+    let token = read_state(|state| state.data.tokens_list.get(&req.token_id).cloned())
+        .ok_or(management::update_nft_metadata::UpdateNftMetadataError::TokenDoesNotExist)?;
 
-    match token_list.contains_key(&token_name_hash.clone()) {
-        true => {
-            let mut token = token_list.get(&token_name_hash.clone()).unwrap().clone();
+    let block_index = replace_metadata_and_log(caller, token, req.metadata, req.memo);
 
-            let previous_metadata =
-                __METADATA.with_borrow(|m| m.get_all_data(Some(token_name_hash.clone())));
+    trace(&format!(
+        "Updated NFT metadata for token: {:?}",
+        req.token_id
+    ));
+    Ok(block_index)
+}
 
-            __METADATA.with_borrow_mut(|m| token.replace_metadata(m, req.metadata));
+/// Replaces a token's metadata and records the change as one `7update_token`
+/// block whose meta holds the previous and the new metadata maps.
+///
+/// The write and the block stand or fall together: a block the log refuses
+/// traps, and the trap rolls the metadata write back. Returns the index of the
+/// new block.
+fn replace_metadata_and_log(
+    caller: Principal,
+    mut token: Icrc7Token,
+    metadata: Vec<(String, Icrc3Value)>,
+    memo: Option<serde_bytes::ByteBuf>,
+) -> Nat {
+    let token_id = token.token_id.clone();
+    let previous_metadata = token_metadata_map(&token_id);
+    __METADATA.with_borrow_mut(|m| token.replace_metadata(m, metadata));
+    let new_metadata = token_metadata_map(&token_id);
 
-            let new_metadata =
-                __METADATA.with_borrow(|m| m.get_all_data(Some(token_name_hash.clone())));
+    let mut meta = BTreeMap::new();
+    meta.insert("icrc7:previous_metadata".to_string(), previous_metadata);
+    meta.insert("icrc7:new_metadata".to_string(), new_metadata);
 
-            let mut metadata_map = BTreeMap::new();
+    let now = ic_cdk::api::time();
+    let transaction = ICRC7Transaction::new(
+        "7update_token".to_string(),
+        now,
+        ICRC7TransactionData {
+            op: "7update_token".to_string(),
+            tid: Some(token_id.clone()),
+            from: Some(Account {
+                owner: caller,
+                subaccount: None,
+            }),
+            to: None,
+            meta: Some(Icrc3Value::Map(meta)),
+            memo,
+            created_at_time: Some(Nat::from(now)),
+        },
+    );
 
-            metadata_map.insert(
-                "icrc7:previous_metadata".to_string(),
-                Icrc3Value::Map(
-                    previous_metadata
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(|(k, v)| (k, v.0))
-                        .collect(),
-                ),
-            );
-
-            metadata_map.insert(
-                "icrc7:new_metadata".to_string(),
-                Icrc3Value::Map(
-                    new_metadata
-                        .unwrap_or_default()
-                        .into_iter()
-                        .map(|(k, v)| (k, v.0))
-                        .collect(),
-                ),
-            );
-
-            let meta = Icrc3Value::Map(metadata_map);
-
-            let transaction = ICRC7Transaction::new(
-                "7update_token".to_string(),
-                ic_cdk::api::time(),
-                ICRC7TransactionData {
-                    op: "7update_token".to_string(),
-                    tid: Some(token_name_hash.clone()),
-                    from: Some(Account {
-                        owner: ic_cdk::api::msg_caller(),
-                        subaccount: None,
-                    }),
-                    to: None,
-                    meta: Some(meta),
-                    memo: None,
-                    created_at_time: Some(Nat::from(ic_cdk::api::time())),
-                },
-            );
-
-            match icrc3_add_transaction(transaction) {
-                Ok(_) => {}
-                Err(e) => {
-                    return Err(management::update_nft_metadata::UpdateNftMetadataError::StorageCanisterError(
-                        e.to_string(),
-                    ));
-                }
-            };
-
-            mutate_state(|state| {
-                state
-                    .data
-                    .tokens_list
-                    .insert(token_name_hash.clone(), token);
-            });
-            trace(&format!(
-                "Updated NFT metadata for token: {:?}",
-                token_name_hash.clone()
-            ));
-        }
-        false => {
-            return Err(management::update_nft_metadata::UpdateNftMetadataError::TokenDoesNotExist);
-        }
+    match icrc3_add_transaction(transaction) {
+        // add_transaction answers with the log length after the append, so the
+        // block it just wrote is the one below it.
+        Ok(log_length) => Nat::from(log_length - 1),
+        Err(e) => ic_cdk::trap(&format!(
+            "7update_token block for token {} refused: {}",
+            token_id, e
+        )),
     }
+}
 
-    Ok(token_name_hash.clone())
+/// A token's stored metadata as the ICRC-3 map a `7update_token` block logs.
+fn token_metadata_map(token_id: &Nat) -> Icrc3Value {
+    let data = __METADATA.with_borrow(|m| m.get_all_data(Some(token_id.clone())));
+    Icrc3Value::Map(
+        data.unwrap_or_default()
+            .into_iter()
+            .map(|(key, value)| (key, value.0))
+            .collect(),
+    )
 }
 
 #[update]
