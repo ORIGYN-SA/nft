@@ -208,3 +208,59 @@ pub fn test_setup_no_limit() -> TestEnv {
 
     test_env.build(init_args)
 }
+
+/// A collection installed with the arguments claimlink's
+/// `build_origyn_nft_init_args` passes for everything that shapes the ICRC-3
+/// log and the management calls: no `tx_window` (a zero window), no supply
+/// cap, and every batch, memo and take limit left unset. The 100 transactions
+/// per window are fixed by core_nft's `init` for every collection.
+/// `test_mode` and the vetKD names stay as in the other setups; they do not
+/// touch the log.
+pub fn claimlink_init_args_test_setup() -> TestEnv {
+    let mut test_env = TestEnvBuilder::new();
+
+    let mut user_permissions = HashMap::new();
+    user_permissions.insert(
+        test_env.controller.clone(),
+        vec![
+            Permission::Minting,
+            Permission::ManageAuthorities,
+            Permission::UpdateMetadata,
+            Permission::UpdateCollectionMetadata,
+            Permission::ReadUploads,
+            Permission::UpdateUploads,
+        ],
+    );
+
+    let init_args = InitArgs {
+        test_mode: true,
+        version: BuildVersion::min(),
+        commit_hash: "commit_hash".to_string(),
+        permissions: PermissionManager::new(user_permissions),
+        description: Some("Claimlink style collection".to_string()),
+        symbol: "CL".to_string(),
+        name: "ClaimlinkStyle".to_string(),
+        logo: None,
+        supply_cap: None,
+        max_query_batch_size: None,
+        max_update_batch_size: None,
+        max_take_value: None,
+        default_take_value: None,
+        max_memo_size: None,
+        atomic_batch_transfers: None,
+        tx_window: None,
+        permitted_drift: None,
+        max_canister_storage_threshold: None,
+        collection_metadata: HashMap::new(),
+        approval_init: InitApprovalsArg {
+            max_approvals_per_token_or_collection: Some(Nat::from(100u64)),
+            max_revoke_approvals: Some(Nat::from(100u64)),
+        },
+        base_url: None,
+        vetkd_key_name: "dfx_test_key".to_string(),
+        vetkd_context: "vetkd_context".to_string(),
+        storage_cycles: None,
+    };
+
+    test_env.build(init_args)
+}

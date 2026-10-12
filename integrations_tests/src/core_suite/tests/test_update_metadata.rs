@@ -5,11 +5,14 @@
 use crate::client::core_nft::{
     icrc3_get_blocks, icrc7_token_metadata, mint, update_nft_metadata, update_nft_metadata_batch,
 };
+use crate::core_suite::setup::claimlink_init_args_test_setup;
 use crate::core_suite::setup::setup::TestEnv;
 use crate::core_suite::setup::test_setup_no_limit;
 use candid::{Nat, Principal};
 use core_nft_common::types::icrc7::DEFAULT_MAX_MEMO_SIZE;
-use core_nft_common::types::management::update_nft_metadata_batch::{Item, LogMode};
+use core_nft_common::types::management::update_nft_metadata_batch::{
+    Item, LogMode, MAX_METADATA_BATCH_ITEMS,
+};
 use core_nft_common::types::management::{mint, update_nft_metadata, update_nft_metadata_batch};
 use icrc_ledger_types::icrc::generic_value::ICRC3Value;
 use icrc_ledger_types::icrc1::account::Account;
@@ -696,5 +699,271 @@ fn test_update_nft_metadata_batch_repeated_token_refused() {
         token_metadata(pic, controller, collection_canister_id, &token_ids[1]),
         Some(json_data(r#"{"n":1}"#)),
         "the item between the two repeats was not written either"
+    );
+}
+
+/// `JSON_DATA` bytes per item of the 25-item batch. Twenty-five of them make
+/// about 1.5 MiB, the payload the private collections rewrite job sends per
+/// call.
+const REWRITE_ITEM_BYTES: usize = 60 * 1024;
+
+/// A JSON text of exactly `bytes` bytes in the private form
+/// `{"template":{...},"private":{"v":1,"salt":...,"blob":...}}`.
+fn private_form_json(position: usize, bytes: usize) -> String {
+    let prefix = format!(
+        "{{\"template\":{{\"id\":7,\"version\":3}},\"private\":{{\"v\":1,\"salt\":\"{:04}\",\"blob\":\"",
+        position
+    );
+    let suffix = "\"}}";
+    let fill = bytes - prefix.len() - suffix.len();
+    format!("{}{}{}", prefix, "A".repeat(fill), suffix)
+}
+
+/// `update_nft_metadata_batch` without the client's panic on a reject, for
+/// batches that may trap.
+fn update_nft_metadata_batch_raw(
+    pic: &PocketIc,
+    sender: Principal,
+    collection: Principal,
+    args: &update_nft_metadata_batch::Args,
+) -> Result<update_nft_metadata_batch::Response, RejectResponse> {
+    pic.update_call(
+        collection,
+        sender,
+        "update_nft_metadata_batch",
+        candid::encode_one(args).unwrap(),
+    )
+    .map(|bytes| candid::decode_one(&bytes).unwrap())
+}
+
+#[test]
+fn test_update_nft_metadata_batch_25_items_fit_one_message() {
+    let mut test_env: TestEnv = claimlink_init_args_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        ..
+    } = test_env;
+    let token_ids = mint_tokens(pic, controller, collection_canister_id, nft_owner1, 25);
+    let items: Vec<Item> = token_ids
+        .iter()
+        .enumerate()
+        .map(|(position, token_id)| Item {
+            token_id: token_id.clone(),
+            metadata: json_data(&private_form_json(position, REWRITE_ITEM_BYTES)),
+        })
+        .collect();
+    let before = log_length(pic, controller, collection_canister_id);
+
+    let result = update_nft_metadata_batch_raw(
+        pic,
+        controller,
+        collection_canister_id,
+        &update_nft_metadata_batch::Args {
+            items: items.clone(),
+            memo: Some(ByteBuf::from(VISIBILITY_MEMO.to_vec())),
+            log: LogMode::HashOnly,
+        },
+    );
+
+    let block_indexes = match result {
+        Ok(Ok(block_indexes)) => block_indexes,
+        Ok(Err(e)) => panic!("a 25-item batch was refused: {:?}", e),
+        Err(reject) => panic!("a 25-item batch trapped: {}", reject.reject_message),
+    };
+    let expected: Vec<Nat> = (0..25u64).map(|k| before.clone() + Nat::from(k)).collect();
+    assert_eq!(block_indexes, expected);
+    assert_eq!(
+        log_length(pic, controller, collection_canister_id),
+        before + Nat::from(25u64)
+    );
+    assert_eq!(
+        token_metadata(pic, controller, collection_canister_id, &token_ids[24]),
+        Some(items[24].metadata.clone())
+    );
+}
+
+/// One item per token, each with a small `JSON_DATA` value. Small values keep
+/// the message far below the 2 MiB ingress limit, so the only limits a batch
+/// of them can meet are the item cap and the log's throttle.
+fn small_items(token_ids: &[Nat]) -> Vec<Item> {
+    token_ids
+        .iter()
+        .enumerate()
+        .map(|(position, token_id)| Item {
+            token_id: token_id.clone(),
+            metadata: json_data(&format!("{{\"rewritten\":{}}}", position)),
+        })
+        .collect()
+}
+
+#[test]
+fn test_update_nft_metadata_batch_over_limit_refused() {
+    let mut test_env: TestEnv = claimlink_init_args_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        ..
+    } = test_env;
+    let count = MAX_METADATA_BATCH_ITEMS + 1;
+    let token_ids = mint_tokens(pic, controller, collection_canister_id, nft_owner1, count);
+    let before = log_length(pic, controller, collection_canister_id);
+
+    let result = update_nft_metadata_batch_raw(
+        pic,
+        controller,
+        collection_canister_id,
+        &update_nft_metadata_batch::Args {
+            items: small_items(&token_ids),
+            memo: Some(ByteBuf::from(VISIBILITY_MEMO.to_vec())),
+            log: LogMode::HashOnly,
+        },
+    );
+
+    match result {
+        Ok(Err(update_nft_metadata::UpdateNftMetadataError::StorageCanisterError(message))) => {
+            assert_eq!(message, "batch of 51 items exceeds the limit of 50")
+        }
+        Ok(other) => panic!("expected the item cap refusal, got {:?}", other),
+        Err(reject) => panic!(
+            "expected the item cap refusal, the call trapped: {}",
+            reject.reject_message
+        ),
+    }
+    assert_eq!(
+        log_length(pic, controller, collection_canister_id),
+        before,
+        "the refused batch wrote no block"
+    );
+    assert_eq!(
+        token_metadata(pic, controller, collection_canister_id, &token_ids[0]),
+        Some(json_data(r#"{"n":0}"#))
+    );
+    assert_eq!(
+        token_metadata(pic, controller, collection_canister_id, &token_ids[50]),
+        Some(json_data(r#"{"n":50}"#))
+    );
+}
+
+#[test]
+fn test_update_nft_metadata_batch_50_items_fit_an_empty_window() {
+    let mut test_env: TestEnv = claimlink_init_args_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        ..
+    } = test_env;
+    let token_ids = mint_tokens(
+        pic,
+        controller,
+        collection_canister_id,
+        nft_owner1,
+        MAX_METADATA_BATCH_ITEMS,
+    );
+    let items = small_items(&token_ids);
+    let before = log_length(pic, controller, collection_canister_id);
+
+    let result = update_nft_metadata_batch_raw(
+        pic,
+        controller,
+        collection_canister_id,
+        &update_nft_metadata_batch::Args {
+            items: items.clone(),
+            memo: Some(ByteBuf::from(VISIBILITY_MEMO.to_vec())),
+            log: LogMode::HashOnly,
+        },
+    );
+
+    let block_indexes = match result {
+        Ok(Ok(block_indexes)) => block_indexes,
+        Ok(Err(e)) => panic!("a 50-item batch was refused: {:?}", e),
+        Err(reject) => panic!("a 50-item batch trapped: {}", reject.reject_message),
+    };
+    let expected: Vec<Nat> = (0..MAX_METADATA_BATCH_ITEMS as u64)
+        .map(|k| before.clone() + Nat::from(k))
+        .collect();
+    assert_eq!(block_indexes, expected);
+    assert_eq!(
+        token_metadata(pic, controller, collection_canister_id, &token_ids[49]),
+        Some(items[49].metadata.clone())
+    );
+}
+
+#[test]
+fn test_update_nft_metadata_batch_throttle_trap_rolls_back() {
+    let mut test_env: TestEnv = claimlink_init_args_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        ..
+    } = test_env;
+    let token_ids = mint_tokens(pic, controller, collection_canister_id, nft_owner1, 51);
+    // One block written just before the batch, with the clock held still,
+    // stays in the log's window, so the 50th item of the batch is the 51st
+    // block in the window and the throttle refuses it.
+    let earlier = json_data(r#"{"n":"earlier edit"}"#);
+    update_nft_metadata(
+        pic,
+        controller,
+        collection_canister_id,
+        &update_nft_metadata::Args {
+            token_id: token_ids[50].clone(),
+            metadata: earlier.clone(),
+            memo: None,
+        },
+    )
+    .expect("the earlier edit");
+    let before = log_length(pic, controller, collection_canister_id);
+
+    let result = update_nft_metadata_batch_raw(
+        pic,
+        controller,
+        collection_canister_id,
+        &update_nft_metadata_batch::Args {
+            items: small_items(&token_ids[..50]),
+            memo: Some(ByteBuf::from(VISIBILITY_MEMO.to_vec())),
+            log: LogMode::HashOnly,
+        },
+    );
+
+    let reject = match result {
+        Err(reject) => reject,
+        Ok(response) => panic!(
+            "the batch was expected to trap on the throttle, got {:?}",
+            response
+        ),
+    };
+    assert!(
+        reject.reject_message.contains("Transaction throttled"),
+        "unexpected reject: {}",
+        reject.reject_message
+    );
+    assert_eq!(
+        log_length(pic, controller, collection_canister_id),
+        before,
+        "the trap rolled back every block of the batch"
+    );
+    assert_eq!(
+        token_metadata(pic, controller, collection_canister_id, &token_ids[0]),
+        Some(json_data(r#"{"n":0}"#)),
+        "the first item, written before the refusal, rolled back too"
+    );
+    assert_eq!(
+        token_metadata(pic, controller, collection_canister_id, &token_ids[48]),
+        Some(json_data(r#"{"n":48}"#)),
+        "the last item written before the refusal rolled back too"
+    );
+    assert_eq!(
+        token_metadata(pic, controller, collection_canister_id, &token_ids[50]),
+        Some(earlier),
+        "the earlier message keeps its change"
     );
 }
