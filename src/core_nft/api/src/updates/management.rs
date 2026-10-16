@@ -23,6 +23,9 @@ pub use management::update_collection_metadata::{
 pub use management::update_nft_metadata::{
     Args as UpdateNftMetadataArgs, Response as UpdateNftMetadataResponse,
 };
+pub use management::update_nft_metadata_batch::{
+    Args as UpdateNftMetadataBatchArgs, Response as UpdateNftMetadataBatchResponse,
+};
 
 pub use management::cancel_upload::{Args as CancelUploadArgs, Response as CancelUploadResponse};
 pub use management::finalize_upload::{

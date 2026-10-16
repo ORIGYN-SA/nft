@@ -311,6 +311,7 @@ fn test_get_blocks_mints_transfers_and_updates() {
                 Icrc3Value::Text("Updated description".to_string()),
             ),
         ],
+        memo: None,
     };
 
     let update_result = update_nft_metadata(
@@ -441,6 +442,7 @@ fn test_get_blocks_large_sequence() {
                 ),
                 ("version".to_string(), Icrc3Value::Text("2.0".to_string())),
             ],
+            memo: None,
         };
 
         let update_result = update_nft_metadata(
@@ -858,6 +860,7 @@ fn test_get_blocks_complex_filters_and_ordering() {
                 "description".to_string(),
                 Icrc3Value::Text(format!("Updated description for token {}", i).to_string()),
             )],
+            memo: None,
         };
 
         let update_response =
@@ -868,6 +871,11 @@ fn test_get_blocks_complex_filters_and_ordering() {
             "Update {} failed: {:?}",
             i,
             update_response
+        );
+        assert_eq!(
+            update_response.unwrap(),
+            Nat::from((8 + i) as u64),
+            "update_nft_metadata answers with the index of the block it wrote"
         );
 
         block_sequence.push(("update", controller, (8 + i) as u64));

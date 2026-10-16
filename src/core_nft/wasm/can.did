@@ -108,8 +108,10 @@ type Args_15 = record {
 type Args_16 = record {
   token_id : nat;
   metadata : vec record { text; CustomValue };
+  memo : opt blob;
 };
-type Args_17 = variant { Upgrade : UpgradeArgs; Init : InitArgs };
+type Args_17 = record { log : LogMode; memo : opt blob; items : vec Item };
+type Args_18 = variant { Upgrade : UpgradeArgs; Init : InitArgs };
 type Args_2 = record { file_path : text };
 type Args_3 = record { input : blob; transport_public_key : blob };
 type Args_4 = record {
@@ -365,6 +367,15 @@ type IsApprovedArg = record {
   from_subaccount : opt blob;
   spender : Account;
 };
+type Item = record {
+  token_id : nat;
+  metadata : vec record { text; CustomValue };
+};
+// How each `7update_token` block records its change. `Full` logs the
+// previous and the new metadata maps. `HashOnly` logs only their ICRC-3
+// representation-independent hashes, so the previous values never enter
+// the permanent log.
+type LogMode = variant { Full; HashOnly };
 type MintError = variant {
   TokenAlreadyExists;
   StorageCanisterError : text;
@@ -447,6 +458,7 @@ type Result_24 = variant { Ok : record {}; Err : StoreChunkError };
 type Result_25 = variant { Ok; Err : StorePrivateContentChunkError };
 type Result_26 = variant { Ok; Err : UpdateCollectionMetadataError };
 type Result_27 = variant { Ok : nat; Err : UpdateNftMetadataError };
+type Result_28 = variant { Ok : vec nat; Err : UpdateNftMetadataError };
 type Result_3 = variant { Ok : record {}; Err : CancelUploadError };
 type Result_4 = variant { Ok : DeriveVetkeyResp; Err : text };
 type Result_5 = variant { Ok : DeriveVetkeyPublicKeyResp; Err : text };
@@ -574,6 +586,7 @@ type UpdateCollectionMetadataError = variant {
 type UpdateNftMetadataError = variant {
   StorageCanisterError : text;
   TokenDoesNotExist;
+  InvalidMemo : text;
   ConcurrentManagementCall;
 };
 type UpgradeArgs = record {
@@ -621,7 +634,7 @@ type Vec = vec record {
       },
     ) query;
 };
-service : (Args_17) -> {
+service : (Args_18) -> {
   append_file : (Args) -> (Result);
   burn_nft : (nat) -> (Result_1);
   cancel_private_content_upload : (Args_1) -> (Result_2);
@@ -695,5 +708,17 @@ service : (Args_17) -> {
   store_chunk : (Args_13) -> (Result_24);
   store_private_content_chunk : (Args_14) -> (Result_25);
   update_collection_metadata : (Args_15) -> (Result_26);
+  // Replaces a token's metadata. `Ok` is the index of the `7update_token` block
+  // that records the change, with `memo` in it.
   update_nft_metadata : (Args_16) -> (Result_27);
+  // Replaces the metadata of several tokens in one message: one `7update_token`
+  // block per item, in item order, every block carrying `memo`. `Ok` is each
+  // item's block index.
+  // 
+  // All or nothing. An empty batch, one over `MAX_METADATA_BATCH_ITEMS`, one
+  // naming a token twice, or one with a missing token is refused before the
+  // first write, so each token gets at most one block per message. A block the
+  // log refuses traps, which rolls back every item; blocks still in the log's
+  // window from earlier messages can make even a batch within the limit trap.
+  update_nft_metadata_batch : (Args_17) -> (Result_28);
 }

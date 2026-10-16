@@ -2,7 +2,7 @@ use crate::lifecycle::init_canister;
 use crate::memory::get_upgrades_memory;
 use crate::migrations::migrate_internal_filestorage_into_public_content;
 use crate::state::{
-    mutate_state, read_state, replace_icrc3, start_default_archive_job, RuntimeState,
+    mutate_state, read_state, replace_icrc3, start_default_archive_job, RuntimeState, STORAGE_WASM,
 };
 use bity_ic_canister_logger::LogEntry;
 use bity_ic_canister_tracing_macros::trace;
@@ -14,8 +14,6 @@ use core_nft_common::types::http::{add_redirection, certify_all_assets};
 use ic_cdk_macros::post_upgrade;
 use std::time::Duration;
 use tracing::{error, info};
-
-const STORAGE_WASM: &[u8] = include_bytes!("../../../../../wasm/storage_canister.wasm.gz");
 
 #[post_upgrade]
 #[trace]

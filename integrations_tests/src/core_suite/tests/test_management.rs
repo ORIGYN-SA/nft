@@ -946,6 +946,7 @@ fn test_update_nft_metadata_unauthorized() {
         &(update_nft_metadata::Args {
             token_id: Nat::from(0u64),
             metadata: create_default_icrc97_metadata(metadata_url),
+            memo: None,
         }),
     );
 }
@@ -1811,6 +1812,7 @@ fn test_permissions_add_and_remove_one_by_one() {
         &(update_nft_metadata::Args {
             token_id: token_id.clone(),
             metadata: create_default_icrc97_metadata(update_metadata_url),
+            memo: None,
         }),
     );
     assert!(
