@@ -597,6 +597,10 @@ pub fn update_nft_metadata_batch(
 
     let management::update_nft_metadata_batch::Args { items, memo, log } = req;
 
+    if log == LogMode::HashOnly && read_state(|state| state.data.permanent) {
+        return Err(management::update_nft_metadata::UpdateNftMetadataError::FullLogRequired);
+    }
+
     check_metadata_batch(&items)
         .map_err(management::update_nft_metadata::UpdateNftMetadataError::StorageCanisterError)?;
 
@@ -689,6 +693,10 @@ pub async fn burn_nft(token_id: Nat) -> management::burn_nft::Response {
     let caller = ic_cdk::api::msg_caller();
     let _guard_principal = GuardManagement::new(caller)
         .map_err(|_| management::burn_nft::BurnNftError::ConcurrentManagementCall)?;
+
+    if read_state(|state| state.data.permanent) {
+        return Err(management::burn_nft::BurnNftError::CollectionIsPermanent);
+    }
 
     let token = match read_state(|state| state.data.tokens_list.get(&token_id).cloned()) {
         Some(token) => token,
@@ -1001,6 +1009,15 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
     let url = construct_url(&main_canister_id, &path);
 
     Ok(finalize_upload::FinalizeUploadResp { url })
+}
+
+/// Settings fixed when the collection was installed. Public, so indexers and
+/// backups can tell how a collection treats its tokens.
+#[query]
+pub fn get_collection_settings() -> management::get_collection_settings::Response {
+    read_state(|state| management::get_collection_settings::CollectionSettings {
+        permanent: state.data.permanent,
+    })
 }
 
 #[query(guard = "caller_has_manage_authorities_permission")]

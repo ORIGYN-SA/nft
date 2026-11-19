@@ -39,4 +39,10 @@ pub struct InitArgs {
     pub vetkd_context: String,
     /// Cycle settings for storage sub-canisters. `None` uses the defaults.
     pub storage_cycles: Option<StorageCyclesConfig>,
+    /// Installs the collection as permanent, for records that must outlive
+    /// their owners: burns are refused and every metadata edit logs the full
+    /// previous and new metadata. Fixed for the life of the canister; `None`
+    /// is `false`.
+    #[serde(default)]
+    pub permanent: Option<bool>,
 }

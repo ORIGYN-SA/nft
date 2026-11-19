@@ -150,6 +150,7 @@ fn init_args(controller: Principal) -> InitArgs {
         vetkd_key_name: "dfx_test_key".to_string(),
         vetkd_context: "vetkd_context".to_string(),
         storage_cycles: None,
+        permanent: None,
     }
 }
 

@@ -62,6 +62,7 @@ pub fn default_test_setup() -> TestEnv {
         vetkd_key_name: "dfx_test_key".to_string(),
         vetkd_context: "vetkd_context".to_string(),
         storage_cycles: None,
+        permanent: None,
     };
 
     test_env.build(init_args_index, init_args_collection)
@@ -119,6 +120,7 @@ pub fn test_setup_atomic_batch_transfers() -> TestEnv {
         vetkd_key_name: "dfx_test_key".to_string(),
         vetkd_context: "vetkd_context".to_string(),
         storage_cycles: None,
+        permanent: None,
     };
 
     test_env.build(init_args_index, init_args_collection)
@@ -176,6 +178,7 @@ pub fn test_setup_no_limit() -> TestEnv {
         vetkd_key_name: "dfx_test_key".to_string(),
         vetkd_context: "vetkd_context".to_string(),
         storage_cycles: None,
+        permanent: None,
     };
 
     test_env.build(init_args_index, init_args_collection)

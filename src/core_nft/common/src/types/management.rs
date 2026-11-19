@@ -100,6 +100,8 @@ pub mod burn_nft {
         ConcurrentManagementCall,
         TokenDoesNotExist,
         StorageCanisterError(String),
+        /// The collection was installed as permanent: its tokens can't be burned.
+        CollectionIsPermanent,
     }
     pub type Response = Result<(), BurnNftError>;
 }
@@ -119,6 +121,9 @@ pub mod update_nft_metadata {
         TokenDoesNotExist,
         StorageCanisterError(String),
         InvalidMemo(String),
+        /// The collection was installed as permanent, so every edit must log
+        /// the full previous and new metadata: `HashOnly` is refused.
+        FullLogRequired,
     }
     /// `Ok` is the index of the `7update_token` block the call wrote.
     pub type Response = Result<Nat, UpdateNftMetadataError>;
@@ -160,6 +165,20 @@ pub mod update_nft_metadata_batch {
     /// `Ok` is the index of each item's `7update_token` block, in item order.
     pub type Response = Result<Vec<Nat>, super::update_nft_metadata::UpdateNftMetadataError>;
 }
+pub mod get_collection_settings {
+    use super::*;
+
+    pub type Args = ();
+    /// Settings fixed when the collection was installed.
+    #[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+    pub struct CollectionSettings {
+        /// Tokens can't be burned, and every edit logs the full previous and
+        /// new metadata.
+        pub permanent: bool,
+    }
+    pub type Response = CollectionSettings;
+}
+
 pub mod get_upload_status {
     use super::*;
 

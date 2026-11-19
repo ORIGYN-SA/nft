@@ -63,6 +63,7 @@ fn init(args: Args) {
                 init_args.vetkd_key_name.clone(),
                 init_args.vetkd_context.clone(),
                 init_args.storage_cycles.clone(),
+                init_args.permanent.unwrap_or(false),
             );
 
             if env.is_test_mode() {
