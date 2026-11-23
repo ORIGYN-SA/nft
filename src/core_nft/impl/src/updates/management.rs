@@ -157,24 +157,26 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
         .map_err(|_| management::mint::MintError::ConcurrentManagementCall)?;
 
     // Efficiently read config and state without cloning the whole ledger
-    let (max_batch_size, current_token_id, supply_cap, current_token_count) = read_state(|state| {
-        (
-            state
-                .data
-                .max_update_batch_size
-                .as_ref()
-                .map(|n| n.0.clone())
-                .unwrap_or(100u64.into()),
-            state.data.last_token_id.clone(),
-            state
-                .data
-                .supply_cap
-                .as_ref()
-                .cloned()
-                .unwrap_or(Nat::from(icrc7::DEFAULT_MAX_SUPPLY_CAP)),
-            state.data.tokens_list.len() as u64,
-        )
-    });
+    let (max_batch_size, current_token_id, supply_cap, current_token_count, permanent) =
+        read_state(|state| {
+            (
+                state
+                    .data
+                    .max_update_batch_size
+                    .as_ref()
+                    .map(|n| n.0.clone())
+                    .unwrap_or(100u64.into()),
+                state.data.last_token_id.clone(),
+                state
+                    .data
+                    .supply_cap
+                    .as_ref()
+                    .cloned()
+                    .unwrap_or(Nat::from(icrc7::DEFAULT_MAX_SUPPLY_CAP)),
+                state.data.tokens_list.len() as u64,
+                state.data.permanent,
+            )
+        });
 
     if req.mint_requests.len() as u64 > u64::try_from(max_batch_size).unwrap_or(100) {
         return Err(management::mint::MintError::ExceedMaxAllowedSupplyCap);
@@ -329,7 +331,9 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
                 tid: Some(token_id.clone()),
                 from: None,
                 to: Some(mint_request.token_owner.clone()),
-                meta: None,
+                // A permanent collection's chain log holds every version of a
+                // token, the first one included.
+                meta: permanent.then(|| mint_meta(&token_id)),
                 memo: mint_request.memo.clone(),
                 created_at_time: Some(Nat::from(timestamp)),
             },
@@ -675,6 +679,14 @@ fn replace_metadata_and_log(
             token_id, e
         )),
     }
+}
+
+/// A mint block's `meta`: the token's metadata as minted.
+fn mint_meta(token_id: &Nat) -> Icrc3Value {
+    Icrc3Value::Map(std::collections::BTreeMap::from([(
+        "icrc7:token_metadata".to_string(),
+        token_metadata_map(token_id),
+    )]))
 }
 
 /// A token's stored metadata as the ICRC-3 map a `7update_token` block logs.

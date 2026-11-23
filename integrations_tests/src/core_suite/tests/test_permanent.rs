@@ -1,7 +1,7 @@
-//! Permanent collections: burns are refused, edits always log the full
-//! previous and new metadata, and the setting survives an upgrade. A collection
-//! installed without the setting keeps the old behaviour, including mint blocks
-//! without `meta`.
+//! Permanent collections: mint blocks carry the first version, burns are
+//! refused, edits always log the full previous and new metadata, and the
+//! setting survives an upgrade. A collection installed without the setting
+//! keeps the old behaviour, including mint blocks without `meta`.
 
 use crate::client::core_nft::{
     burn_nft, get_collection_settings, icrc3_get_blocks, icrc7_token_metadata, mint,
@@ -303,4 +303,113 @@ fn test_permanent_survives_an_upgrade() {
         "expected CollectionIsPermanent after the upgrade, got {:?}",
         result
     );
+}
+
+fn mint_meta(tx: &BTreeMap<String, ICRC3Value>) -> ICRC3Value {
+    match tx.get("meta") {
+        Some(ICRC3Value::Map(meta)) => meta
+            .get("icrc7:token_metadata")
+            .cloned()
+            .expect("the mint meta holds icrc7:token_metadata"),
+        other => panic!("the mint block has no meta map: {:?}", other),
+    }
+}
+
+#[test]
+fn test_permanent_mint_block_carries_the_first_version() {
+    let mut test_env: TestEnv = permanent_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        ..
+    } = test_env;
+    let token_id = mint_one(pic, controller, collection_canister_id, nft_owner1, r#"{"a":1}"#);
+    let first_version = token_metadata_map(pic, controller, collection_canister_id, &token_id);
+
+    let mint_tx = block_tx(pic, controller, collection_canister_id, &Nat::from(0u64));
+    assert_eq!(mint_tx.get("op"), Some(&ICRC3Value::Text("7mint".to_string())));
+    assert_eq!(mint_meta(&mint_tx), first_version);
+
+    let block_indexes = update_nft_metadata_batch(
+        pic,
+        controller,
+        collection_canister_id,
+        &update_nft_metadata_batch::Args {
+            items: vec![Item {
+                token_id: token_id.clone(),
+                metadata: json_data(r#"{"a":2}"#),
+            }],
+            memo: None,
+            log: LogMode::Full,
+        },
+    )
+    .expect("a full edit is accepted");
+    let edit_tx = block_tx(pic, controller, collection_canister_id, &block_indexes[0]);
+    match edit_tx.get("meta") {
+        Some(ICRC3Value::Map(meta)) => {
+            assert_eq!(meta.get("icrc7:previous_metadata"), Some(&first_version))
+        }
+        other => panic!("the edit block has no meta map: {:?}", other),
+    }
+}
+
+/// One mint call close to the 2 MiB message limit: every block carries its
+/// certificate, and the chain log's duplicate check hashes each one against
+/// the others in the same call.
+#[test]
+fn test_permanent_mint_batch_at_the_message_limit() {
+    const ITEMS: usize = 40;
+    const CERTIFICATE_BYTES: usize = 45_000;
+    let mut test_env: TestEnv = permanent_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        ..
+    } = test_env;
+    let mint_requests: Vec<mint::MintRequest> = (0..ITEMS)
+        .map(|n| mint::MintRequest {
+            token_owner: Account {
+                owner: nft_owner1,
+                subaccount: None,
+            },
+            memo: None,
+            metadata: json_data(&format!(
+                r#"{{"n":{n},"body":"{}"}}"#,
+                "x".repeat(CERTIFICATE_BYTES)
+            )),
+            private_content: None,
+            public_content: None,
+        })
+        .collect();
+    let cycles_before = pic.cycle_balance(collection_canister_id);
+
+    mint(
+        pic,
+        controller,
+        collection_canister_id,
+        &mint::Args { mint_requests },
+    )
+    .expect("the batch mints");
+
+    println!(
+        "cycles for {ITEMS} permanent mints of {CERTIFICATE_BYTES} bytes: {}",
+        cycles_before - pic.cycle_balance(collection_canister_id)
+    );
+    pic.advance_time(Duration::from_secs(1));
+    pic.tick();
+    assert_eq!(log_length(pic, controller, collection_canister_id), Nat::from(ITEMS as u64));
+    for index in [0u64, ITEMS as u64 - 1] {
+        let tx = block_tx(pic, controller, collection_canister_id, &Nat::from(index));
+        match mint_meta(&tx) {
+            ICRC3Value::Map(metadata) => assert!(matches!(
+                metadata.get("JSON_DATA"),
+                Some(ICRC3Value::Text(text)) if text.len() > CERTIFICATE_BYTES
+            )),
+            other => panic!("the token metadata is not a map: {:?}", other),
+        }
+    }
 }
