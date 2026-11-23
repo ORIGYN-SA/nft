@@ -178,24 +178,38 @@ fn icrc37_is_approved(args: icrc37_is_approved::Args) -> icrc37_is_approved::Res
 
             trace(&format!("has_token_approval: {:?}", has_token_approval));
 
-            let has_collection_approval = __COLLECTION_APPROVALS
-                .with_borrow(|collection_approvals| {
-                    collection_approvals.get(&WrappedAccount::from(spender_account.clone()))
-                })
-                .map(|approval_map| approval_map.0)
-                .unwrap_or(HashMap::new())
-                .iter()
-                .any(|(account, _approval)| {
-                    account.0.owner == spender_account.owner
-                        && account.0.subaccount == spender_account.subaccount
-                });
+            let owner = state.data.owner_of(&arg.token_id);
+
+            // Collection approvals are read under the holder's account, as
+            // icrc37_transfer_from reads them, and only when the caller's
+            // from_subaccount names that account.
+            let has_collection_approval = owner.as_ref().is_some_and(|holder| {
+                let approving_account = Account {
+                    owner: holder.owner,
+                    subaccount: arg.from_subaccount,
+                };
+                *holder == approving_account
+                    && __COLLECTION_APPROVALS
+                        .with_borrow(|collection_approvals| {
+                            collection_approvals.get(&WrappedAccount::from(*holder))
+                        })
+                        .and_then(|approval_map| {
+                            approval_map
+                                .0
+                                .get(&WrappedAccount::from(spender_account))
+                                .cloned()
+                        })
+                        .is_some_and(|approval| {
+                            approval
+                                .expires_at
+                                .is_none_or(|expires_at| expires_at > current_time)
+                        })
+            });
 
             trace(&format!(
                 "has_collection_approval: {:?}",
                 has_collection_approval
             ));
-
-            let owner = state.data.owner_of(&arg.token_id);
             let is_owner = owner == Some(from_account);
 
             trace(&format!("is_owner: {:?}", is_owner));

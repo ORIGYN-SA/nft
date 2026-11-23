@@ -2,7 +2,7 @@ use crate::client::core_nft::{
     icrc37_approve_collection, icrc37_approve_tokens, icrc37_is_approved,
     icrc37_max_approvals_per_token_or_collection, icrc37_max_revoke_approvals,
     icrc37_revoke_collection_approvals, icrc37_revoke_token_approvals, icrc37_transfer_from,
-    icrc7_owner_of,
+    icrc7_owner_of, icrc7_transfer,
 };
 use crate::core_suite::setup::default_test_setup;
 use crate::core_suite::setup::setup::{TestEnv, MINUTE_IN_MS};
@@ -16,6 +16,8 @@ use core_nft_api::lifecycle::Args;
 use core_nft_api::post_upgrade::UpgradeArgs;
 use core_nft_common::icrc37_approve_tokens::ApproveTokenResult;
 use core_nft_common::types::icrc37;
+use core_nft_common::types::icrc7;
+use pocket_ic::PocketIc;
 use icrc_ledger_types::icrc1::account::Account;
 use serde_bytes::ByteBuf;
 use std::time::Duration;
@@ -2936,4 +2938,174 @@ fn test_icrc37_approve_tokens_sliding_window_rate_limit() {
             assert!(false);
         }
     }
+}
+
+/// Mints a token to `holder`, and has `holder` approve `spender` for the whole
+/// collection, optionally for `expires_in` from the approval.
+fn token_with_collection_approval(
+    pic: &mut PocketIc,
+    controller: candid::Principal,
+    collection: candid::Principal,
+    holder: candid::Principal,
+    spender: candid::Principal,
+    expires_in: Option<Duration>,
+) -> Nat {
+    let token_id = mint_nft(
+        pic,
+        Account {
+            owner: holder,
+            subaccount: None,
+        },
+        controller,
+        collection,
+        create_default_metadata(),
+    )
+    .expect("mint");
+    pic.advance_time(Duration::from_secs(1));
+    tick_n_blocks(pic, 5);
+
+    let now = pic.get_time().as_nanos_since_unix_epoch();
+    let approved = icrc37_approve_collection(
+        pic,
+        holder,
+        collection,
+        &vec![icrc37::icrc37_approve_collection::ApproveCollectionArg {
+            approval_info: icrc37::ApprovalInfo {
+                spender: Account {
+                    owner: spender,
+                    subaccount: None,
+                },
+                from_subaccount: None,
+                expires_at: expires_in.map(|duration| now + duration.as_nanos() as u64),
+                memo: None,
+                created_at_time: now,
+            },
+        }],
+    )
+    .expect("approve the collection");
+    assert!(matches!(
+        approved[0],
+        Some(icrc37::icrc37_approve_collection::ApproveCollectionResult::Ok(_))
+    ));
+    pic.advance_time(Duration::from_secs(1));
+    tick_n_blocks(pic, 5);
+    token_id
+}
+
+fn is_approved(
+    pic: &PocketIc,
+    caller: candid::Principal,
+    collection: candid::Principal,
+    spender: candid::Principal,
+    token_id: &Nat,
+) -> bool {
+    icrc37_is_approved(
+        pic,
+        caller,
+        collection,
+        &vec![icrc37::icrc37_is_approved::IsApprovedArg {
+            spender: Account {
+                owner: spender,
+                subaccount: None,
+            },
+            from_subaccount: None,
+            token_id: token_id.clone(),
+        }],
+    )[0]
+}
+
+#[test]
+fn test_icrc37_is_approved_reports_a_collection_approval() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+    let token_id = token_with_collection_approval(
+        pic,
+        controller,
+        collection_canister_id,
+        nft_owner1,
+        nft_owner2,
+        None,
+    );
+
+    assert!(is_approved(pic, controller, collection_canister_id, nft_owner2, &token_id));
+    assert!(!is_approved(
+        pic,
+        controller,
+        collection_canister_id,
+        random_principal(),
+        &token_id
+    ));
+}
+
+#[test]
+fn test_icrc37_is_approved_ignores_an_expired_collection_approval() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+    let token_id = token_with_collection_approval(
+        pic,
+        controller,
+        collection_canister_id,
+        nft_owner1,
+        nft_owner2,
+        Some(Duration::from_secs(60)),
+    );
+    assert!(is_approved(pic, controller, collection_canister_id, nft_owner2, &token_id));
+
+    pic.advance_time(Duration::from_secs(120));
+    tick_n_blocks(pic, 5);
+
+    assert!(!is_approved(pic, controller, collection_canister_id, nft_owner2, &token_id));
+}
+
+#[test]
+fn test_icrc37_is_approved_drops_a_collection_approval_once_the_token_moves() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+    let token_id = token_with_collection_approval(
+        pic,
+        controller,
+        collection_canister_id,
+        nft_owner1,
+        nft_owner2,
+        None,
+    );
+
+    let new_holder = random_principal();
+    let transferred = icrc7_transfer(
+        pic,
+        nft_owner1,
+        collection_canister_id,
+        &vec![icrc7::TransferArg {
+            to: Account {
+                owner: new_holder,
+                subaccount: None,
+            },
+            token_id: token_id.clone(),
+            memo: None,
+            from_subaccount: None,
+            created_at_time: Some(pic.get_time().as_nanos_since_unix_epoch()),
+        }],
+    );
+    assert!(transferred[0].as_ref().is_some_and(|result| result.is_ok()));
+    tick_n_blocks(pic, 5);
+
+    assert!(!is_approved(pic, controller, collection_canister_id, nft_owner2, &token_id));
 }
