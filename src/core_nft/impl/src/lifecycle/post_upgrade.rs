@@ -1,5 +1,5 @@
 use crate::lifecycle::init_canister;
-use crate::memory::get_upgrades_memory;
+use crate::memory::{get_upgrades_memory, init_block_log_memory, repair_memory_manager_header};
 use crate::migrations::migrate_internal_filestorage_into_public_content;
 use crate::state::{
     mutate_state, read_state, replace_icrc3, start_default_archive_job, RuntimeState, STORAGE_WASM,
@@ -24,6 +24,8 @@ fn post_upgrade(args: Args) {
                 "Cannot upgrade the canister with an Init argument. Please provide an Upgrade argument."
             ),
         Args::Upgrade(upgrade_args) => {
+            let header_repair = repair_memory_manager_header();
+            init_block_log_memory();
             let memory = get_upgrades_memory();
             let reader = get_reader(&memory);
 
@@ -68,6 +70,14 @@ fn post_upgrade(args: Args) {
             state.env.set_commit_hash(upgrade_args.commit_hash.clone());
 
             bity_ic_canister_logger::init_with_logs(state.env.is_test_mode(), logs, traces);
+            // Sizes raised to fill their buckets are routine; a moved bucket
+            // count or a memory that read as empty is worth a log line.
+            if let Some(repair) = header_repair.filter(|repair| {
+                repair.allocated_buckets.0 != repair.allocated_buckets.1
+                    || repair.raised_sizes.iter().any(|(_, old, _)| *old == 0)
+            }) {
+                info!(?repair, "Repaired the stable memory header");
+            }
             init_canister(state.clone());
             replace_icrc3(icrc3);
             start_default_archive_job();

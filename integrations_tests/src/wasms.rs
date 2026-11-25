@@ -14,6 +14,7 @@ lazy_static! {
 
     // Wasms in particular canister folder
     pub static ref CORE_WASM_OLD: CanisterWasm = get_core_wasm_old();
+    pub static ref CORE_WASM_LIVE: CanisterWasm = get_core_wasm_live();
 
     // The tests call the endpoints gated behind the `inttest` cargo feature, so
     // they load the inttest build of core_nft, not the release artifact. The
@@ -49,6 +50,20 @@ fn get_core_wasm_old() -> CanisterWasm {
         Ok(wasm) => wasm,
         Err(err) => {
             println!("Failed to read core_nft_api_old wasm: {err}");
+            panic!()
+        }
+    }
+}
+
+/// The release wasm of the live collections, whose ICRC3 block log runs a
+/// second memory manager over the collection's stable memory.
+/// `test_memory_layout` installs it to build the stale headers an upgrade has
+/// to repair.
+fn get_core_wasm_live() -> CanisterWasm {
+    match read_file_from_relative_bin("../wasm/core_nft_canister_live.wasm.gz") {
+        Ok(wasm) => wasm,
+        Err(err) => {
+            println!("Failed to read the live core_nft wasm: {err}");
             panic!()
         }
     }
