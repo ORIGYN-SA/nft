@@ -471,3 +471,67 @@ fn test_permanent_refused_batch_leaves_nothing_for_the_next_mint() {
     let mint_tx = block_tx(pic, controller, collection_canister_id, &Nat::from(0u64));
     assert_eq!(mint_meta(&mint_tx), expected);
 }
+
+/// Blocks that log whole certificates come back in pages: a request for more
+/// than one reply can hold returns the first blocks that fit, and a reader
+/// that continues from the last id gets every block once, in order.
+#[test]
+fn test_large_blocks_come_back_in_pages() {
+    const EDITS: u64 = 30;
+    let mut test_env: TestEnv = permanent_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        ..
+    } = test_env;
+    let certificate =
+        |version: u64| format!(r#"{{"v":{version},"body":"{}"}}"#, "x".repeat(180_000));
+    let token_id = mint_one(
+        pic,
+        controller,
+        collection_canister_id,
+        nft_owner1,
+        &certificate(0),
+    );
+    for version in 1..=EDITS {
+        update_nft_metadata_batch(
+            pic,
+            controller,
+            collection_canister_id,
+            &update_nft_metadata_batch::Args {
+                items: vec![Item {
+                    token_id: token_id.clone(),
+                    metadata: json_data(&certificate(version)),
+                }],
+                memo: None,
+                log: LogMode::Full,
+            },
+        )
+        .expect("edit");
+    }
+
+    let mut ids = vec![];
+    while (ids.len() as u64) <= EDITS {
+        let page = icrc3_get_blocks(
+            pic,
+            controller,
+            collection_canister_id,
+            &vec![GetBlocksRequest {
+                start: Nat::from(ids.len() as u64),
+                length: Nat::from(100u64),
+            }],
+        );
+        assert!(!page.blocks.is_empty());
+        if ids.is_empty() {
+            assert!(
+                (page.blocks.len() as u64) < EDITS + 1,
+                "one reply held every block"
+            );
+        }
+        ids.extend(page.blocks.iter().map(|block| block.id.clone()));
+    }
+    let expected: Vec<Nat> = (0..=EDITS).map(Nat::from).collect();
+    assert_eq!(ids, expected);
+}
