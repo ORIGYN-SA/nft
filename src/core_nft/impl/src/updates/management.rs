@@ -157,24 +157,26 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
         .map_err(|_| management::mint::MintError::ConcurrentManagementCall)?;
 
     // Efficiently read config and state without cloning the whole ledger
-    let (max_batch_size, current_token_id, supply_cap, current_token_count) = read_state(|state| {
-        (
-            state
-                .data
-                .max_update_batch_size
-                .as_ref()
-                .map(|n| n.0.clone())
-                .unwrap_or(100u64.into()),
-            state.data.last_token_id.clone(),
-            state
-                .data
-                .supply_cap
-                .as_ref()
-                .cloned()
-                .unwrap_or(Nat::from(icrc7::DEFAULT_MAX_SUPPLY_CAP)),
-            state.data.tokens_list.len() as u64,
-        )
-    });
+    let (max_batch_size, current_token_id, supply_cap, current_token_count, permanent) =
+        read_state(|state| {
+            (
+                state
+                    .data
+                    .max_update_batch_size
+                    .as_ref()
+                    .map(|n| n.0.clone())
+                    .unwrap_or(100u64.into()),
+                state.data.last_token_id.clone(),
+                state
+                    .data
+                    .supply_cap
+                    .as_ref()
+                    .cloned()
+                    .unwrap_or(Nat::from(icrc7::DEFAULT_MAX_SUPPLY_CAP)),
+                state.data.tokens_list.len() as u64,
+                state.data.permanent,
+            )
+        });
 
     if req.mint_requests.len() as u64 > u64::try_from(max_batch_size).unwrap_or(100) {
         return Err(management::mint::MintError::ExceedMaxAllowedSupplyCap);
@@ -198,9 +200,7 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
     let timestamp = ic_cdk::api::time();
     let mut seen_hashes = std::collections::HashSet::new();
 
-    for (i, mint_request) in req.mint_requests.iter().enumerate() {
-        let token_id = current_token_id.clone() + Nat::from(i as u64);
-
+    for mint_request in &req.mint_requests {
         if let Some(pc) = &mint_request.private_content {
             for (entry_name, entry_hash) in &pc.entries {
                 // Prevent double-spending a cache entry in the same batch
@@ -317,7 +317,13 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
                 }
             }
         }
+    }
 
+    // Every request is checked before the first metadata write. A request
+    // refused after a write would return an error with that write kept, and
+    // the next mint at the same token id would merge into it.
+    for (i, mint_request) in req.mint_requests.iter().enumerate() {
+        let token_id = current_token_id.clone() + Nat::from(i as u64);
         let mut new_token = Icrc7Token::new(token_id.clone(), mint_request.token_owner.clone());
         __METADATA.with_borrow_mut(|m| new_token.add_metadata(m, mint_request.metadata.clone()));
 
@@ -329,7 +335,9 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
                 tid: Some(token_id.clone()),
                 from: None,
                 to: Some(mint_request.token_owner.clone()),
-                meta: None,
+                // A permanent collection's chain log holds every version of a
+                // token, the first one included.
+                meta: permanent.then(|| mint_meta(&token_id)),
                 memo: mint_request.memo.clone(),
                 created_at_time: Some(Nat::from(timestamp)),
             },
@@ -597,6 +605,10 @@ pub fn update_nft_metadata_batch(
 
     let management::update_nft_metadata_batch::Args { items, memo, log } = req;
 
+    if log == LogMode::HashOnly && read_state(|state| state.data.permanent) {
+        return Err(management::update_nft_metadata::UpdateNftMetadataError::FullLogRequired);
+    }
+
     check_metadata_batch(&items)
         .map_err(management::update_nft_metadata::UpdateNftMetadataError::StorageCanisterError)?;
 
@@ -673,6 +685,14 @@ fn replace_metadata_and_log(
     }
 }
 
+/// A mint block's `meta`: the token's metadata as minted.
+fn mint_meta(token_id: &Nat) -> Icrc3Value {
+    Icrc3Value::Map(std::collections::BTreeMap::from([(
+        "icrc7:token_metadata".to_string(),
+        token_metadata_map(token_id),
+    )]))
+}
+
 /// A token's stored metadata as the ICRC-3 map a `7update_token` block logs.
 fn token_metadata_map(token_id: &Nat) -> Icrc3Value {
     let data = __METADATA.with_borrow(|m| m.get_all_data(Some(token_id.clone())));
@@ -689,6 +709,10 @@ pub async fn burn_nft(token_id: Nat) -> management::burn_nft::Response {
     let caller = ic_cdk::api::msg_caller();
     let _guard_principal = GuardManagement::new(caller)
         .map_err(|_| management::burn_nft::BurnNftError::ConcurrentManagementCall)?;
+
+    if read_state(|state| state.data.permanent) {
+        return Err(management::burn_nft::BurnNftError::CollectionIsPermanent);
+    }
 
     let token = match read_state(|state| state.data.tokens_list.get(&token_id).cloned()) {
         Some(token) => token,
@@ -1001,6 +1025,15 @@ pub async fn finalize_upload(data: finalize_upload::Args) -> finalize_upload::Re
     let url = construct_url(&main_canister_id, &path);
 
     Ok(finalize_upload::FinalizeUploadResp { url })
+}
+
+/// Settings fixed when the collection was installed. Public, so indexers and
+/// backups can tell how a collection treats its tokens.
+#[query]
+pub fn get_collection_settings() -> management::get_collection_settings::Response {
+    read_state(|state| management::get_collection_settings::CollectionSettings {
+        permanent: state.data.permanent,
+    })
 }
 
 #[query(guard = "caller_has_manage_authorities_permission")]

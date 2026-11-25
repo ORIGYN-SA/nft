@@ -1,4 +1,5 @@
 use crate::lifecycle::init_canister;
+use crate::memory::init_block_log_memory;
 use crate::state::{init_icrc3, start_default_archive_job, Data, RuntimeState};
 use bity_ic_canister_tracing_macros::trace;
 use bity_ic_icrc3::config::{ICRC3Config, ICRC3Properties};
@@ -17,6 +18,7 @@ use tracing::info;
 fn init(args: Args) {
     match args {
         Args::Init(init_args) => {
+            init_block_log_memory();
             info!("Init start.");
 
             let env = CanisterEnv::new(
@@ -61,6 +63,7 @@ fn init(args: Args) {
                 init_args.vetkd_key_name.clone(),
                 init_args.vetkd_context.clone(),
                 init_args.storage_cycles.clone(),
+                init_args.permanent.unwrap_or(false),
             );
 
             if env.is_test_mode() {

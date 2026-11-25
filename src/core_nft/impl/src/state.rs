@@ -99,6 +99,10 @@ pub struct Data {
     #[serde(default)]
     pub custom_collection_metadata:
         HashMap<String, core_nft_common::types::value_custom::CustomValue>,
+    /// Set once at install and never changed. A canister installed before this
+    /// setting existed reads `false`, so its behaviour is unchanged.
+    #[serde(default)]
+    pub permanent: bool,
 }
 
 impl Data {
@@ -127,6 +131,7 @@ impl Data {
         vetkd_key_name: String,
         vetkd_context: String,
         storage_cycles: Option<StorageCyclesConfig>,
+        permanent: bool,
     ) -> Self {
         let mut authorized_principals = vec![];
 
@@ -207,6 +212,7 @@ impl Data {
             media_redirections: HashMap::new(),
             base_url,
             custom_collection_metadata: HashMap::new(),
+            permanent,
         }
     }
 
@@ -290,6 +296,7 @@ impl Clone for Data {
             media_redirections: self.media_redirections.clone(),
             base_url: self.base_url.clone(),
             custom_collection_metadata: self.custom_collection_metadata.clone(),
+            permanent: self.permanent,
         }
     }
 }

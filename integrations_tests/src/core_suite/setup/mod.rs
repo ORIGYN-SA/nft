@@ -1,6 +1,6 @@
 use self::setup::{TestEnv, TestEnvBuilder};
 use bity_ic_types::{BuildVersion, CanisterId, Milliseconds};
-use candid::Nat;
+use candid::{Nat, Principal};
 use core_nft_api::lifecycle::init::{InitApprovalsArg, InitArgs};
 use core_nft_common::types::permissions::{Permission, PermissionManager};
 use core_nft_common::types::sub_canister::StorageCyclesConfig;
@@ -57,6 +57,7 @@ pub fn test_setup_with_storage_cycles(storage_cycles: Option<StorageCyclesConfig
         vetkd_key_name: "dfx_test_key".to_string(),
         vetkd_context: "vetkd_context".to_string(),
         storage_cycles,
+        permanent: None,
     };
 
     test_env.build(init_args)
@@ -106,6 +107,7 @@ pub fn old_test_setup() -> TestEnv {
         vetkd_key_name: "dfx_test_key".to_string(),
         vetkd_context: "vetkd_context".to_string(),
         storage_cycles: None,
+        permanent: None,
     };
 
     test_env.build_old(init_args)
@@ -155,6 +157,7 @@ pub fn test_setup_atomic_batch_transfers() -> TestEnv {
         vetkd_key_name: "dfx_test_key".to_string(),
         vetkd_context: "vetkd_context".to_string(),
         storage_cycles: None,
+        permanent: None,
     };
 
     test_env.build(init_args)
@@ -204,6 +207,7 @@ pub fn test_setup_no_limit() -> TestEnv {
         vetkd_key_name: "dfx_test_key".to_string(),
         vetkd_context: "vetkd_context".to_string(),
         storage_cycles: None,
+        permanent: None,
     };
 
     test_env.build(init_args)
@@ -218,10 +222,22 @@ pub fn test_setup_no_limit() -> TestEnv {
 /// touch the log.
 pub fn claimlink_init_args_test_setup() -> TestEnv {
     let mut test_env = TestEnvBuilder::new();
+    let init_args = claimlink_init_args(test_env.controller);
+    test_env.build(init_args)
+}
 
+/// The claimlink-style collection above, installed as permanent.
+pub fn permanent_test_setup() -> TestEnv {
+    let mut test_env = TestEnvBuilder::new();
+    let mut init_args = claimlink_init_args(test_env.controller);
+    init_args.permanent = Some(true);
+    test_env.build(init_args)
+}
+
+fn claimlink_init_args(controller: Principal) -> InitArgs {
     let mut user_permissions = HashMap::new();
     user_permissions.insert(
-        test_env.controller.clone(),
+        controller,
         vec![
             Permission::Minting,
             Permission::ManageAuthorities,
@@ -260,7 +276,8 @@ pub fn claimlink_init_args_test_setup() -> TestEnv {
         vetkd_key_name: "dfx_test_key".to_string(),
         vetkd_context: "vetkd_context".to_string(),
         storage_cycles: None,
+        permanent: None,
     };
 
-    test_env.build(init_args)
+    init_args
 }

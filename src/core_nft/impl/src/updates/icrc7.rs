@@ -1,4 +1,6 @@
 use crate::state::{icrc3_add_transaction, mutate_state, read_state};
+use crate::types::icrc37::__TOKEN_APPROVALS;
+use core_nft_common::types::WrappedNat;
 use crate::utils::check_memo;
 use bity_ic_icrc3::transaction::{ICRC7Transaction, ICRC7TransactionData};
 use candid::{Nat, Principal};
@@ -115,6 +117,10 @@ fn transfer_nft(arg: &icrc7::TransferArg) -> Result<Nat, icrc7::icrc7_transfer::
                         }
                     }
                 }
+            });
+            // Approvals the previous holder gave for this token end with the transfer.
+            __TOKEN_APPROVALS.with_borrow_mut(|token_approvals| {
+                token_approvals.remove(&WrappedNat::from(arg.token_id.clone()));
             });
             Ok(Nat::from(transaction_id))
         }

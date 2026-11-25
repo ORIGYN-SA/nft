@@ -29,7 +29,8 @@ use core_nft_common::types::icrc7::{
     icrc7_tokens, icrc7_tokens_of, icrc7_total_supply, icrc7_transfer, icrc7_tx_window,
 };
 use core_nft_common::types::management::{
-    append_file, cancel_upload, finalize_upload, get_all_uploads, get_upload_status,
+    append_file, cancel_upload, finalize_upload, get_all_uploads, get_collection_settings,
+    get_upload_status,
     get_user_permissions, grant_permission, has_permission, init_upload, mint, revoke_permission,
     store_chunk, update_collection_metadata, update_nft_metadata, update_nft_metadata_batch,
 };
@@ -79,6 +80,7 @@ generate_pocket_update_call!(revoke_permission);
 generate_pocket_query_call!(get_user_permissions);
 generate_pocket_query_call!(has_permission);
 generate_pocket_query_call!(get_upload_status);
+generate_pocket_query_call!(get_collection_settings);
 
 generate_pocket_update_call!(icrc37_approve_collection);
 generate_pocket_update_call!(icrc37_approve_tokens);
