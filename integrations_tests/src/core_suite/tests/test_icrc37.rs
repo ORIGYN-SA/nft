@@ -3232,3 +3232,50 @@ fn test_icrc37_token_approval_ends_when_the_holder_transfers_the_token() {
         "the earlier holder's spender took the token: {taken:?}"
     );
 }
+
+#[test]
+fn test_icrc37_collection_approval_survives_moving_one_of_the_holders_tokens() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+    let first = token_with_collection_approval(
+        pic,
+        controller,
+        collection_canister_id,
+        nft_owner1,
+        nft_owner2,
+        None,
+    );
+    let second = mint_nft(
+        pic,
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+        create_default_metadata(),
+    )
+    .expect("mint");
+    pic.advance_time(Duration::from_secs(1));
+    tick_n_blocks(pic, 5);
+
+    let buyer = random_principal();
+    let moved = transfer_from(pic, collection_canister_id, nft_owner2, nft_owner1, buyer, &first);
+    assert!(
+        matches!(moved, icrc37::icrc37_transfer_from::TransferFromResult::Ok(_)),
+        "{moved:?}"
+    );
+
+    assert!(is_approved(pic, controller, collection_canister_id, nft_owner2, &second));
+    let moved = transfer_from(pic, collection_canister_id, nft_owner2, nft_owner1, buyer, &second);
+    assert!(
+        matches!(moved, icrc37::icrc37_transfer_from::TransferFromResult::Ok(_)),
+        "{moved:?}"
+    );
+}

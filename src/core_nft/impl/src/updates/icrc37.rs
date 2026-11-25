@@ -874,10 +874,13 @@ fn transfer_from(
         token_approvals.remove(&WrappedNat::from(arg.token_id.clone()));
     });
 
-    let has_nfts = __TOKEN_APPROVALS.with_borrow(|token_approvals| {
-        token_approvals
-            .get(&WrappedNat::from(arg.token_id.clone()))
-            .is_some()
+    // The sender's collection approvals stay while it still holds tokens.
+    let has_nfts = read_state(|state| {
+        state
+            .data
+            .tokens_list_by_owner
+            .get(&arg.from)
+            .is_some_and(|token_ids| !token_ids.is_empty())
     });
 
     if !has_nfts {
