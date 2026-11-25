@@ -171,6 +171,8 @@ type BurnNftError = variant {
   StorageCanisterError : text;
   TokenDoesNotExist;
   ConcurrentManagementCall;
+  // The collection was installed as permanent: its tokens can't be burned.
+  CollectionIsPermanent;
   NotTokenOwner;
 };
 type CancelPrivateContentUploadError = variant {
@@ -184,6 +186,12 @@ type CancelUploadError = variant {
   InvalidFilePath;
   UploadNotInitialized;
   UploadAlreadyFinalized;
+};
+// Settings fixed when the collection was installed.
+type CollectionSettings = record {
+  // Tokens can't be burned, and every edit logs the full previous and
+  // new metadata.
+  permanent : bool;
 };
 type ConsentInfo = record {
   metadata : ConsentMessageMetadata;
@@ -332,6 +340,11 @@ type InitApprovalsArg = record {
 type InitArgs = record {
   base_url : opt text;
   permissions : PermissionManager;
+  // Installs the collection as permanent, for records that must outlive
+  // their owners: burns are refused and every metadata edit logs the full
+  // previous and new metadata. Fixed for the life of the canister; `None`
+  // is `false`.
+  permanent : opt bool;
   supply_cap : opt nat;
   tx_window : opt nat;
   test_mode : bool;
@@ -588,6 +601,9 @@ type UpdateNftMetadataError = variant {
   TokenDoesNotExist;
   InvalidMemo : text;
   ConcurrentManagementCall;
+  // The collection was installed as permanent, so every edit must log
+  // the full previous and new metadata: `HashOnly` is refused.
+  FullLogRequired;
 };
 type UpgradeArgs = record {
   base_url : opt text;
@@ -646,6 +662,9 @@ service : (Args_18) -> {
   finalize_upload : (Args_2) -> (Result_7);
   get_all_storage_subcanisters : () -> (vec principal) query;
   get_all_uploads : (opt nat, opt nat) -> (Result_8) query;
+  // Settings fixed when the collection was installed. Public, so indexers and
+  // backups can tell how a collection treats its tokens.
+  get_collection_settings : () -> (CollectionSettings) query;
   get_upload_status : (text) -> (Result_9) query;
   get_user_permissions : (Args_6) -> (Result_10) query;
   grant_permission : (Args_7) -> (Result_11);
