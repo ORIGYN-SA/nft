@@ -3109,3 +3109,126 @@ fn test_icrc37_is_approved_drops_a_collection_approval_once_the_token_moves() {
 
     assert!(!is_approved(pic, controller, collection_canister_id, nft_owner2, &token_id));
 }
+
+/// `spender` moves `token_id` out of `from` to `to` with icrc37_transfer_from.
+fn transfer_from(
+    pic: &mut PocketIc,
+    collection: candid::Principal,
+    spender: candid::Principal,
+    from: candid::Principal,
+    to: candid::Principal,
+    token_id: &Nat,
+) -> icrc37::icrc37_transfer_from::TransferFromResult {
+    let created_at_time = pic.get_time().as_nanos_since_unix_epoch();
+    let mut results = icrc37_transfer_from(
+        pic,
+        spender,
+        collection,
+        &vec![icrc37::icrc37_transfer_from::TransferFromArg {
+            spender_subaccount: None,
+            from: Account {
+                owner: from,
+                subaccount: None,
+            },
+            to: Account {
+                owner: to,
+                subaccount: None,
+            },
+            token_id: token_id.clone(),
+            memo: None,
+            created_at_time: Some(created_at_time),
+        }],
+    )
+    .expect("icrc37_transfer_from");
+    pic.advance_time(Duration::from_secs(1));
+    tick_n_blocks(pic, 5);
+    results.remove(0).expect("one result")
+}
+
+#[test]
+fn test_icrc37_token_approval_ends_when_the_holder_transfers_the_token() {
+    let mut test_env: TestEnv = default_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        nft_owner2,
+    } = test_env;
+    let token_id = mint_nft(
+        pic,
+        Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        controller,
+        collection_canister_id,
+        create_default_metadata(),
+    )
+    .expect("mint");
+    pic.advance_time(Duration::from_secs(1));
+    tick_n_blocks(pic, 5);
+    let created_at_time = pic.get_time().as_nanos_since_unix_epoch();
+    let approved = icrc37_approve_tokens(
+        pic,
+        nft_owner1,
+        collection_canister_id,
+        &vec![icrc37::icrc37_approve_tokens::ApproveTokenArg {
+            token_id: token_id.clone(),
+            approval_info: icrc37::ApprovalInfo {
+                spender: Account {
+                    owner: nft_owner2,
+                    subaccount: None,
+                },
+                from_subaccount: None,
+                expires_at: None,
+                memo: None,
+                created_at_time,
+            },
+        }],
+    )
+    .expect("approve the token");
+    assert!(matches!(approved[0], Some(ApproveTokenResult::Ok(_))));
+    pic.advance_time(Duration::from_secs(1));
+    tick_n_blocks(pic, 5);
+
+    let new_holder = random_principal();
+    let created_at_time = pic.get_time().as_nanos_since_unix_epoch();
+    let transferred = icrc7_transfer(
+        pic,
+        nft_owner1,
+        collection_canister_id,
+        &vec![icrc7::TransferArg {
+            to: Account {
+                owner: new_holder,
+                subaccount: None,
+            },
+            token_id: token_id.clone(),
+            memo: None,
+            from_subaccount: None,
+            created_at_time: Some(created_at_time),
+        }],
+    );
+    assert!(transferred[0].as_ref().is_some_and(|result| result.is_ok()));
+    pic.advance_time(Duration::from_secs(1));
+    tick_n_blocks(pic, 5);
+
+    assert!(!is_approved(pic, controller, collection_canister_id, nft_owner2, &token_id));
+    let taken = transfer_from(
+        pic,
+        collection_canister_id,
+        nft_owner2,
+        new_holder,
+        nft_owner2,
+        &token_id,
+    );
+    assert!(
+        matches!(
+            taken,
+            icrc37::icrc37_transfer_from::TransferFromResult::Err(
+                icrc37::icrc37_transfer_from::TransferFromError::Unauthorized
+            )
+        ),
+        "the earlier holder's spender took the token: {taken:?}"
+    );
+}

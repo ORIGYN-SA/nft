@@ -160,7 +160,10 @@ fn icrc37_is_approved(args: icrc37_is_approved::Args) -> icrc37_is_approved::Res
                 if let Some(approval) = token_approvals.get(&WrappedAccount::from(spender_account))
                 {
                     trace(&format!("approval: {:?}", approval));
-                    if let Some(expires_at) = approval.expires_at {
+                    // An approval given by an earlier holder no longer covers the token.
+                    if state.data.owner_of(&arg.token_id) != Some(approval.from.0) {
+                        false
+                    } else if let Some(expires_at) = approval.expires_at {
                         trace(&format!("expires_at: {:?}", expires_at));
                         expires_at > current_time
                     } else {

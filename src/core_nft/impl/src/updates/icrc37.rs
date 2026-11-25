@@ -734,6 +734,10 @@ fn transfer_from(
             let mut approval_map = token_approval.0;
 
             if let Some(approval) = approval_map.get(&WrappedAccount::from(spender_account)) {
+                // An approval given by an earlier holder no longer covers the token.
+                if approval.from.0 != nft.token_owner {
+                    return false;
+                }
                 if let Some(expires_at) = approval.expires_at {
                     if expires_at <= current_time {
                         approval_map.remove(&WrappedAccount::from(spender_account));
