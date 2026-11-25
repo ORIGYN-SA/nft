@@ -200,9 +200,7 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
     let timestamp = ic_cdk::api::time();
     let mut seen_hashes = std::collections::HashSet::new();
 
-    for (i, mint_request) in req.mint_requests.iter().enumerate() {
-        let token_id = current_token_id.clone() + Nat::from(i as u64);
-
+    for mint_request in &req.mint_requests {
         if let Some(pc) = &mint_request.private_content {
             for (entry_name, entry_hash) in &pc.entries {
                 // Prevent double-spending a cache entry in the same batch
@@ -319,7 +317,13 @@ pub fn mint(req: management::mint::Args) -> management::mint::Response {
                 }
             }
         }
+    }
 
+    // Every request is checked before the first metadata write. A request
+    // refused after a write would return an error with that write kept, and
+    // the next mint at the same token id would merge into it.
+    for (i, mint_request) in req.mint_requests.iter().enumerate() {
+        let token_id = current_token_id.clone() + Nat::from(i as u64);
         let mut new_token = Icrc7Token::new(token_id.clone(), mint_request.token_owner.clone());
         __METADATA.with_borrow_mut(|m| new_token.add_metadata(m, mint_request.metadata.clone()));
 

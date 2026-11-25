@@ -413,3 +413,61 @@ fn test_permanent_mint_batch_at_the_message_limit() {
         }
     }
 }
+
+/// A batch refused on a later request leaves no metadata behind, so the next
+/// mint at the same token id holds only its own, in the token and in its
+/// mint block.
+#[test]
+fn test_permanent_refused_batch_leaves_nothing_for_the_next_mint() {
+    let mut test_env: TestEnv = permanent_test_setup();
+    let TestEnv {
+        ref mut pic,
+        collection_canister_id,
+        controller,
+        nft_owner1,
+        ..
+    } = test_env;
+    let request = |metadata: Vec<(String, ICRC3Value)>,
+                   public_content: Option<mint::NftPublicRecordMint>| mint::MintRequest {
+        token_owner: Account {
+            owner: nft_owner1,
+            subaccount: None,
+        },
+        memo: None,
+        metadata,
+        private_content: None,
+        public_content,
+    };
+    let mut first = json_data(r#"{"a":1}"#);
+    first.push(("image".to_string(), ICRC3Value::Text("a.png".to_string())));
+    let missing_file = mint::NftPublicRecordMint {
+        entries: std::collections::HashMap::from([(
+            "photo".to_string(),
+            "/missing.png".to_string(),
+        )]),
+    };
+
+    let refused = mint(
+        pic,
+        controller,
+        collection_canister_id,
+        &mint::Args {
+            mint_requests: vec![
+                request(first, None),
+                request(json_data(r#"{"b":1}"#), Some(missing_file)),
+            ],
+        },
+    );
+    assert!(refused.is_err(), "the batch was accepted: {refused:?}");
+    pic.advance_time(Duration::from_secs(1));
+    pic.tick();
+
+    let token_id = mint_one(pic, controller, collection_canister_id, nft_owner1, r#"{"c":1}"#);
+    let expected = ICRC3Value::Map(json_data(r#"{"c":1}"#).into_iter().collect());
+    assert_eq!(
+        token_metadata_map(pic, controller, collection_canister_id, &token_id),
+        expected
+    );
+    let mint_tx = block_tx(pic, controller, collection_canister_id, &Nat::from(0u64));
+    assert_eq!(mint_meta(&mint_tx), expected);
+}
